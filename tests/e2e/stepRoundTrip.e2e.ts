@@ -119,6 +119,29 @@ describe("STEP export round-trip (real OCCT kernel)", () => {
     expect(near(await reimportVolume(blob), expected)).toBe(true);
   });
 
+  it("exports an edge-modified mesh from its stored exact CAD B-Rep", async () => {
+    const source = brep.cylinder(5, 20, { axis: [0, 1, 0] });
+    const serialized = brep.toBREP(source);
+    expect(serialized.ok).toBe(true);
+    const modified = shape({
+      kind: "mesh",
+      name: "Filleted cylinder",
+      x: 12,
+      z: -4,
+      elevation: 3,
+      width: 20,
+      depth: 20,
+      height: 40,
+      cadBrep: (serialized as { value: string }).value,
+      cadBrepFrame: { x: 0, z: 0, elevation: -10, width: 10, depth: 10, height: 20 },
+    });
+
+    const { blob, exportedCount, skipped } = await exportShapesToStep([modified]);
+    expect(exportedCount).toBe(1);
+    expect(skipped).toEqual([]);
+    expect(near(await reimportVolume(blob), PI * 10 * 10 * 40)).toBe(true);
+  });
+
   it("skips non-exact shapes with descriptive reasons but still exports the rest", async () => {
     const box = shape({ kind: "box", name: "Box", width: 8, depth: 8, height: 8 });
     const pyramid = shape({ kind: "pyramid", name: "Pyramid", width: 8, depth: 8, height: 8 });
@@ -132,7 +155,7 @@ describe("STEP export round-trip (real OCCT kernel)", () => {
   });
 
   it("throws when there is nothing exact to export", async () => {
-    await expect(exportShapesToStep([shape({ kind: "pyramid", name: "Pyramid" })])).rejects.toThrow(/No box\/cylinder\/sphere/i);
+    await expect(exportShapesToStep([shape({ kind: "pyramid", name: "Pyramid" })])).rejects.toThrow(/No supported primitive or exact CAD body/i);
   });
 });
 

@@ -2,6 +2,9 @@
 
 ## Unreleased
 
+## 1.0.10
+
+- Fixed STEP export for filleted and chamfered objects that retain exact CAD B-Rep geometry.
 - Fixed three-point arcs creating separate coincident endpoints instead of joining existing open paths. Arc joins now preserve curve handles and produce closed, selectable profiles, including when the endpoints are picked in the same order.
 
 - Added a Three-point Arc sketch tool: choose start and end points, then the bulge, with a live preview, cancellation, and one-step undo. Arcs use editable Bezier spans, consistent with sketch circles. Updated the separate Bezier Curve icon to show tangent handles.

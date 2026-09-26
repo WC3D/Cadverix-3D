@@ -1,6 +1,8 @@
 import type { WorkplaneShape } from "@/types/sketchforge";
 import { shapeDepth, shapeWidth } from "@/lib/workplaneShapes";
 import { loadBrepWithOcct, type Brep, type BrepSolid } from "@/lib/brepKernel";
+import { cadBrepTransformForShape, cadTransformToMatrix } from "@/lib/cadBakeMetadata";
+import * as THREE from "three";
 
 export type SkippedShape = {
   name: string;
@@ -153,6 +155,42 @@ async function buildImportedBody(brep: Brep, shape: WorkplaneShape): Promise<Bui
   return { solid: body };
 }
 
+function buildStoredCadBody(brep: Brep, shape: WorkplaneShape): BuildOutcome {
+  if (!shape.cadBrep || !shape.cadBrepFrame) {
+    return { skip: "stored CAD body has no placement frame" };
+  }
+  const restored = brep.fromBREP(shape.cadBrep);
+  if (!restored.ok) {
+    return { skip: "stored CAD B-Rep failed to restore" };
+  }
+
+  let body = restored.value as unknown as BrepSolid;
+  const transform = cadBrepTransformForShape(shape);
+  if (transform) {
+    const translation = new THREE.Vector3();
+    const rotation = new THREE.Quaternion();
+    const scale = new THREE.Vector3();
+    cadTransformToMatrix(transform).decompose(translation, rotation, scale);
+    const scaleMagnitude = Math.abs(scale.x);
+    if (Math.abs(Math.abs(scale.y) - scaleMagnitude) > 1e-6 || Math.abs(Math.abs(scale.z) - scaleMagnitude) > 1e-6) {
+      return { skip: "non-uniformly resized CAD body cannot be exported safely" };
+    }
+    if (Math.abs(scaleMagnitude - 1) > 1e-9) body = brep.scale(body, scaleMagnitude);
+    if (scale.x < 0) body = brep.mirror(body, { normal: [1, 0, 0] });
+    if (scale.y < 0) body = brep.mirror(body, { normal: [0, 1, 0] });
+    if (scale.z < 0) body = brep.mirror(body, { normal: [0, 0, 1] });
+    const angle = 2 * Math.acos(Math.max(-1, Math.min(1, rotation.w)));
+    const axisLength = Math.hypot(rotation.x, rotation.y, rotation.z);
+    if (axisLength > 1e-9 && angle > 1e-9) {
+      body = brep.rotate(body, THREE.MathUtils.radToDeg(angle), {
+        axis: [rotation.x / axisLength, rotation.y / axisLength, rotation.z / axisLength],
+      });
+    }
+    if (translation.lengthSq() > 1e-18) body = brep.translate(body, [translation.x, translation.y, translation.z]);
+  }
+  return { solid: body };
+}
+
 function describe(shape: WorkplaneShape, reason: string): SkippedShape {
   return { name: shape.name, kind: shape.kind, reason };
 }
@@ -214,11 +252,14 @@ export async function exportShapesToStep(shapes: WorkplaneShape[]): Promise<Step
   }
 
   const isImportedBody = (shape: WorkplaneShape) => shape.kind === "mesh" && Boolean(shape.importedMesh?.brepStep);
+  const isStoredCadBody = (shape: WorkplaneShape) => Boolean(shape.cadBrep);
 
   const parts: { shape: BrepSolid; name: string; color: string }[] = [];
   for (const shape of shapes.filter((s) => !s.hole)) {
     let built: BuildOutcome;
-    if (isImportedBody(shape)) {
+    if (isStoredCadBody(shape)) {
+      built = buildStoredCadBody(brep, shape);
+    } else if (isImportedBody(shape)) {
       built = await buildImportedBody(brep, shape);
     } else if (EXACT_KINDS.has(shape.kind)) {
       built = buildExactSolid(brep, shape);
@@ -248,7 +289,7 @@ export async function exportShapesToStep(shapes: WorkplaneShape[]): Promise<Step
   }
 
   if (parts.length === 0) {
-    throw new Error("No box/cylinder/sphere or imported STEP solids to export as B-Rep STEP");
+    throw new Error("No supported primitive or exact CAD body to export as B-Rep STEP");
   }
 
   const result = brep.exportAssemblySTEP(parts, { unit: "MM" });
