@@ -15,6 +15,7 @@ import {
   normalizeGearToothWidth,
   normalizeGearType,
 } from "@/lib/gearGeometry";
+import { DEFAULT_THREAD_HANDEDNESS, DEFAULT_THREAD_QUALITY, METRIC_THREAD_PRESETS, normalizeThreadDepth } from "@/lib/fastenerGeometry";
 import type { ShapeAsset, ShapeCustomization, ShapeKind, WorkplaneShape } from "@/types/sketchforge";
 
 export type ToolbarShapeAsset = ShapeAsset & { menuIcon: string };
@@ -32,9 +33,20 @@ export const toolbarShapeAssets: ToolbarShapeAsset[] = [
   { id: "torus", name: "Torus", src: "assets/sketchforge/shape-icons-gray/torus.png", menuIcon: "assets/sketchforge/shape-icons-gray/torus.png", kind: "torus", color: "#0098c7" },
   { id: "tube", name: "Tube", src: "assets/sketchforge/shape-icons-gray/tube.png", menuIcon: "assets/sketchforge/shape-icons-gray/tube.png", kind: "tube", color: "#ce7013" },
   { id: "gear", name: "Gear", src: "assets/sketchforge/gear-types/spur.png", menuIcon: "assets/sketchforge/gear-types/spur.png", kind: "gear", color: "#6f7f8d" },
+  { id: "screw", name: "Screw", src: "assets/sketchforge/shape-icons-gray/screw.svg", menuIcon: "assets/sketchforge/shape-icons-gray/screw.svg", kind: "screw", color: "#677786" },
+  { id: "washer", name: "Washer", src: "assets/sketchforge/shape-icons-gray/washer.svg", menuIcon: "assets/sketchforge/shape-icons-gray/washer.svg", kind: "washer", color: "#81909d" },
+  { id: "nut", name: "Nut", src: "assets/sketchforge/shape-icons-gray/nut.svg", menuIcon: "assets/sketchforge/shape-icons-gray/nut.svg", kind: "nut", color: "#596976" },
 ];
 
+const GENERATOR_KINDS: ReadonlySet<ShapeKind> = new Set(["gear", "screw", "washer", "nut"]);
+export const toolbarBasicShapeAssets = toolbarShapeAssets.filter((asset) => !GENERATOR_KINDS.has(asset.kind));
+export const toolbarGeneratorAssets = toolbarShapeAssets.filter((asset) => GENERATOR_KINDS.has(asset.kind));
+
 export function shapeAssetDefaultDimensions(kind: ShapeKind) {
+  const m6 = METRIC_THREAD_PRESETS.find((preset) => preset.id === "m6")!;
+  if (kind === "screw") return { width: m6.headAcrossFlats * 2 / Math.sqrt(3), depth: m6.headAcrossFlats, height: 24 };
+  if (kind === "nut") return { width: m6.nutAcrossFlats * 2 / Math.sqrt(3), depth: m6.nutAcrossFlats, height: m6.nutHeight };
+  if (kind === "washer") return { width: 12, depth: 12, height: 1.6 };
   const roundProfile = kind === "sphere" || kind === "torus" || kind === "ring" || kind === "halfSphere";
   const flatProfile = kind === "torus" || kind === "ring" || kind === "text" || kind === "gear";
   const size = kind === "gear" ? 30 : roundProfile ? 22 : 20;
@@ -67,6 +79,18 @@ export function shapeAssetSpecialDefaults(kind: ShapeKind, dimensions = shapeAss
       helixQuality: DEFAULT_GEAR_HELIX_QUALITY,
     };
   }
+  const m6 = METRIC_THREAD_PRESETS.find((preset) => preset.id === "m6")!;
+  if (kind === "screw") return {
+    threadMode: "external", threadFamily: "metric", threadPreset: m6.id, threadPitch: m6.pitch,
+    threadDepth: normalizeThreadDepth(undefined, m6.diameter, m6.pitch), threadHandedness: DEFAULT_THREAD_HANDEDNESS,
+    threadQuality: DEFAULT_THREAD_QUALITY, shaftDiameter: m6.diameter, headHeight: m6.headHeight,
+  };
+  if (kind === "nut") return {
+    threadMode: "internal", threadFamily: "metric", threadPreset: m6.id, threadPitch: m6.pitch,
+    threadDepth: normalizeThreadDepth(undefined, m6.diameter, m6.pitch), threadHandedness: DEFAULT_THREAD_HANDEDNESS,
+    threadQuality: DEFAULT_THREAD_QUALITY, boreDiameter: m6.diameter,
+  };
+  if (kind === "washer") return { boreDiameter: 6.6, threadQuality: DEFAULT_THREAD_QUALITY };
   return {};
 }
 
@@ -110,6 +134,16 @@ export function sceneShape(shape: Partial<WorkplaneShape> & Pick<WorkplaneShape,
     gearType: shape.gearType,
     helixAngle: shape.helixAngle,
     helixQuality: shape.helixQuality,
+    threadMode: shape.threadMode,
+    threadFamily: shape.threadFamily,
+    threadPreset: shape.threadPreset,
+    threadPitch: shape.threadPitch,
+    threadDepth: shape.threadDepth,
+    threadHandedness: shape.threadHandedness,
+    threadQuality: shape.threadQuality,
+    boreDiameter: shape.boreDiameter,
+    shaftDiameter: shape.shaftDiameter,
+    headHeight: shape.headHeight,
     text: shape.text,
     font: shape.font,
     importedMesh: shape.importedMesh,
@@ -139,6 +173,7 @@ export function makeShapeFromAsset(
   const size = Math.max(width, depth);
   const gearTeeth = asset.kind === "gear" ? normalizeGearTeeth(customization.teeth ?? DEFAULT_GEAR_TEETH) : undefined;
   const gearToothSize = asset.kind === "gear" ? normalizeGearToothSize(customization.toothSize ?? DEFAULT_GEAR_TOOTH_SIZE, width, depth) : undefined;
+  const special = shapeAssetSpecialDefaults(asset.kind, { width, depth, height });
 
   return {
     id: createLocalId(asset.id),
@@ -174,6 +209,16 @@ export function makeShapeFromAsset(
     gearType: asset.kind === "gear" ? normalizeGearType(customization.gearType ?? DEFAULT_GEAR_TYPE) : undefined,
     helixAngle: asset.kind === "gear" ? normalizeGearHelixAngle(customization.helixAngle ?? DEFAULT_GEAR_HELIX_ANGLE) : undefined,
     helixQuality: asset.kind === "gear" ? normalizeGearHelixQuality(customization.helixQuality ?? DEFAULT_GEAR_HELIX_QUALITY) : undefined,
+    threadMode: customization.threadMode ?? special.threadMode ?? (asset.kind === "cylinder" ? "none" : undefined),
+    threadFamily: customization.threadFamily ?? special.threadFamily,
+    threadPreset: customization.threadPreset ?? special.threadPreset,
+    threadPitch: customization.threadPitch ?? special.threadPitch,
+    threadDepth: customization.threadDepth ?? special.threadDepth,
+    threadHandedness: customization.threadHandedness ?? special.threadHandedness,
+    threadQuality: customization.threadQuality ?? special.threadQuality,
+    boreDiameter: customization.boreDiameter ?? special.boreDiameter,
+    shaftDiameter: customization.shaftDiameter ?? special.shaftDiameter,
+    headHeight: customization.headHeight ?? special.headHeight,
     locked: false,
     hidden: false,
   };

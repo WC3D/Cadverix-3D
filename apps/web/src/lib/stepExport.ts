@@ -2,6 +2,7 @@ import type { WorkplaneShape } from "@/types/sketchforge";
 import { shapeDepth, shapeWidth } from "@/lib/workplaneShapes";
 import { loadBrepWithOcct, type Brep, type BrepSolid } from "@/lib/brepKernel";
 import { cadBrepTransformForShape, cadTransformToMatrix } from "@/lib/cadBakeMetadata";
+import { normalizeBoreDiameter, normalizeThreadDepth, normalizeThreadHandedness, normalizeThreadPitch, normalizeThreadQuality } from "@/lib/fastenerGeometry";
 import * as THREE from "three";
 
 export type SkippedShape = {
@@ -23,11 +24,68 @@ export type StepExportResult = {
 // Cones are exact: the multi-solid STEP writer that used to drop a cone's lateral
 // CONICAL_SURFACE was fixed upstream in occt-wasm 3.6.1 (verified end-to-end —
 // cone keeps its full surface and volume in a multi-solid assembly).
-const EXACT_KINDS: ReadonlySet<WorkplaneShape["kind"]> = new Set(["box", "cylinder", "sphere", "cone"]);
+const EXACT_KINDS: ReadonlySet<WorkplaneShape["kind"]> = new Set(["box", "cylinder", "sphere", "cone", "screw", "washer", "nut"]);
 const SIZE_EPS = 0.0005;
 
 function unsupportedReason(): string {
   return "no exact B-Rep mapping";
+}
+
+function hasExactPrimitiveMapping(shape: WorkplaneShape): boolean {
+  return EXACT_KINDS.has(shape.kind);
+}
+
+function resultSolid(result: ReturnType<Brep["fuse"]> | ReturnType<Brep["cutAll"]>, failure: string): BuildOutcome {
+  return result.ok ? { solid: result.value as unknown as BrepSolid } : { skip: `${failure}: ${String(result.error.message ?? result.error)}` };
+}
+
+function makeHexPrism(brep: Brep, width: number, depth: number, height: number, elevation = 0): BuildOutcome {
+  const points = Array.from({ length: 6 }, (_, index) => {
+    const angle = index * Math.PI / 3;
+    return [Math.cos(angle) * width / 2, elevation, Math.sin(angle) * depth / (2 * Math.sin(Math.PI / 3))] as [number, number, number];
+  });
+  const face = brep.polygon(points);
+  if (!face.ok) return { skip: "could not build hexagonal fastener profile" };
+  const prism = brep.extrude(face.value, [0, height, 0]);
+  return prism.ok ? { solid: prism.value as unknown as BrepSolid } : { skip: "could not extrude hexagonal fastener profile" };
+}
+
+function makeThreadRidge(brep: Brep, diameter: number, height: number, shape: WorkplaneShape, inward = false): BuildOutcome {
+  const pitch = normalizeThreadPitch(shape.threadPitch, diameter);
+  const depth = normalizeThreadDepth(shape.threadDepth, diameter, pitch);
+  if (height / pitch > 80) {
+    return { skip: "thread exceeds the STEP complexity limit of 80 turns; increase pitch or reduce thread length" };
+  }
+  const radius = inward ? diameter / 2 : Math.max(SIZE_EPS, diameter / 2 - depth);
+  const ridge = brep.thread({
+    radius,
+    pitch,
+    height,
+    depth,
+    sectionsPerTurn: Math.max(6, Math.min(24, Math.round(normalizeThreadQuality(shape.threadQuality) / 3))),
+    lefthand: normalizeThreadHandedness(shape.threadHandedness) === "left",
+    inward,
+  });
+  if (!ridge.ok) return { skip: `thread generation failed: ${String(ridge.error.message ?? ridge.error)}` };
+  return { solid: brep.rotate(ridge.value as unknown as BrepSolid, -90, { axis: [1, 0, 0] }) };
+}
+
+function makeExternalThread(brep: Brep, diameter: number, height: number, shape: WorkplaneShape): BuildOutcome {
+  const pitch = normalizeThreadPitch(shape.threadPitch, diameter);
+  const depth = normalizeThreadDepth(shape.threadDepth, diameter, pitch);
+  const ridge = makeThreadRidge(brep, diameter, height, shape);
+  if ("skip" in ridge) return ridge;
+  const core = brep.cylinder(Math.max(SIZE_EPS, diameter / 2 - depth + 0.01), height, { axis: [0, 1, 0] });
+  return resultSolid(brep.fuse(core, ridge.solid), "thread fusion failed");
+}
+
+function cutInternalThread(brep: Brep, host: BrepSolid, diameter: number, height: number, shape: WorkplaneShape): BuildOutcome {
+  const pitch = normalizeThreadPitch(shape.threadPitch, diameter);
+  const depth = normalizeThreadDepth(shape.threadDepth, diameter, pitch);
+  const ridge = makeThreadRidge(brep, diameter, height, shape, true);
+  if ("skip" in ridge) return ridge;
+  const bore = brep.cylinder(Math.max(SIZE_EPS, diameter / 2 - depth + 0.01), height, { axis: [0, 1, 0] });
+  return resultSolid(brep.cutAll(host, [bore, ridge.solid]), "internal thread subtraction failed");
 }
 
 // SketchForge composes rotation as a THREE Euler in "XYZ" order, so the world
@@ -72,7 +130,18 @@ function buildExactSolid(brep: Brep, shape: WorkplaneShape): BuildOutcome {
       if (Math.abs(width - depth) >= SIZE_EPS) {
         return { skip: "elliptical base is not an exact OCCT primitive" };
       }
-      solid = brep.cylinder(width / 2, height, { axis: [0, 1, 0], centered: true });
+      if (shape.threadMode === "external") {
+        const threaded = makeExternalThread(brep, width, height, shape);
+        if ("skip" in threaded) return threaded;
+        solid = threaded.solid;
+      } else if (shape.threadMode === "internal") {
+        const boreDiameter = normalizeBoreDiameter(shape.boreDiameter, width);
+        const threaded = cutInternalThread(brep, brep.cylinder(width / 2, height, { axis: [0, 1, 0] }), boreDiameter, height, shape);
+        if ("skip" in threaded) return threaded;
+        solid = threaded.solid;
+      } else {
+        solid = brep.cylinder(width / 2, height, { axis: [0, 1, 0], centered: true });
+      }
       break;
     }
     case "cone": {
@@ -86,8 +155,45 @@ function buildExactSolid(brep: Brep, shape: WorkplaneShape): BuildOutcome {
       solid = brep.cone(baseRadius, baseRadius * topScale, height, { axis: [0, 1, 0], centered: true });
       break;
     }
+    case "washer": {
+      if (Math.abs(width - depth) >= SIZE_EPS) return { skip: "elliptical washer is not an exact OCCT primitive" };
+      const boreDiameter = normalizeBoreDiameter(shape.boreDiameter, width);
+      const cut = brep.cutAll(
+        brep.cylinder(width / 2, height, { axis: [0, 1, 0] }),
+        [brep.cylinder(boreDiameter / 2, height, { axis: [0, 1, 0] })],
+      );
+      if (!cut.ok) return { skip: "washer bore subtraction failed" };
+      solid = cut.value;
+      break;
+    }
+    case "screw": {
+      const shaftDiameter = Math.min(shape.shaftDiameter ?? Math.min(width, depth) * 0.6, width, depth);
+      const headHeight = Math.max(SIZE_EPS, Math.min(shape.headHeight ?? height * 0.28, height - SIZE_EPS));
+      const shaftHeight = height - headHeight;
+      const shaft = makeExternalThread(brep, shaftDiameter, shaftHeight, shape);
+      if ("skip" in shaft) return shaft;
+      const head = makeHexPrism(brep, width, depth, headHeight + 0.01, shaftHeight - 0.01);
+      if ("skip" in head) return head;
+      const fused = brep.fuse(shaft.solid, head.solid);
+      if (!fused.ok) return { skip: "screw head fusion failed" };
+      solid = fused.value;
+      break;
+    }
+    case "nut": {
+      const body = makeHexPrism(brep, width, depth, height);
+      if ("skip" in body) return body;
+      const boreDiameter = normalizeBoreDiameter(shape.boreDiameter, Math.min(width, depth));
+      const threaded = cutInternalThread(brep, body.solid, boreDiameter, height, shape);
+      if ("skip" in threaded) return threaded;
+      solid = threaded.solid;
+      break;
+    }
     default:
       return { skip: "no exact B-Rep mapping" };
+  }
+
+  if (["screw", "nut", "washer"].includes(shape.kind) || shape.kind === "cylinder" && shape.threadMode !== undefined && shape.threadMode !== "none") {
+    solid = brep.translate(solid, [0, -height / 2, 0]);
   }
 
   const rotZ = shape.rotationZ ?? 0;
@@ -239,7 +345,7 @@ export async function exportShapesToStep(shapes: WorkplaneShape[]): Promise<Step
   const skipped: SkippedShape[] = [];
   const holes: { box: Aabb; solid: BrepSolid }[] = [];
   for (const shape of shapes.filter((s) => s.hole)) {
-    if (!EXACT_KINDS.has(shape.kind)) {
+    if (!hasExactPrimitiveMapping(shape)) {
       skipped.push(describe(shape, `hole ${unsupportedReason()}; cut omitted`));
       continue;
     }
@@ -261,7 +367,7 @@ export async function exportShapesToStep(shapes: WorkplaneShape[]): Promise<Step
       built = buildStoredCadBody(brep, shape);
     } else if (isImportedBody(shape)) {
       built = await buildImportedBody(brep, shape);
-    } else if (EXACT_KINDS.has(shape.kind)) {
+    } else if (hasExactPrimitiveMapping(shape)) {
       built = buildExactSolid(brep, shape);
     } else {
       const reason = shape.kind === "mesh" ? "imported mesh has no B-Rep source; re-import as STEP to round-trip" : unsupportedReason();

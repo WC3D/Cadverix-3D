@@ -65,7 +65,7 @@ export function shapeTaperDimensions(shape: WorkplaneShape) {
 }
 
 export function shapeHasTaper(shape: WorkplaneShape) {
-  if (shape.kind === "gear") return false;
+  if (["gear", "screw", "washer", "nut"].includes(shape.kind) || shape.kind === "cylinder" && shape.threadMode !== undefined && shape.threadMode !== "none") return false;
   const width = shapeWidth(shape);
   const depth = shapeDepth(shape);
   const taper = shapeTaperDimensions(shape);
@@ -84,7 +84,7 @@ export function shapeOverallFootprintDimensions(shape: WorkplaneShape) {
 }
 
 export function shapeTaperScaleAt(shape: WorkplaneShape, normalizedHeight: number, axis: "width" | "depth" = "width") {
-  if (shape.kind === "gear") return 1;
+  if (["gear", "screw", "washer", "nut"].includes(shape.kind) || shape.kind === "cylinder" && shape.threadMode !== undefined && shape.threadMode !== "none") return 1;
   const taper = shapeTaperDimensions(shape);
   const base = axis === "width" ? shapeWidth(shape) : shapeDepth(shape);
   const bottom = axis === "width" ? taper.bottomWidth : taper.bottomDepth;
@@ -280,6 +280,16 @@ export function workplaneShapesEqual(a: WorkplaneShape, b: WorkplaneShape) {
     a.gearType === b.gearType &&
     a.helixAngle === b.helixAngle &&
     a.helixQuality === b.helixQuality &&
+    a.threadMode === b.threadMode &&
+    a.threadFamily === b.threadFamily &&
+    a.threadPreset === b.threadPreset &&
+    a.threadPitch === b.threadPitch &&
+    a.threadDepth === b.threadDepth &&
+    a.threadHandedness === b.threadHandedness &&
+    a.threadQuality === b.threadQuality &&
+    a.boreDiameter === b.boreDiameter &&
+    a.shaftDiameter === b.shaftDiameter &&
+    a.headHeight === b.headHeight &&
     a.text === b.text &&
     a.font === b.font &&
     a.importedMesh === b.importedMesh &&

@@ -29,6 +29,7 @@ import type { ChallengeTutorialId } from "@/lib/challenges";
 import { cadModifierPrimitiveForBakedShape, cadTransformFromMatrix, cadTransformToMatrix } from "@/lib/cadBakeMetadata";
 import { orthographicFramingZoom, perspectiveFramingDistance } from "@/lib/cameraFraming";
 import { createGearGeometry } from "@/lib/gearGeometry";
+import { createNutGeometry, createScrewGeometry, createThreadedCylinderGeometry, createWasherGeometry } from "@/lib/fastenerGeometry";
 import { parseMeasurementInput } from "@/lib/measurementUnits";
 import type { ModelSplitPlane } from "@/lib/modelSplit";
 import type { SculptBrushSettings, SculptPoint } from "@/lib/sculptBrush";
@@ -131,6 +132,9 @@ const SHAPE_KINDS = new Set<ShapeAsset["kind"]>([
   "torus",
   "tube",
   "gear",
+  "screw",
+  "washer",
+  "nut",
   "ring",
   "wedge",
   "polygon",
@@ -990,6 +994,15 @@ function rulerShapeTopologyKey(shape: WorkplaneShape): string {
     gearType: shape.gearType,
     helixAngle: shape.helixAngle,
     helixQuality: shape.helixQuality,
+    threadMode: shape.threadMode,
+    threadPreset: shape.threadPreset,
+    threadPitch: shape.threadPitch,
+    threadDepth: shape.threadDepth,
+    threadHandedness: shape.threadHandedness,
+    threadQuality: shape.threadQuality,
+    boreDiameter: shape.boreDiameter,
+    shaftDiameter: shape.shaftDiameter,
+    headHeight: shape.headHeight,
     text: shape.text,
     font: shape.font,
     mesh: [positions.length, positionSample],
@@ -1045,7 +1058,7 @@ function shapeMaterialSignature(shape: WorkplaneShape): string {
 }
 
 function shapeGeometrySignature(shape: WorkplaneShape): string {
-  const taper = shape.kind === "gear" || !shapeHasTaper(shape)
+  const taper = ["gear", "screw", "washer", "nut"].includes(shape.kind) || !shapeHasTaper(shape)
     ? null
     : { ...shapeTaperDimensions(shape), baseWidth: shapeWidth(shape), baseDepth: shapeDepth(shape) };
   if (shape.groupedShapes?.length && !shape.importedMesh) {
@@ -1082,7 +1095,12 @@ function shapeGeometrySignature(shape: WorkplaneShape): string {
     return JSON.stringify({ kind: "box", taper });
   }
   if (shape.kind === "cylinder") {
-    return JSON.stringify({ kind: "cylinder", sides: shape.sides, segments: shape.segments, taper });
+    return JSON.stringify({
+      kind: "cylinder", sides: shape.sides, segments: shape.segments, taper,
+      threadMode: shape.threadMode, threadPreset: shape.threadPreset, threadPitch: shape.threadPitch,
+      threadDepth: shape.threadDepth, threadHandedness: shape.threadHandedness, threadQuality: shape.threadQuality,
+      boreDiameter: shape.boreDiameter, width: shapeWidth(shape), depth: shapeDepth(shape), height: shape.height,
+    });
   }
   if (shape.kind === "sphere") {
     return JSON.stringify({ kind: "sphere", steps: shape.steps, taper });
@@ -1117,6 +1135,15 @@ function shapeGeometrySignature(shape: WorkplaneShape): string {
     gearType: shape.gearType,
     helixAngle: shape.helixAngle,
     helixQuality: shape.helixQuality,
+    threadMode: shape.threadMode,
+    threadPreset: shape.threadPreset,
+    threadPitch: shape.threadPitch,
+    threadDepth: shape.threadDepth,
+    threadHandedness: shape.threadHandedness,
+    threadQuality: shape.threadQuality,
+    boreDiameter: shape.boreDiameter,
+    shaftDiameter: shape.shaftDiameter,
+    headHeight: shape.headHeight,
     text: shape.text,
     font: shape.font,
   });
@@ -8196,7 +8223,15 @@ function createShapeObject(
       );
       break;
     case "cylinder":
-      addMesh(group, sharedShapeGeometry(geometryCacheKey, () => new THREE.CylinderGeometry(1, 1, 1, shape.sides ?? 96, shape.segments ?? 1)), material, shape, undefined, undefined, new THREE.Vector3(width / 2, height, depth / 2));
+      if (shape.threadMode && shape.threadMode !== "none") {
+        addMesh(group, sharedShapeGeometry(geometryCacheKey, () => createThreadedCylinderGeometry({
+          width, depth, height, boreDiameter: shape.boreDiameter, threadMode: shape.threadMode,
+          threadPitch: shape.threadPitch, threadDepth: shape.threadDepth, threadHandedness: shape.threadHandedness,
+          threadQuality: shape.threadQuality,
+        })), material, shape);
+      } else {
+        addMesh(group, sharedShapeGeometry(geometryCacheKey, () => new THREE.CylinderGeometry(1, 1, 1, shape.sides ?? 96, shape.segments ?? 1)), material, shape, undefined, undefined, new THREE.Vector3(width / 2, height, depth / 2));
+      }
       break;
     case "sphere": {
       const { widthSegments, heightSegments } = sphereTessellation(shape.steps);
@@ -8247,6 +8282,24 @@ function createShapeObject(
         gearType: shape.gearType,
         helixAngle: shape.helixAngle,
         helixQuality: shape.helixQuality,
+      })), material, shape);
+      break;
+    case "screw":
+      addMesh(group, sharedShapeGeometry(geometryCacheKey, () => createScrewGeometry({
+        width, depth, height, shaftDiameter: shape.shaftDiameter, headHeight: shape.headHeight,
+        threadPitch: shape.threadPitch, threadDepth: shape.threadDepth, threadHandedness: shape.threadHandedness,
+        threadQuality: shape.threadQuality,
+      })), material, shape);
+      break;
+    case "nut":
+      addMesh(group, sharedShapeGeometry(geometryCacheKey, () => createNutGeometry({
+        width, depth, height, boreDiameter: shape.boreDiameter, threadPitch: shape.threadPitch,
+        threadDepth: shape.threadDepth, threadHandedness: shape.threadHandedness, threadQuality: shape.threadQuality,
+      })), material, shape);
+      break;
+    case "washer":
+      addMesh(group, sharedShapeGeometry(geometryCacheKey, () => createWasherGeometry({
+        width, depth, height, boreDiameter: shape.boreDiameter, quality: shape.threadQuality,
       })), material, shape);
       break;
     case "wedge":
@@ -8448,7 +8501,7 @@ function addShapeEdgeDecorations(group: THREE.Group, mesh: THREE.Mesh, prepared:
   const complexEdges =
     shape.kind === "mesh" ||
     Boolean(shape.importedMesh) ||
-    ["cone", "pyramid", "roof", "roundRoof", "halfSphere", "torus", "tube", "ring", "gear", "wedge"].includes(shape.kind);
+    ["cone", "pyramid", "roof", "roundRoof", "halfSphere", "torus", "tube", "ring", "gear", "screw", "washer", "nut", "wedge"].includes(shape.kind) || shape.kind === "cylinder" && shape.threadMode !== "none";
   const importedTriangleCount = shape.importedMesh?.triangleCount ?? 0;
   const skipHeavyImportedEdges = Boolean(shape.importedMesh) && importedTriangleCount > IMPORTED_SELECTED_EDGE_TRIANGLE_LIMIT;
   if ((group.userData.showEdges || complexEdges) && !skipHeavyImportedEdges) {

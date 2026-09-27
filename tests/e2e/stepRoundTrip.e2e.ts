@@ -142,6 +142,20 @@ describe("STEP export round-trip (real OCCT kernel)", () => {
     expect(near(await reimportVolume(blob), PI * 10 * 10 * 40)).toBe(true);
   });
 
+  it("exports generated fasteners and internal/external threads as B-Rep", async () => {
+    const thread = { threadPitch: 2, threadDepth: 0.2, threadHandedness: "right" as const, threadQuality: 12 };
+    const screw = shape({ kind: "screw", name: "Screw", x: -24, width: 8, depth: 8, height: 6, shaftDiameter: 4, headHeight: 2, threadMode: "external", ...thread });
+    const nut = shape({ kind: "nut", name: "Nut", x: -8, width: 8, depth: 8, height: 2, boreDiameter: 4, threadMode: "internal", ...thread });
+    const washer = shape({ kind: "washer", name: "Washer", x: 8, width: 8, depth: 8, height: 1, boreDiameter: 4 });
+    const external = shape({ kind: "cylinder", name: "External", x: 24, width: 4, depth: 4, height: 2, threadMode: "external", ...thread });
+    const internal = shape({ kind: "cylinder", name: "Internal", x: 40, width: 8, depth: 8, height: 2, boreDiameter: 4, threadMode: "internal", ...thread });
+
+    const { blob, exportedCount, skipped } = await exportShapesToStep([screw, nut, washer, external, internal]);
+    expect(exportedCount).toBe(5);
+    expect(skipped).toEqual([]);
+    expect(await reimportVolume(blob)).toBeGreaterThan(0);
+  });
+
   it("skips non-exact shapes with descriptive reasons but still exports the rest", async () => {
     const box = shape({ kind: "box", name: "Box", width: 8, depth: 8, height: 8 });
     const pyramid = shape({ kind: "pyramid", name: "Pyramid", width: 8, depth: 8, height: 8 });

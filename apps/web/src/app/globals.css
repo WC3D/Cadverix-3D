@@ -2879,6 +2879,12 @@ button {
   height: 43px;
 }
 
+.generator-menu-trigger > svg {
+  width: 33px;
+  height: 33px;
+  stroke-width: 2.2;
+}
+
 .shape-menu-dropdown {
   position: absolute;
   top: var(--editor-toolbar-tools-height);

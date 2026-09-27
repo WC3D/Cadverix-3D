@@ -15,7 +15,7 @@ export const SKF_SCHEMA_ID = "com.sketchforge.project";
 export const SKF_FORMAT_VERSION = 2;
 export const SKF_MINIMUM_READER_VERSION = 2;
 export const SKF_OLDEST_READABLE_FORMAT_VERSION = 1;
-export const SKF_CREATED_WITH_VERSION = "1.0.10";
+export const SKF_CREATED_WITH_VERSION = "1.0.11";
 export const SKF_MEDIA_TYPE = "application/vnd.sketchforge.project+zip";
 
 export const SKF_LIMITS = {
@@ -33,7 +33,7 @@ export const SKF_LIMITS = {
 
 const SHAPE_KINDS = new Set([
   "box", "cylinder", "sphere", "sketch", "scribble", "cone", "pyramid", "roof", "text", "roundRoof",
-  "halfSphere", "torus", "tube", "gear", "ring", "wedge", "polygon", "icosahedron", "constructionPlane", "mesh",
+  "halfSphere", "torus", "tube", "gear", "screw", "washer", "nut", "ring", "wedge", "polygon", "icosahedron", "constructionPlane", "mesh",
 ]);
 
 const FEATURE_TYPES = new Set([
@@ -1199,6 +1199,25 @@ function validateShapeDefinition(definition: Record<string, unknown>, label: str
         throw new Error(`${label}.helixQuality is outside the supported range`);
       }
     }
+  }
+  if (["screw", "nut"].includes(kind) || kind === "cylinder" && definition.threadMode !== undefined) {
+    if (!["none", "external", "internal"].includes(definition.threadMode as string)) throw new Error(`${label}.threadMode is invalid`);
+    if (definition.threadFamily !== undefined && !["metric", "unc", "unf", "custom"].includes(definition.threadFamily as string)) throw new Error(`${label}.threadFamily is invalid`);
+    if (definition.threadPreset !== undefined) stringValue(definition.threadPreset, `${label}.threadPreset`);
+    if (definition.threadPitch !== undefined && finiteNumber(definition.threadPitch, `${label}.threadPitch`) <= 0) throw new Error(`${label}.threadPitch must be positive`);
+    if (definition.threadDepth !== undefined && finiteNumber(definition.threadDepth, `${label}.threadDepth`) < 0) throw new Error(`${label}.threadDepth cannot be negative`);
+    if (definition.threadHandedness !== undefined && !["right", "left"].includes(definition.threadHandedness as string)) throw new Error(`${label}.threadHandedness is invalid`);
+    if (definition.threadQuality !== undefined) {
+      const quality = finiteNumber(definition.threadQuality, `${label}.threadQuality`);
+      if (!Number.isInteger(quality) || quality < 12 || quality > 96) throw new Error(`${label}.threadQuality is outside the supported range`);
+    }
+  }
+  if (["nut", "washer"].includes(kind) || kind === "cylinder" && definition.threadMode === "internal") {
+    if (finiteNumber(definition.boreDiameter, `${label}.boreDiameter`) <= 0) throw new Error(`${label}.boreDiameter must be positive`);
+  }
+  if (kind === "screw") {
+    if (finiteNumber(definition.shaftDiameter, `${label}.shaftDiameter`) <= 0) throw new Error(`${label}.shaftDiameter must be positive`);
+    if (finiteNumber(definition.headHeight, `${label}.headHeight`) <= 0) throw new Error(`${label}.headHeight must be positive`);
   }
   return id;
 }

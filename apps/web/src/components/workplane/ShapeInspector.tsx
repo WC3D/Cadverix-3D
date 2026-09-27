@@ -21,6 +21,16 @@ import {
   normalizeGearType,
   gearToothPitch,
 } from "@/lib/gearGeometry";
+import {
+  DEFAULT_THREAD_QUALITY,
+  MAX_THREAD_QUALITY,
+  MIN_THREAD_QUALITY,
+  THREAD_PRESETS,
+  normalizeBoreDiameter,
+  normalizeThreadDepth,
+  normalizeThreadPitch,
+  normalizeThreadQuality,
+} from "@/lib/fastenerGeometry";
 import { displayStepFromMillimeters, displayToMillimeters, formatMeasurementNumber, lengthDisplayUnit, millimetersToDisplay, parseMeasurementInput } from "@/lib/measurementUnits";
 import { resizedShapeSize, shapeDepth, shapeHasTaper, shapeOverallFootprintDimensions, shapeTaperDimensions, shapeWidth } from "@/lib/workplaneShapes";
 import { normalizeSketchRevolveSettings } from "@/lib/sketchRevolve";
@@ -105,7 +115,7 @@ function formatPropertyNumber(value: number, accuracy: MeasurementAccuracy, step
 }
 
 function propertyUsesLengthUnit(label: string) {
-  return ["Radius", "Length", "Width", "Height", "Bevel", "Top Radius", "Base Radius", "Thickness", "Tooth Size", "Tooth Width", "Center Hole", "Top Length", "Top Width", "Bottom Length", "Bottom Width"].includes(label);
+  return ["Radius", "Length", "Width", "Height", "Bevel", "Top Radius", "Base Radius", "Thickness", "Tooth Size", "Tooth Width", "Center Hole", "Top Length", "Top Width", "Bottom Length", "Bottom Width", "Bore Diameter", "Shaft Diameter", "Head Height", "Head Across Flats", "Across Flats", "Thread Pitch", "Thread Depth"].includes(label);
 }
 
 function getShapePropertiesWithAppLimits(shape: WorkplaneShape, onUpdate: ShapeInspectorUpdate, textWidthMax = 260): ShapePropertyConfig[] {
@@ -153,6 +163,48 @@ function getShapePropertiesWithAppLimits(shape: WorkplaneShape, onUpdate: ShapeI
     onUpdate({ baseRadius: value, width: diameter, size: resizedShapeSize(diameter, baseDepth) }, { resizeAxis: "width" });
   };
   const setHeight = (height: number) => onUpdate({ height }, { resizeAxis: "height" });
+  const threadMode = shape.kind === "screw" ? "external" : shape.kind === "nut" ? "internal" : shape.threadMode ?? "none";
+  const threadDiameter = threadMode === "internal"
+    ? normalizeBoreDiameter(shape.boreDiameter, Math.min(width, depth))
+    : shape.kind === "screw"
+      ? shape.shaftDiameter ?? Math.min(width, depth) * 0.6
+      : Math.min(width, depth);
+  const threadPitch = normalizeThreadPitch(shape.threadPitch, threadDiameter);
+  const threadDepth = normalizeThreadDepth(shape.threadDepth, threadDiameter, threadPitch);
+  const threadPreset = THREAD_PRESETS.find((preset) => preset.id === shape.threadPreset);
+  const threadProperties = (): ShapePropertyConfig[] => [
+    {
+      type: "select",
+      label: "Thread Standard",
+      value: threadPreset?.label ?? "Custom",
+      options: ["Custom", ...THREAD_PRESETS.map((preset) => preset.label)],
+      onChange: (label) => {
+        const preset = THREAD_PRESETS.find((candidate) => candidate.label === label);
+        if (!preset) {
+          onUpdate({ threadPreset: "custom", threadFamily: "custom" });
+          return;
+        }
+        const diameterPatch = shape.kind === "screw"
+          ? { shaftDiameter: preset.diameter, width: preset.headAcrossFlats * 2 / Math.sqrt(3), depth: preset.headAcrossFlats, size: preset.headAcrossFlats * 2 / Math.sqrt(3), headHeight: preset.headHeight }
+          : shape.kind === "nut"
+            ? { boreDiameter: preset.diameter, width: preset.nutAcrossFlats * 2 / Math.sqrt(3), depth: preset.nutAcrossFlats, size: preset.nutAcrossFlats * 2 / Math.sqrt(3), height: preset.nutHeight }
+          : threadMode === "internal"
+            ? { boreDiameter: preset.diameter }
+            : { width: preset.diameter, depth: preset.diameter, size: preset.diameter };
+        onUpdate({
+          threadPreset: preset.id,
+          threadFamily: preset.family,
+          threadPitch: preset.pitch,
+          threadDepth: normalizeThreadDepth(undefined, preset.diameter, preset.pitch),
+          ...diameterPatch,
+        });
+      },
+    },
+    { label: "Thread Pitch", value: threadPitch, min: 0.1, max: Math.max(0.1, threadDiameter * 2), step: 0.05, onChange: (threadPitch) => onUpdate({ threadPitch, threadPreset: "custom", threadFamily: "custom" }) },
+    { label: "Thread Depth", value: threadDepth, min: 0, max: Math.max(0.1, threadDiameter * 0.22), step: 0.05, onChange: (threadDepth) => onUpdate({ threadDepth, threadPreset: "custom", threadFamily: "custom" }) },
+    { type: "select", label: "Handedness", value: shape.threadHandedness === "left" ? "Left" : "Right", options: ["Right", "Left"], onChange: (value) => onUpdate({ threadHandedness: value === "Left" ? "left" : "right" }) },
+    { label: "Thread Quality", value: normalizeThreadQuality(shape.threadQuality ?? DEFAULT_THREAD_QUALITY), min: MIN_THREAD_QUALITY, max: MAX_THREAD_QUALITY, step: 1, onChange: (threadQuality) => onUpdate({ threadQuality: Math.round(threadQuality) }) },
+  ];
 
   if (shape.sketchOperation === "revolve" || shape.sketchRevolve) {
     const settings = normalizeSketchRevolveSettings(shape.sketchRevolve);
@@ -176,8 +228,64 @@ function getShapePropertiesWithAppLimits(shape: WorkplaneShape, onUpdate: ShapeI
   }
 
   if (shape.kind === "cylinder") {
-    return [
+    const properties: ShapePropertyConfig[] = [
+      {
+        type: "select",
+        label: "Thread",
+        value: threadMode === "internal" ? "Internal" : threadMode === "external" ? "External" : "None",
+        options: ["None", "External", "Internal"],
+        onChange: (value) => {
+          const nextMode = value.toLowerCase() as WorkplaneShape["threadMode"];
+          if (nextMode === "none") {
+            onUpdate({ threadMode: nextMode });
+            return;
+          }
+          const diameter = nextMode === "internal" ? normalizeBoreDiameter(shape.boreDiameter, Math.min(width, depth)) : Math.min(width, depth);
+          const pitch = normalizeThreadPitch(shape.threadPitch, diameter);
+          onUpdate({
+            threadMode: nextMode,
+            threadFamily: shape.threadFamily ?? "custom",
+            threadPreset: shape.threadPreset ?? "custom",
+            threadPitch: pitch,
+            threadDepth: normalizeThreadDepth(shape.threadDepth, diameter, pitch),
+            threadHandedness: shape.threadHandedness ?? "right",
+            threadQuality: normalizeThreadQuality(shape.threadQuality),
+            ...(nextMode === "internal" ? { boreDiameter: diameter } : {}),
+          });
+        },
+      },
       { label: "Sides", value: shape.sides ?? 96, min: 3, max: MAX_HIGH_RESOLUTION_SIDES, step: 1, onChange: (sides) => onUpdate({ sides: Math.round(sides) }) },
+      { label: "Length", value: depth, min: MIN_SHAPE_SIZE, max: 160, onChange: setDepth },
+      { label: "Width", value: width, min: MIN_SHAPE_SIZE, max: 160, onChange: setWidth },
+      { label: "Height", value: shape.height, min: MIN_SHAPE_SIZE, max: 160, onChange: setHeight },
+    ];
+    if (threadMode === "internal") properties.splice(1, 0, { label: "Bore Diameter", value: threadDiameter, min: 0.1, max: Math.min(width, depth) * 0.9, step: 0.1, onChange: (boreDiameter) => onUpdate({ boreDiameter, threadPreset: "custom", threadFamily: "custom" }) });
+    if (threadMode !== "none") properties.splice(threadMode === "internal" ? 2 : 1, 0, ...threadProperties());
+    return properties;
+  }
+
+  if (shape.kind === "screw") {
+    return [
+      ...threadProperties(),
+      { label: "Shaft Diameter", value: shape.shaftDiameter ?? threadDiameter, min: 0.1, max: Math.min(width, depth) * 0.9, step: 0.1, onChange: (shaftDiameter) => onUpdate({ shaftDiameter, threadPreset: "custom", threadFamily: "custom" }) },
+      { label: "Head Height", value: shape.headHeight ?? shape.height * 0.28, min: 0.1, max: shape.height * 0.8, step: 0.1, onChange: (headHeight) => onUpdate({ headHeight }) },
+      { label: "Head Across Flats", value: depth, min: MIN_SHAPE_SIZE, max: 160, onChange: (acrossFlats) => onUpdate({ depth: acrossFlats, width: acrossFlats * 2 / Math.sqrt(3), size: acrossFlats * 2 / Math.sqrt(3), threadPreset: "custom", threadFamily: "custom" }) },
+      { label: "Height", value: shape.height, min: MIN_SHAPE_SIZE, max: 160, onChange: setHeight },
+    ];
+  }
+
+  if (shape.kind === "nut") {
+    return [
+      ...threadProperties(),
+      { label: "Bore Diameter", value: threadDiameter, min: 0.1, max: Math.min(width, depth) * 0.9, step: 0.1, onChange: (boreDiameter) => onUpdate({ boreDiameter, threadPreset: "custom", threadFamily: "custom" }) },
+      { label: "Across Flats", value: depth, min: MIN_SHAPE_SIZE, max: 160, onChange: (acrossFlats) => onUpdate({ depth: acrossFlats, width: acrossFlats * 2 / Math.sqrt(3), size: acrossFlats * 2 / Math.sqrt(3), threadPreset: "custom", threadFamily: "custom" }) },
+      { label: "Height", value: shape.height, min: MIN_SHAPE_SIZE, max: 160, onChange: setHeight },
+    ];
+  }
+
+  if (shape.kind === "washer") {
+    return [
+      { label: "Bore Diameter", value: normalizeBoreDiameter(shape.boreDiameter, Math.min(width, depth)), min: 0.1, max: Math.min(width, depth) * 0.9, step: 0.1, onChange: (boreDiameter) => onUpdate({ boreDiameter }) },
       { label: "Length", value: depth, min: MIN_SHAPE_SIZE, max: 160, onChange: setDepth },
       { label: "Width", value: width, min: MIN_SHAPE_SIZE, max: 160, onChange: setWidth },
       { label: "Height", value: shape.height, min: MIN_SHAPE_SIZE, max: 160, onChange: setHeight },
@@ -408,7 +516,8 @@ export function ShapeInspector({
     : [];
   const taper = shapeTaperDimensions(shape);
   const taperDimensionMax = workspace.shapeCustomizations[shape.kind]?.maxDimension ?? 480;
-  const taperProperties: ShapePropertyConfig[] = shape.kind === "gear" ? [] : [
+  const supportsTaper = !["gear", "screw", "washer", "nut"].includes(shape.kind) && !(shape.kind === "cylinder" && shape.threadMode !== undefined && shape.threadMode !== "none");
+  const taperProperties: ShapePropertyConfig[] = supportsTaper ? [
     {
       label: "Top Length",
       value: taper.topDepth,
@@ -437,7 +546,7 @@ export function ShapeInspector({
       max: taperDimensionMax,
       onChange: (taperBottomWidth) => onUpdate({ taperBottomWidth, taperBottomDepth: taper.bottomDepth, taperBottomScale: undefined }),
     },
-  ];
+  ] : [];
   const isSketchRevolve = shape.sketchOperation === "revolve" || Boolean(shape.sketchRevolve);
   const inspectorRef = useRef<HTMLElement>(null);
   const [propertiesOpen, setPropertiesOpen] = useState(true);
@@ -595,7 +704,7 @@ export function ShapeInspector({
           </div>
         ) : null}
       </div>
-      {shape.kind !== "gear" ? (
+      {supportsTaper ? (
         <div className={`property-card ${taperOpen ? "" : "collapsed"}`}>
           <button
             className="property-card-header"

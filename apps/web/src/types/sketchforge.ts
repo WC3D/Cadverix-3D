@@ -16,6 +16,9 @@ export type ShapeKind =
   | "torus"
   | "tube"
   | "gear"
+  | "screw"
+  | "washer"
+  | "nut"
   | "ring"
   | "wedge"
   | "polygon"
@@ -47,6 +50,9 @@ export type ProjectAsset = {
 export type GridSize = "Off" | "0.1 mm" | "0.25 mm" | "0.5 mm" | "1.0 mm" | "2.0 mm" | "5.0 mm" | "Brick";
 export type MeasurementAccuracy = 1 | 2 | 3;
 export type HistoryRetentionLimit = "unlimited" | number;
+export type ThreadMode = "none" | "external" | "internal";
+export type ThreadHandedness = "right" | "left";
+export type ThreadFamily = "metric" | "unc" | "unf" | "custom";
 
 export type ShapeCustomization = {
   width?: number;
@@ -66,6 +72,16 @@ export type ShapeCustomization = {
   gearType?: GearType;
   helixAngle?: number;
   helixQuality?: number;
+  threadMode?: ThreadMode;
+  threadFamily?: ThreadFamily;
+  threadPreset?: string;
+  threadPitch?: number;
+  threadDepth?: number;
+  threadHandedness?: ThreadHandedness;
+  threadQuality?: number;
+  boreDiameter?: number;
+  shaftDiameter?: number;
+  headHeight?: number;
   text?: string;
   font?: string;
 };
@@ -295,6 +311,16 @@ export type WorkplaneShape = {
   gearType?: GearType;
   helixAngle?: number;
   helixQuality?: number;
+  threadMode?: ThreadMode;
+  threadFamily?: ThreadFamily;
+  threadPreset?: string;
+  threadPitch?: number;
+  threadDepth?: number;
+  threadHandedness?: ThreadHandedness;
+  threadQuality?: number;
+  boreDiameter?: number;
+  shaftDiameter?: number;
+  headHeight?: number;
   text?: string;
   font?: string;
   importedMesh?: {

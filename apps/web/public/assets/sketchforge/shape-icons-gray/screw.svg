@@ -1,0 +1,20 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128">
+  <defs>
+    <linearGradient id="head" x1="0" y1="0" x2="0.8" y2="1">
+      <stop offset="0" stop-color="#f5f5f5"/>
+      <stop offset="1" stop-color="#b9b9b9"/>
+    </linearGradient>
+    <linearGradient id="shaft" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0" stop-color="#a9a9a9"/>
+      <stop offset="0.45" stop-color="#eeeeee"/>
+      <stop offset="1" stop-color="#9b9b9b"/>
+    </linearGradient>
+  </defs>
+  <path d="m35 18 29-11 29 11v24L64 54 35 42Z" fill="url(#head)" stroke="#666" stroke-width="3" stroke-linejoin="round"/>
+  <path d="m35 18 29 11 29-11M64 29v25" fill="none" stroke="#777" stroke-width="2.4" stroke-linejoin="round"/>
+  <path d="M47 48v58l7 10h20l7-10V48L64 54Z" fill="url(#shaft)" stroke="#666" stroke-width="3" stroke-linejoin="round"/>
+  <g fill="none" stroke="#777" stroke-width="3" stroke-linecap="round">
+    <path d="m48 59 32 10M48 70l32 10M48 81l32 10M48 92l30 9M51 104l23 7"/>
+  </g>
+  <path d="M54 116h20" stroke="#666" stroke-width="3" stroke-linecap="round"/>
+</svg>

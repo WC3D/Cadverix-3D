@@ -2,6 +2,18 @@
 
 ## Unreleased
 
+## 1.0.11
+
+- Added a dedicated **Generators** toolbar menu and moved Gear, Screw, Washer, and Nut out of the basic Shapes menu.
+- Added editable, watertight screw, washer, and hex-nut generators that participate in selection, transforms, booleans, mesh exports, and editable `.skf` project persistence.
+- Added ISO metric presets for M3, M4, M5, M6, M8, M10, and M12 threads, including standards-based hex-head across-flats dimensions, head heights, nut widths, and nut thicknesses.
+- Added common UNC and UNF presets from #8 through 3/8 inch, with inch thread pitch and common ASME hex-head and finished-nut dimensions converted to millimeters.
+- Added custom thread pitch, depth, handedness, quality, shaft diameter, bore diameter, head height, and across-flats controls.
+- Added internal and external threading options to cylinders, including right- and left-hand threads.
+- Added exact OpenCascade B-Rep STEP construction for generated screws, nuts, washers, and internally or externally threaded cylinders. STEP generation now guards against thread definitions exceeding 80 turns to avoid unsafe kernel workloads.
+- Added dedicated screw, washer, and hex-nut menu artwork and updated the Center Rectangle sketch icon with a visible center point.
+- Added geometry, catalog, persistence, and real-kernel STEP round-trip coverage for fasteners and threaded parts.
+
 ## 1.0.10
 
 - Fixed STEP export for filleted and chamfered objects that retain exact CAD B-Rep geometry.

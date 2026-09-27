@@ -207,7 +207,7 @@ describe("SketchForge .skf project packages", () => {
   it("round-trips every supported native shape kind and editable properties", async () => {
     const nativeKinds: ShapeKind[] = [
       "box", "cylinder", "sphere", "sketch", "scribble", "cone", "pyramid", "roof", "text", "roundRoof",
-      "halfSphere", "torus", "tube", "gear", "ring", "wedge", "polygon", "icosahedron",
+      "halfSphere", "torus", "tube", "gear", "screw", "washer", "nut", "ring", "wedge", "polygon", "icosahedron",
     ];
     const shapes = nativeKinds.map((kind, index) => shape(kind, `${kind}-${index}`, {
       hole: index === 2,
@@ -222,6 +222,16 @@ describe("SketchForge .skf project packages", () => {
       gearType: kind === "gear" ? "helical" : undefined,
       helixAngle: kind === "gear" ? -30 : undefined,
       helixQuality: kind === "gear" ? 24 : undefined,
+      threadMode: kind === "screw" ? "external" : kind === "nut" ? "internal" : undefined,
+      threadFamily: kind === "screw" || kind === "nut" ? "unf" : undefined,
+      threadPreset: kind === "screw" || kind === "nut" ? "1/4-28-unf" : undefined,
+      threadPitch: kind === "screw" || kind === "nut" ? 25.4 / 28 : undefined,
+      threadDepth: kind === "screw" || kind === "nut" ? 0.3 : undefined,
+      threadHandedness: kind === "screw" || kind === "nut" ? "left" : undefined,
+      threadQuality: kind === "screw" || kind === "nut" || kind === "washer" ? 48 : undefined,
+      boreDiameter: kind === "nut" || kind === "washer" ? 6.35 : undefined,
+      shaftDiameter: kind === "screw" ? 6.35 : undefined,
+      headHeight: kind === "screw" ? 4.5 : undefined,
       text: kind === "text" ? "Editable" : undefined,
       sketchProfile: kind === "sketch" ? {
         points: [

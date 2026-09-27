@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { ShapeAsset } from "@/types/sketchforge";
-import { makeShapeFromAsset, sceneShape, toolbarShapeAssets } from "@/lib/shapeCatalog";
+import { makeShapeFromAsset, sceneShape, toolbarBasicShapeAssets, toolbarGeneratorAssets, toolbarShapeAssets } from "@/lib/shapeCatalog";
 
 describe("shape catalog", () => {
   it("does not expose removed decorative shapes in the toolbar catalog", () => {
@@ -8,6 +8,12 @@ describe("shape catalog", () => {
 
     expect(kinds).not.toContain("star");
     expect(kinds).not.toContain("heart");
+  });
+
+  it("separates procedural generators from basic shapes", () => {
+    expect(toolbarGeneratorAssets.map((asset) => asset.kind)).toEqual(["gear", "screw", "washer", "nut"]);
+    expect(toolbarBasicShapeAssets.map((asset) => asset.kind)).not.toContain("gear");
+    expect(toolbarBasicShapeAssets.map((asset) => asset.kind)).not.toContain("screw");
   });
 
   it("creates placed shapes from toolbar assets", () => {
@@ -52,6 +58,18 @@ describe("shape catalog", () => {
       helixAngle: 22.5,
       helixQuality: 16,
     });
+  });
+
+  it("creates metric fasteners with editable thread defaults", () => {
+    const screw = makeShapeFromAsset(toolbarShapeAssets.find((asset) => asset.kind === "screw")!);
+    const nut = makeShapeFromAsset(toolbarShapeAssets.find((asset) => asset.kind === "nut")!);
+    const washer = makeShapeFromAsset(toolbarShapeAssets.find((asset) => asset.kind === "washer")!);
+
+    expect(screw).toMatchObject({ depth: 10, height: 24, threadMode: "external", threadPreset: "m6", threadPitch: 1, shaftDiameter: 6, headHeight: 4 });
+    expect(screw.width).toBeCloseTo(10 * 2 / Math.sqrt(3));
+    expect(nut).toMatchObject({ depth: 10, height: 5, threadMode: "internal", threadPreset: "m6", threadPitch: 1, boreDiameter: 6 });
+    expect(nut.width).toBeCloseTo(10 * 2 / Math.sqrt(3));
+    expect(washer).toMatchObject({ width: 12, depth: 12, height: 1.6, boreDiameter: 6.6 });
   });
 
   it("applies only explicitly customized creation dimensions", () => {
