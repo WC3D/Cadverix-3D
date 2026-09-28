@@ -9,9 +9,21 @@ export type CadModifierEdge = {
   angle: number;
   boundary: boolean;
   manifold: boolean;
+  /** Inward horizontal displacement per unit downward travel of a planar wall. */
+  topWallSlope?: number;
 };
 
 export type CadModifierQuality = "draft" | "standard" | "fine";
+
+export type CadModifierFaultDiagnostic = {
+  phase: string;
+  operation: CadModifierKind | "prepare" | "dispose";
+  strategy: "native-edge" | "planar-rim";
+  edgeIds: number[];
+  amount?: number;
+  rawMessage: string;
+  stack?: string;
+};
 
 export type CadModifierDisplayEdge = {
   points: number[];
@@ -78,4 +90,4 @@ export type CadModifierWorkerResponse =
       components?: CadModifierComponentMesh[];
     }
   | { type: "disposed"; requestId: number }
-  | { type: "error"; requestId: number; message: string; resetSession?: boolean };
+  | { type: "error"; requestId: number; message: string; resetSession?: boolean; diagnostic?: CadModifierFaultDiagnostic };

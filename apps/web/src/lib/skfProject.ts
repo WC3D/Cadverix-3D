@@ -15,7 +15,7 @@ export const SKF_SCHEMA_ID = "com.sketchforge.project";
 export const SKF_FORMAT_VERSION = 2;
 export const SKF_MINIMUM_READER_VERSION = 2;
 export const SKF_OLDEST_READABLE_FORMAT_VERSION = 1;
-export const SKF_CREATED_WITH_VERSION = "1.0.11";
+export const SKF_CREATED_WITH_VERSION = "1.0.12";
 export const SKF_MEDIA_TYPE = "application/vnd.sketchforge.project+zip";
 
 export const SKF_LIMITS = {

@@ -1,6 +1,26 @@
 # Changelog
 
-## Unreleased
+## 1.0.12
+
+### CAD edge tools
+
+- Added a rounded-rim Fillet path for supported complete, convex, horizontal outer rims on imported meshes. Rational circular profiles follow the adjacent wall slopes, avoiding the native 121-edge fillet-builder memory fault reproduced on the door-repair STL.
+- Added a tapered-cut Chamfer path for supported faceted outer rims. Rim treatments validate available material and the resulting solid, preserve the body below the treatment band, and retain B-Rep geometry.
+- Stop treating WebAssembly memory faults as retryable topology failures. Faulted workers are replaced, including when optional exact preview serialization fails.
+- Added fault diagnostics with the operation stage, geometry strategy, selected edge IDs, amount, and underlying error, logged under `[SketchForge CAD]` and available through the local MCP error report.
+
+### Editor and mobile alpha
+
+- Prevent mobile object Multi mode from injecting Shift into Fillet/Chamfer taps and silently selecting one edge instead of the tangent chain. The Multi control is hidden during edge treatment and restored afterward.
+- Fixed a viewport settings feedback loop that could trigger React's maximum-update-depth error. Settings notify persistence at edit time, incoming values are compared before updating state, and saved defaults no longer override later snap/theme choices.
+- Fixed wheel/trackpad zoom over selection handles by using a native non-passive listener, eliminating the repeated `preventDefault` warnings.
+
+### Dependencies and validation
+
+- Added a reproducible `three-bvh-csg@0.0.18` compatibility patch that replaces deprecated `maxLeafSize` with `targetLeafSize` in its ESM and CommonJS builds. Installation applies it through `patch-package`, and Docker copies the patches before installing dependencies.
+- Added mathematical radius/tangency checks, real-kernel solid/volume/B-Rep tests, worker-recovery and diagnostic tests, and browser coverage for wheel zoom and settings persistence.
+- Added an opt-in local-project regression covering actual rim taps, Fillet/Chamfer preview and Apply, and Multi on/off in Chromium and WebKit. The project fixture remains external to the repository.
+- Updated the application version, README badge, and SKF `createdWithVersion` metadata to 1.0.12. The SKF format version remains 2.
 
 ## 1.0.11
 

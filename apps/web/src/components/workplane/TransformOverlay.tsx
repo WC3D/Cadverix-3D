@@ -1,4 +1,4 @@
-import type { CSSProperties } from "react";
+import { useEffect, useRef, type CSSProperties } from "react";
 import * as THREE from "three";
 import {
   measureKeyForHandle,
@@ -62,6 +62,15 @@ export function TransformOverlay({
   onCommitRotationEdit,
   onCancelRotationEdit,
 }: TransformOverlayProps) {
+  const overlayRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    const overlay = overlayRef.current;
+    if (!overlay) return;
+    // React delegates wheel events passively, so cancellation must happen in
+    // a native non-passive listener before forwarding zoom to the canvas.
+    overlay.addEventListener("wheel", onCameraWheel, { capture: true, passive: false });
+    return () => overlay.removeEventListener("wheel", onCameraWheel, true);
+  }, [onCameraWheel]);
   const marks = measureKey ? (box.dimensions[measureKey] ?? []) : [];
   const visibleMarks = (hideDimensionMarks ? [] : marks).filter((mark) => mark.key !== editingDimension?.key);
   const handleMeasureKey = (handle: TransformOverlayState["handles"][number]) => measureKeyForHandle(handle.kind, handle.key, box);
@@ -93,6 +102,7 @@ export function TransformOverlay({
   const wheel = pinnedWheel?.wheel ?? box.rotationWheels[rotationWheelAxis] ?? box.rotationWheel;
   return (
     <div
+      ref={overlayRef}
       className={`transform-overlay ${hideSelectionChrome ? "hide-selection-chrome" : ""}`}
       onPointerDownCapture={(event) => {
         if (event.button === 1 || event.button === 2) {
@@ -101,7 +111,6 @@ export function TransformOverlay({
           onBeginCameraDrag(event);
         }
       }}
-      onWheelCapture={onCameraWheel}
       onContextMenu={(event) => {
         event.preventDefault();
         event.stopPropagation();

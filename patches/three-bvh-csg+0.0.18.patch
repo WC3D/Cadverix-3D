@@ -1,0 +1,12 @@
+diff --git a/node_modules/three-bvh-csg/src/core/Brush.js b/node_modules/three-bvh-csg/src/core/Brush.js
+--- a/node_modules/three-bvh-csg/src/core/Brush.js
++++ b/node_modules/three-bvh-csg/src/core/Brush.js
+@@ -84,1 +84,1 @@
+-		geometry.boundsTree = new MeshBVH( geometry, { maxLeafSize: 3, indirect: true, useSharedArrayBuffer } );
++		geometry.boundsTree = new MeshBVH( geometry, { targetLeafSize: 3, indirect: true, useSharedArrayBuffer } );
+diff --git a/node_modules/three-bvh-csg/build/index.umd.cjs b/node_modules/three-bvh-csg/build/index.umd.cjs
+--- a/node_modules/three-bvh-csg/build/index.umd.cjs
++++ b/node_modules/three-bvh-csg/build/index.umd.cjs
+@@ -823,1 +823,1 @@
+-			geometry.boundsTree = new threeMeshBvh.MeshBVH( geometry, { maxLeafSize: 3, indirect: true, useSharedArrayBuffer } );
++			geometry.boundsTree = new threeMeshBvh.MeshBVH( geometry, { targetLeafSize: 3, indirect: true, useSharedArrayBuffer } );

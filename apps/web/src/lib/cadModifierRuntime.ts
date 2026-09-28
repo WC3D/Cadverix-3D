@@ -188,6 +188,23 @@ export function isCadModifierWasmMemoryFault(message: string, errorName = "") {
   );
 }
 
+/** Ordinary OCCT failures can be retried with a smaller amount, but a trapped
+ * WebAssembly instance must never be used for more topology operations. */
+export function rethrowCadModifierMemoryFault(error: unknown) {
+  const message = error instanceof Error ? error.message : String(error ?? "");
+  const name = error instanceof Error ? error.name : "";
+  if (isCadModifierWasmMemoryFault(message, name)) throw error;
+}
+
+export function validateCadModifierShape(validate: () => boolean) {
+  try {
+    return Boolean(validate());
+  } catch (error) {
+    rethrowCadModifierMemoryFault(error);
+    return false;
+  }
+}
+
 export function defaultCadModifierTangentChain(appliedFeatureCount: number) {
   return appliedFeatureCount === 0;
 }

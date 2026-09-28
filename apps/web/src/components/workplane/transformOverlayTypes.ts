@@ -1,4 +1,4 @@
-import type { PointerEvent as ReactPointerEvent, WheelEvent as ReactWheelEvent } from "react";
+import type { PointerEvent as ReactPointerEvent } from "react";
 
 export type TransformHandleKind = "scale" | "height" | "lift" | "rotate";
 export type RotationAxis = "x" | "y" | "z";
@@ -259,7 +259,7 @@ export type TransformOverlayProps = {
   rotationWheelAxis: RotationAxis;
   pinnedRotationWheelView: PinnedRotationWheelView | null;
   onBeginCameraDrag: (event: ReactPointerEvent<Element>) => void;
-  onCameraWheel: (event: ReactWheelEvent<Element>) => void;
+  onCameraWheel: (event: WheelEvent) => void;
   onBeginTransform: (kind: TransformHandleKind, handleKey: string, event: ReactPointerEvent<Element>) => void;
   onMoveTransform: (clientX: number, clientY: number, shiftKey?: boolean, altKey?: boolean) => boolean;
   onFinishTransform: (event: ReactPointerEvent<Element>) => void;

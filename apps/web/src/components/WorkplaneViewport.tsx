@@ -1,7 +1,7 @@
 "use client";
 
 import { ChevronLeft, ChevronRight, Crosshair, Home, Minus, MousePointer2, PanelsTopLeft, Plus, Ruler, X } from "lucide-react";
-import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type Dispatch, type DragEvent, type MutableRefObject, type PointerEvent as ReactPointerEvent, type SetStateAction, type WheelEvent as ReactWheelEvent } from "react";
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type Dispatch, type DragEvent, type MutableRefObject, type PointerEvent as ReactPointerEvent, type SetStateAction } from "react";
 import * as THREE from "three";
 import { Brush, Evaluator, HOLLOW_INTERSECTION } from "three-bvh-csg";
 import { acceleratedRaycast, computeBoundsTree, disposeBoundsTree } from "three-mesh-bvh";
@@ -55,7 +55,7 @@ import {
 } from "@/lib/placementWorkplane";
 import { regularPolygonFootprintScale } from "@/lib/regularPolygonFootprint";
 import { projectThumbnailDimensions } from "@/lib/projectThumbnail";
-import { canBeginShapeDrag, DEFAULT_SNAP_GRID, DEFAULT_WORKPLANE_WORKSPACE, normalizeSnapGrid, normalizeWorkspaceSettings, shapeDimensionLimit, snapGridStep as snapStep, workplaneSettingsFingerprint, workspaceHydrationRequired, workspaceHydrationSyncDecision } from "@/lib/workplaneSettings";
+import { canBeginShapeDrag, DEFAULT_SNAP_GRID, DEFAULT_WORKPLANE_WORKSPACE, normalizeSnapGrid, normalizeWorkspaceSettings, shapeDimensionLimit, snapGridStep as snapStep, workplaneSettingsFingerprint } from "@/lib/workplaneSettings";
 import { interiorWorkplaneGridCoordinates, workplaneGridPalette, workplaneLabelLayout, workplaneThemePalette, WORKPLANE_LABEL_ASPECT, WORKPLANE_LABEL_TEXT, WORKPLANE_LINE_ELEVATION, WORKPLANE_MAJOR_GRID_INTERVAL } from "@/lib/workplaneGrid";
 import { cleanNearZero, cleanRotationDegrees, fallbackSolidColor, mirroredAxisCount, mirrorSign, preservesEdgeTreatmentSize, proportionalResizeScale, resizedImportedCoordinates, resizedImportedMeshPositions, resizedShapeSize, shapeDepth, shapeHasTaper, shapeOverallFootprintDimensions, shapeTaperDimensions, shapeTaperScaleAt, shapeWidth } from "@/lib/workplaneShapes";
 import { sphereTessellation } from "@/lib/sphereTessellation";
@@ -2591,10 +2591,9 @@ export function WorkplaneViewport({
   const lastResizeAnchorRef = useRef<ResizeAnchorMemory | null>(null);
   const suppressNextLiftEditRef = useRef(false);
   const snapRef = useRef(snap);
-  const workspaceRef = useRef(normalizeWorkspaceSettings(initialWorkspace ?? externalWorkspace));
+  const workspaceRef = useRef(workspace);
   const workspaceSettingsKeyRef = useRef(workspaceSettingsKey ?? null);
-  const lastWorkspaceSettingsSyncRef = useRef("");
-  const pendingWorkspaceHydrationFingerprintRef = useRef<string | null>(null);
+  const lastWorkspaceHydrationRef = useRef<{ key: string | null; fingerprint: string } | null>(null);
   const viewCubeRef = useRef<HTMLDivElement | null>(null);
   const transformOverlayRef = useRef<TransformOverlayState | null>(null);
   const alignOverlayRef = useRef<AlignOverlayState | null>(null);
@@ -2662,16 +2661,6 @@ export function WorkplaneViewport({
       placementWorkplaneRef.current,
     );
   }, [renderSelectionIds, theme]);
-
-  // When the active theme's viewport background changes (theme switch or custom
-  // theme edit), sync workspace.background so rebuildWorkplane applies the correct
-  // scene background and grid colors.
-  const prevVpBgRef = useRef(theme.viewport.background);
-  useEffect(() => {
-    if (prevVpBgRef.current === theme.viewport.background) return;
-    prevVpBgRef.current = theme.viewport.background;
-    setWorkspace((prev) => ({ ...prev, background: theme.viewport.background }));
-  }, [theme.viewport.background]);
 
   useEffect(() => {
     modifierEdgesRef.current = modifierEdges;
@@ -2785,70 +2774,59 @@ export function WorkplaneViewport({
 
   useLayoutEffect(() => {
     const nextKey = workspaceSettingsKey ?? null;
-    const keyChanged = workspaceSettingsKeyRef.current !== nextKey;
-    if (keyChanged) {
-      workspaceSettingsKeyRef.current = nextKey;
-      lastWorkspaceSettingsSyncRef.current = "";
-    }
-    const shouldUseSavedDefault = nextKey === "local-workplane" || (initialSnap === undefined && initialWorkspace === undefined);
+    const incomingSnap = normalizeSnapGrid(initialSnap, DEFAULT_SNAP_GRID);
+    const incomingWorkspace = normalizeWorkspaceSettings(initialWorkspace ?? externalWorkspace);
+    const fingerprint = workplaneSettingsFingerprint(incomingWorkspace, incomingSnap);
+    const previous = lastWorkspaceHydrationRef.current;
+    if (previous?.key === nextKey && previous.fingerprint === fingerprint) return;
+    const keyChanged = !previous || previous.key !== nextKey;
+    lastWorkspaceHydrationRef.current = { key: nextKey, fingerprint };
+    workspaceSettingsKeyRef.current = nextKey;
+    // Defaults seed a workspace once. Re-reading them on every parent render
+    // would overwrite the user's first snap/theme change with the saved default.
+    const shouldUseSavedDefault = keyChanged && (nextKey === "local-workplane" || (initialSnap === undefined && initialWorkspace === undefined && externalWorkspace === undefined));
     const savedDefault = shouldUseSavedDefault ? readSavedWorkspaceDefault(nextKey) : null;
-    const nextSnap = savedDefault?.snap ?? normalizeSnapGrid(initialSnap, DEFAULT_SNAP_GRID);
-    const nextWorkspace = savedDefault?.workspace ?? normalizeWorkspaceSettings(initialWorkspace);
+    const nextSnap = savedDefault?.snap ?? incomingSnap;
+    const nextWorkspace = savedDefault?.workspace ?? incomingWorkspace;
     const nextFingerprint = workplaneSettingsFingerprint(nextWorkspace, nextSnap);
-    const currentFingerprint = workplaneSettingsFingerprint(workspaceRef.current, snapRef.current);
-    if (!workspaceHydrationRequired(keyChanged, lastWorkspaceSettingsSyncRef.current, currentFingerprint, nextFingerprint)) {
-      return;
-    }
-    // Prop hydration must not echo back to the parent. Parent persistence creates
-    // new object references even when the values are unchanged, which previously
-    // caused this effect and its callback effect to update each other indefinitely.
-    lastWorkspaceSettingsSyncRef.current = nextFingerprint;
-    pendingWorkspaceHydrationFingerprintRef.current = nextFingerprint;
+    const workspaceChanged = workplaneSettingsFingerprint(workspaceRef.current, nextSnap) !== nextFingerprint;
+    const snapChanged = snapRef.current !== nextSnap;
     snapRef.current = nextSnap;
     workspaceRef.current = nextWorkspace;
-    if (threeRef.current) {
-      rebuildWorkplane(threeRef.current, nextWorkspace, resolvedThemeRef.current, placementWorkplaneRef.current);
-      constrainCamera(threeRef.current, nextWorkspace);
-      threeRef.current.needsRender = true;
-    }
-    setSnap((current) => (current === nextSnap ? current : nextSnap));
-    setWorkspace((current) => (
-      workplaneSettingsFingerprint(current, nextSnap) === nextFingerprint ? current : nextWorkspace
-    ));
-  }, [initialSnap, initialWorkspace, workspaceSettingsKey]);
+    if (snapChanged) setSnap(nextSnap);
+    if (workspaceChanged) setWorkspace(nextWorkspace);
+  }, [externalWorkspace, initialSnap, initialWorkspace, workspaceSettingsKey]);
 
-  useEffect(() => {
-    const normalizedWorkspace = normalizeWorkspaceSettings(workspace);
-    const normalizedSnap = normalizeSnapGrid(snap, DEFAULT_SNAP_GRID);
-    const fingerprint = workplaneSettingsFingerprint(normalizedWorkspace, normalizedSnap);
-    const hydrationDecision = workspaceHydrationSyncDecision(pendingWorkspaceHydrationFingerprintRef.current, fingerprint);
-    pendingWorkspaceHydrationFingerprintRef.current = hydrationDecision.pendingFingerprint;
-    if (!hydrationDecision.shouldSync) {
-      return;
-    }
-    if (lastWorkspaceSettingsSyncRef.current === fingerprint) {
-      return;
-    }
-    lastWorkspaceSettingsSyncRef.current = fingerprint;
-    onWorkspaceSettingsChange?.({ workspace: normalizedWorkspace, snap: normalizedSnap });
-  }, [onWorkspaceSettingsChange, snap, workspace]);
+  // Notify persistence at the source of an edit, never from an effect observing
+  // mirrored state. That removes the parent -> hydration -> callback feedback
+  // loop, including stale passive effects flushed by a layout-effect update.
+  const commitWorkspaceSettings = useCallback((value: WorkspaceSettings, grid: GridSize) => {
+    const nextWorkspace = normalizeWorkspaceSettings(value);
+    const nextSnap = normalizeSnapGrid(grid, DEFAULT_SNAP_GRID);
+    const workspaceChanged = workplaneSettingsFingerprint(workspaceRef.current, nextSnap) !== workplaneSettingsFingerprint(nextWorkspace, nextSnap);
+    const snapChanged = snapRef.current !== nextSnap;
+    if (!workspaceChanged && !snapChanged) return;
+    workspaceRef.current = nextWorkspace;
+    snapRef.current = nextSnap;
+    if (workspaceChanged) setWorkspace(nextWorkspace);
+    if (snapChanged) setSnap(nextSnap);
+    onWorkspaceSettingsChange?.({ workspace: nextWorkspace, snap: nextSnap });
+  }, [onWorkspaceSettingsChange]);
 
-  /**
-   * Snap grid picked from a control, as opposed to hydrated from the project.
-   *
-   * The effect above suppresses one sync after hydration so the freshly loaded
-   * settings are not echoed straight back. On mount that suppression is armed
-   * but never spent, because `snap` is already seeded from `initialSnap` and
-   * hydration therefore changes no state and never triggers the effect. The
-   * first choice a user made was swallowed with it, leaving the editor — and
-   * the project file — on the previous grid until some unrelated change
-   * happened to clear the guard. A choice is never a hydration echo, so
-   * disarm the guard before recording it.
-   */
   const chooseSnapGrid = useCallback<Dispatch<SetStateAction<GridSize>>>((value) => {
-    pendingWorkspaceHydrationFingerprintRef.current = null;
-    setSnap(value);
-  }, []);
+    commitWorkspaceSettings(workspaceRef.current, typeof value === "function" ? value(snapRef.current) : value);
+  }, [commitWorkspaceSettings]);
+
+  const chooseWorkspace = useCallback((value: WorkspaceSettings) => {
+    commitWorkspaceSettings(value, snapRef.current);
+  }, [commitWorkspaceSettings]);
+
+  const prevVpBgRef = useRef(theme.viewport.background);
+  useEffect(() => {
+    if (prevVpBgRef.current === theme.viewport.background) return;
+    prevVpBgRef.current = theme.viewport.background;
+    commitWorkspaceSettings({ ...workspaceRef.current, background: theme.viewport.background }, snapRef.current);
+  }, [commitWorkspaceSettings, theme.viewport.background]);
 
   const makeWorkspaceDefault = useCallback(() => {
     const normalizedWorkspace = normalizeWorkspaceSettings(workspace);
@@ -3053,10 +3031,6 @@ export function WorkplaneViewport({
   }, [splitPlane]);
 
   useEffect(() => {
-    snapRef.current = snap;
-  }, [snap]);
-
-  useEffect(() => {
     rulerModeRef.current = rulerMode;
   }, [rulerMode]);
 
@@ -3136,10 +3110,10 @@ export function WorkplaneViewport({
   }, [clearMoveDimensions, renderSelectionIds, workplaneMode]);
 
   useLayoutEffect(() => {
-    workspaceRef.current = workspace;
     rebuildWorkplane(threeRef.current, workspace, resolvedTheme, placementWorkplane);
     rebuildSelectionHelpers(threeRef.current, shapesRef.current, renderSelectionIds(), placementWorkplane);
     if (threeRef.current) {
+      constrainCamera(threeRef.current, workspace);
       syncTransformOverlay(
         threeRef.current,
         shapesRef.current,
@@ -3891,7 +3865,7 @@ export function WorkplaneViewport({
     );
   }, []);
 
-  const forwardCameraWheelFromOverlay = useCallback((event: ReactWheelEvent<Element>) => {
+  const forwardCameraWheelFromOverlay = useCallback((event: WheelEvent) => {
     const state = threeRef.current;
     const canvas = state?.renderer.domElement;
     const WheelEventConstructor = canvas?.ownerDocument.defaultView?.WheelEvent;
@@ -3901,7 +3875,7 @@ export function WorkplaneViewport({
 
     event.preventDefault();
     event.stopPropagation();
-    const source = event.nativeEvent;
+    const source = event;
     canvas.dispatchEvent(
       new WheelEventConstructor("wheel", {
         bubbles: true,
@@ -5260,10 +5234,12 @@ export function WorkplaneViewport({
   const touchAvailable = useTouchNavigation(hostRef, {
     resetKey: `${rendererRetry}:${touchNavigate}:${touchMultiSelect}:${Boolean(sculptSettings)}:${workplaneMode}:${modifierActive}:${splitActive}`,
     allowTap: !touchNavigate && !splitActive,
-    additive: touchMultiSelect && !sculptSettings,
+    // Multi is object selection, not the edge tool's Shift-to-pick-one-edge
+    // shortcut. Carrying it into CAD mode silently disables tangent chains.
+    additive: touchMultiSelect && !sculptSettings && !modifierActive,
     blocked: () => Boolean(transformRef.current || rulerPointDragRef.current),
     singleAction: (event) => {
-      if (touchNavigate || splitActive || (touchMultiSelect && !sculptSettingsRef.current)) return "navigate";
+      if (touchNavigate || splitActive || (touchMultiSelect && !sculptSettingsRef.current && !modifierActiveRef.current)) return "navigate";
       if (sculptSettingsRef.current || workplaneModeRef.current || modifierActiveRef.current || rulerModeRef.current) return "edit";
       const id = pickShape(event.clientX, event.clientY);
       return id && selectedIdsRef.current.includes(id) ? "edit" : "navigate";
@@ -5639,7 +5615,7 @@ export function WorkplaneViewport({
 
   return (
     <main className={`workplane-stage ${challengeTutorial ? `key-tag-tutorial-active ${challengeTutorialCollapsed ? "key-tag-tutorial-collapsed" : ""}` : ""}`}>
-      {touchAvailable ? <TouchControls navigate={touchNavigate} onNavigateChange={setTouchNavigate} multiSelect={touchMultiSelect} onMultiSelectChange={sculptSettings ? undefined : setTouchMultiSelect} /> : null}
+      {touchAvailable ? <TouchControls navigate={touchNavigate} onNavigateChange={setTouchNavigate} multiSelect={touchMultiSelect} onMultiSelectChange={sculptSettings || modifierActive ? undefined : setTouchMultiSelect} /> : null}
       <div className="view-cube" aria-label="View orientation cube" onPointerDown={(event) => event.stopPropagation()}>
         <div className="view-cube-inner" ref={viewCubeRef}>
           <button type="button" className="cube-face cube-top" aria-label="Bottom view" aria-keyshortcuts="6" title="Bottom view (6)" onClick={() => setViewCubeFace("bottom")}>BOTTOM</button>
@@ -5840,7 +5816,7 @@ export function WorkplaneViewport({
           snap={snap}
           moveDimensionsEnabled={moveDimensionsEnabled}
           showProjectNameInToolbar={showProjectNameInToolbar}
-          onWorkspaceChange={setWorkspace}
+          onWorkspaceChange={chooseWorkspace}
           onSnapChange={chooseSnapGrid}
           onMoveDimensionsEnabledChange={changeMoveDimensionsEnabled}
           onShowProjectNameInToolbarChange={onShowProjectNameInToolbarChange}
