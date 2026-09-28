@@ -1,5 +1,9 @@
 # Changelog
 
+## Unreleased
+
+- Hardened the macOS release action against shell template injection: architecture, signing state, and artifact suffixes now pass through quoted environment variables, and the architecture input is restricted to `x64` or `arm64` before building.
+
 ## 1.0.12
 
 ### CAD edge tools
