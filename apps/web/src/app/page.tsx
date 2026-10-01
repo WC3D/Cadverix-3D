@@ -19,6 +19,7 @@ import { attachProjectAsset, dedupeProjectAssets, MAX_PROJECT_ASSET_BYTES, proje
 import { hydrateProjectShapeState, reconcileLoadedProjectShapeCacheEntry, type ImportedMeshResource } from "@/lib/projectShapePersistence";
 import { exportSkfProject, importSkfProject, SKF_CREATED_WITH_VERSION } from "@/lib/skfProject";
 import { importExtensionSupported } from "@/lib/importExtensions";
+import { editableProjectFileName } from "@/lib/projectFileTypes";
 import { DEFAULT_SNAP_GRID, DEFAULT_WORKPLANE_WORKSPACE, normalizeSnapGrid, normalizeWorkspaceSettings, workplaneSettingsFingerprint } from "@/lib/workplaneSettings";
 import type { GridSize, ProjectAsset, WorkplaneShape, WorkplaneWorkspaceSettings } from "@/types/sketchforge";
 
@@ -1085,10 +1086,10 @@ export default function Home() {
   const importFilesFromDashboard = useCallback(
     async (files: File[]) => {
       if (!files.length) return;
-      const projectFiles = files.filter((file) => /\.skf$/i.test(file.name));
+      const projectFiles = files.filter((file) => editableProjectFileName(file.name));
       if (projectFiles.length) {
         if (files.length !== 1) {
-          setDashboardNotice("Open one .skf project at a time; import 3MF, STL, OBJ, STEP, and SVG geometry separately");
+          setDashboardNotice("Open one .skf or .lyl project at a time; import 3MF, STL, OBJ, STEP, and SVG geometry separately");
           return;
         }
         await openSkfProjectFromFile(projectFiles[0]);
@@ -1254,7 +1255,7 @@ export default function Home() {
         className="hidden-file-input"
         type="file"
         multiple
-        accept=".skf,.3mf,.stl,.obj,.step,.stp,.svg,model/3mf,image/svg+xml"
+        accept=".skf,.lyl,.3mf,.stl,.obj,.step,.stp,.svg,model/3mf,image/svg+xml"
         onChange={(event) => {
           const files = event.currentTarget.files ? Array.from(event.currentTarget.files) : [];
           if (files.length) {

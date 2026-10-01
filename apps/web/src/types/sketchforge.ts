@@ -47,7 +47,8 @@ export type ProjectAsset = {
   sha256: string;
 };
 
-export type GridSize = "Off" | "0.1 mm" | "0.25 mm" | "0.5 mm" | "1.0 mm" | "2.0 mm" | "5.0 mm" | "Brick";
+export type GridSize = "Off" | "0.1 mm" | "0.25 mm" | "0.5 mm" | "1.0 mm" | "2.0 mm" | "5.0 mm"
+  | "1/64 in" | "1/32 in" | "1/16 in" | "1/8 in" | "1/4 in" | "1/2 in" | "1 in" | "Brick";
 export type MeasurementAccuracy = 1 | 2 | 3;
 export type HistoryRetentionLimit = "unlimited" | number;
 export type ThreadMode = "none" | "external" | "internal";

@@ -142,6 +142,8 @@ import { buildSketchRevolveMesh, DEFAULT_SKETCH_REVOLVE_SETTINGS, normalizeSketc
 import { exportSkfProject, SKF_MEDIA_TYPE } from "@/lib/skfProject";
 import { makeShapeFromAsset, sceneShape, toolbarBasicShapeAssets, toolbarGeneratorAssets, type ToolbarShapeAsset } from "@/lib/shapeCatalog";
 import { importExtensionSupported } from "@/lib/importExtensions";
+import { editableProjectFileName } from "@/lib/projectFileTypes";
+import { createCadPreviewQueue } from "@/lib/cadPreviewQueue";
 import { importedShapeFromStl } from "@/lib/stlImport";
 import { exportMeshesToStl } from "@/lib/stlExport";
 import { exportMeshesTo3mf, importedShapeFrom3mf } from "@/lib/threeMf";
@@ -6270,6 +6272,7 @@ export function SketchForgeEditor({
   const cadModifierRequestRef = useRef(0);
   const cadModifierPrepareRef = useRef(0);
   const cadModifierLatestPreviewRef = useRef(0);
+  const cadModifierPreviewQueueRef = useRef<ReturnType<typeof createCadPreviewQueue<CadModifierWorkerPayload>> | null>(null);
   const cadModifierResolvedPreviewRef = useRef<{ amount: number; edgeIds: string } | null>(null);
   const cadModifierBaseShapeRef = useRef<WorkplaneShape | null>(null);
   const cadModifierBaseFingerprintRef = useRef("");
@@ -6349,6 +6352,7 @@ export function SketchForgeEditor({
       cadModifierRequestRef.current = requestId;
       cadModifierPrepareRef.current = requestId;
       cadModifierLatestPreviewRef.current = requestId;
+      cadModifierPreviewQueueRef.current?.reset();
       if (cadModifierBaseShapeRef.current) {
         const message = cadModifierWorkerFailureMessage();
         setEdgeModifier((current) => current ? { ...current, busy: false, prepared: false, preview: null, error: message } : current);
@@ -6450,6 +6454,7 @@ export function SketchForgeEditor({
               ? `Edge size fitted to ${message.appliedAmount.toFixed(3)} mm`
               : "Edge treatment preview ready");
         }
+        cadModifierPreviewQueueRef.current?.settle(message.requestId);
         return;
       }
       if (message.type === "error") {
@@ -6462,10 +6467,13 @@ export function SketchForgeEditor({
           cadModifierBaseShapeRef.current = null;
           cadModifierBaseFingerprintRef.current = "";
           cadModifierSourcePartsRef.current = [];
+          cadModifierPreviewQueueRef.current?.reset();
           setEdgeModifier(null);
           setNotice(message.message);
           return;
         }
+        const nextPreview = cadModifierPreviewQueueRef.current?.settle(message.requestId);
+        if (nextPreview?.status === "sent") return;
         setEdgeModifier((current) => current ? { ...current, busy: false, preview: null, error: message.message } : current);
         setNotice("Edge treatment needs adjustment");
       }
@@ -6502,6 +6510,7 @@ export function SketchForgeEditor({
     cadModifierBaseFingerprintRef.current = "";
     cadModifierSourcePartsRef.current = [];
     cadModifierResolvedPreviewRef.current = null;
+    cadModifierPreviewQueueRef.current?.reset();
     setEdgeModifier(null);
     return true;
   }, [clearCadModifierWatchdog]);
@@ -9105,6 +9114,7 @@ export function SketchForgeEditor({
         cadModifierRequestRef.current = invalidationId;
         cadModifierLatestPreviewRef.current = invalidationId;
         cadModifierPrepareRef.current = invalidationId;
+        cadModifierPreviewQueueRef.current?.reset();
         cadModifierBaseShapeRef.current = null;
         cadModifierBaseFingerprintRef.current = "";
         cadModifierSourcePartsRef.current = [];
@@ -9122,6 +9132,15 @@ export function SketchForgeEditor({
       }
     });
   }, []);
+
+  const sendCadModifierPreview = useCallback((request: CadModifierWorkerPayload) => {
+    const requestId = postCadModifierRequest(request);
+    if (requestId === null) return null;
+    cadModifierLatestPreviewRef.current = requestId;
+    armCadModifierWatchdog(requestId, "preview");
+    setEdgeModifier((current) => current ? { ...current, busy: true, error: null } : current);
+    return requestId;
+  }, [armCadModifierWatchdog, postCadModifierRequest]);
 
   const cancelEdgeModifier = useCallback(() => {
     invalidateCadModifierSession();
@@ -9448,7 +9467,7 @@ export function SketchForgeEditor({
     }
     cadModifierResolvedPreviewRef.current = null;
     const timer = window.setTimeout(() => {
-      const requestId = postCadModifierRequest({
+      const request = {
         type: "preview",
         kind: edgeModifier.kind,
         edgeIds: edgeModifier.selectedEdgeIds,
@@ -9456,19 +9475,21 @@ export function SketchForgeEditor({
         amount: edgeModifier.amount,
         quality: edgeModifier.quality,
         chamferAngle: edgeModifier.chamferAngle,
-      });
-      if (requestId === null) {
+      } satisfies CadModifierWorkerPayload;
+      if (!cadModifierPreviewQueueRef.current) {
+        cadModifierPreviewQueueRef.current = createCadPreviewQueue(sendCadModifierPreview);
+      }
+      const dispatched = cadModifierPreviewQueueRef.current.request(request);
+      if (dispatched.status === "failed") {
         const message = cadModifierWorkerFailureMessage();
         setEdgeModifier((current) => current ? { ...current, busy: false, prepared: false, preview: null, error: message } : current);
         setNotice(message);
         return;
       }
-      cadModifierLatestPreviewRef.current = requestId;
-      armCadModifierWatchdog(requestId, "preview");
       setEdgeModifier((current) => current ? { ...current, busy: true, error: null } : current);
     }, 120);
     return () => window.clearTimeout(timer);
-  }, [armCadModifierWatchdog, edgeModifier?.amount, edgeModifier?.chamferAngle, edgeModifier?.kind, edgeModifier?.prepared, edgeModifier?.quality, edgeModifier?.selectedEdgeIds, postCadModifierRequest]);
+  }, [edgeModifier?.amount, edgeModifier?.chamferAngle, edgeModifier?.kind, edgeModifier?.prepared, edgeModifier?.quality, edgeModifier?.selectedEdgeIds, sendCadModifierPreview]);
 
   const snapSelected = useCallback(() => {
     if (!hasSelection) {
@@ -10561,10 +10582,10 @@ export function SketchForgeEditor({
 
   const importFiles = useCallback(async (files: File[]) => {
     if (!files.length) return;
-    const projectFiles = files.filter((file) => /\.skf$/i.test(file.name));
+    const projectFiles = files.filter((file) => editableProjectFileName(file.name));
     if (projectFiles.length) {
       if (files.length !== 1) {
-        setNotice("Open one .skf project at a time; import 3MF, STL, OBJ, STEP, and SVG geometry separately");
+        setNotice("Open one .skf or .lyl project at a time; import 3MF, STL, OBJ, STEP, and SVG geometry separately");
         return;
       }
       if (!onOpenSkfProjectFile) {
@@ -11372,7 +11393,7 @@ export function SketchForgeEditor({
         ref={projectFileInputRef}
         className="hidden-file-input"
         type="file"
-        accept=".skf"
+        accept=".skf,.lyl"
         onChange={(event) => {
           const file = event.currentTarget.files?.[0];
           if (file) selectFiles([file]);
@@ -12685,7 +12706,7 @@ function TopActionPanel({
             <span className="open-skf-project-icon"><FolderOpen size={18} /></span>
             <span>
               <strong>Open SketchForge Project</strong>
-              <small>Restore an editable .skf file as a new local project</small>
+              <small>Restore an editable .skf or compatible .lyl file as a new local project</small>
             </span>
           </button>
           <div className="import-kind-divider"><span>or add geometry</span></div>

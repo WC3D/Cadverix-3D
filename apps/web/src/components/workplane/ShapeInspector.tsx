@@ -31,13 +31,13 @@ import {
   normalizeThreadPitch,
   normalizeThreadQuality,
 } from "@/lib/fastenerGeometry";
-import { displayStepFromMillimeters, displayToMillimeters, formatMeasurementNumber, lengthDisplayUnit, millimetersToDisplay, parseMeasurementInput } from "@/lib/measurementUnits";
+import { displayStepFromMillimeters, displayToMillimeters, formatFractionalInches, formatMeasurementNumber, lengthDisplayUnit, millimetersToDisplay, parseMeasurementInput } from "@/lib/measurementUnits";
+import { snapGridOptionsForUnits } from "@/lib/workplaneSettings";
 import { resizedShapeSize, shapeDepth, shapeHasTaper, shapeOverallFootprintDimensions, shapeTaperDimensions, shapeWidth } from "@/lib/workplaneShapes";
 import { normalizeSketchRevolveSettings } from "@/lib/sketchRevolve";
 import { MAX_HIGH_RESOLUTION_SIDES } from "@/lib/workplaneSettings";
 import type { GearType, GridSize, MeasurementAccuracy, WorkplaneShape, WorkplaneWorkspaceSettings } from "@/types/sketchforge";
 
-const GRID_SIZES: GridSize[] = ["Off", "0.1 mm", "0.25 mm", "0.5 mm", "1.0 mm", "2.0 mm", "5.0 mm", "Brick"];
 const MIN_SHAPE_SIZE = 0.01;
 const SOLID_COLORS = [
   "#d41721",
@@ -762,7 +762,7 @@ export function ShapeInspector({
         </div>
       ) : null}
       <div className="inspector-snap-dock">
-        <SnapGridControl snap={snap} snapOpen={snapOpen} onSnapChange={onSnapChange} onSnapOpenChange={onSnapOpenChange} />
+        <SnapGridControl snap={snap} snapOpen={snapOpen} units={workspace.units} onSnapChange={onSnapChange} onSnapOpenChange={onSnapOpenChange} />
       </div>
         </>
       ) : null}
@@ -795,11 +795,13 @@ function ShapePropertyRows({
 export function SnapGridControl({
   snap,
   snapOpen,
+  units,
   onSnapChange,
   onSnapOpenChange,
 }: {
   snap: GridSize;
   snapOpen: boolean;
+  units: string;
   onSnapChange: Dispatch<SetStateAction<GridSize>>;
   onSnapOpenChange: Dispatch<SetStateAction<boolean>>;
 }) {
@@ -812,7 +814,7 @@ export function SnapGridControl({
       </button>
       {snapOpen ? (
         <div className="snap-menu">
-          {GRID_SIZES.map((size) => (
+          {snapGridOptionsForUnits(units).map((size) => (
             <button
               key={size}
               className={size === snap ? "selected" : ""}
@@ -849,10 +851,13 @@ function RangeProperty({
   const controlMin = isLength ? millimetersToDisplay(min, workspace) : min;
   const controlMax = isLength ? millimetersToDisplay(max, workspace) : max;
   const controlStep = isLength ? displayStepFromMillimeters(step, workspace) : step;
+  const formatControlValue = (next: number) => isLength && lengthDisplayUnit(workspace).label === "in"
+    ? formatFractionalInches(next)
+    : formatPropertyNumber(next, accuracy, controlStep);
   const sliderValue = clamp(controlValue, controlMin, controlMax);
   const position = ((sliderValue - controlMin) / Math.max(Number.EPSILON, controlMax - controlMin)) * 100;
   const [editing, setEditing] = useState(false);
-  const [draft, setDraft] = useState(formatPropertyNumber(controlValue, accuracy, controlStep));
+  const [draft, setDraft] = useState(formatControlValue(controlValue));
   const unit = isLength ? lengthDisplayUnit(workspace).label : null;
   const toModelValue = (nextValue: number) => isLength ? displayToMillimeters(nextValue, workspace) : nextValue;
   const commitDraft = () => {
@@ -866,7 +871,7 @@ function RangeProperty({
   const handleSliderChange = (nextValue: number) => {
     const next = clamp(Number.isFinite(nextValue) ? nextValue : controlMin, controlMin, controlMax);
     onChange(clamp(toModelValue(next), min, max));
-    setDraft(formatPropertyNumber(next, accuracy, controlStep));
+    setDraft(formatControlValue(next));
   };
   return (
     <label className="range-property" style={{ "--slider-pos": `${position}%` } as CSSProperties}>
@@ -875,12 +880,12 @@ function RangeProperty({
         <span className="range-value-control">
           <input
             type="text"
-            value={editing ? draft : formatPropertyNumber(controlValue, accuracy, controlStep)}
+            value={editing ? draft : formatControlValue(controlValue)}
             disabled={disabled}
-            inputMode="decimal"
+            inputMode={unit === "in" ? "text" : "decimal"}
             onFocus={() => {
               onInteractionActiveChange?.(true);
-              setDraft(formatPropertyNumber(controlValue, accuracy, controlStep));
+              setDraft(formatControlValue(controlValue));
               setEditing(true);
             }}
             onChange={(event) => setDraft(event.currentTarget.value)}
@@ -889,7 +894,7 @@ function RangeProperty({
               if (event.key === "Enter") {
                 event.currentTarget.blur();
               } else if (event.key === "Escape") {
-                setDraft(formatPropertyNumber(controlValue, accuracy, controlStep));
+                setDraft(formatControlValue(controlValue));
                 setEditing(false);
               }
             }}

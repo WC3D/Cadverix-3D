@@ -34,7 +34,9 @@ export const DEFAULT_WORKPLANE_WORKSPACE: WorkplaneWorkspaceSettings = {
   shapeCustomizations: {},
 };
 
-const snapGridOptions: GridSize[] = ["Off", "0.1 mm", "0.25 mm", "0.5 mm", "1.0 mm", "2.0 mm", "5.0 mm", "Brick"];
+export const METRIC_SNAP_GRIDS: GridSize[] = ["Off", "0.1 mm", "0.25 mm", "0.5 mm", "1.0 mm", "2.0 mm", "5.0 mm"];
+export const IMPERIAL_SNAP_GRIDS: GridSize[] = ["Off", "1/64 in", "1/32 in", "1/16 in", "1/8 in", "1/4 in", "1/2 in", "1 in"];
+const snapGridOptions: GridSize[] = [...METRIC_SNAP_GRIDS, ...IMPERIAL_SNAP_GRIDS.slice(1), "Brick"];
 const customizableShapeKinds: ShapeKind[] = [
   "box", "cylinder", "sphere", "sketch", "scribble", "cone", "pyramid", "roof", "text", "roundRoof",
   "halfSphere", "torus", "tube", "gear", "screw", "washer", "nut", "ring", "wedge", "polygon", "icosahedron", "mesh",
@@ -152,6 +154,18 @@ export function normalizeSnapGrid(value: unknown, fallback: GridSize = DEFAULT_S
   return snapGridOptions.includes(value as GridSize) ? (value as GridSize) : fallback;
 }
 
+export function snapGridOptionsForUnits(units: string): GridSize[] {
+  if (units === "Imperial") return IMPERIAL_SNAP_GRIDS;
+  if (units === "Bricks") return ["Off", "Brick"];
+  return METRIC_SNAP_GRIDS;
+}
+
+export function snapGridForUnits(units: string, current: GridSize): GridSize {
+  const options = snapGridOptionsForUnits(units);
+  if (options.includes(current)) return current;
+  return units === "Imperial" ? "1/8 in" : units === "Bricks" ? "Brick" : DEFAULT_SNAP_GRID;
+}
+
 function themeOrDefault(value: unknown, fallback: AppTheme | undefined): AppTheme | undefined {
   if (!value || typeof value !== "object") return fallback;
   const t = value as Record<string, unknown>;
@@ -169,6 +183,11 @@ export function snapGridStep(size: GridSize) {
   }
   if (size === "Brick") {
     return BRICK_SNAP_STEP;
+  }
+  if (size.endsWith(" in")) {
+    const fraction = size.slice(0, -3);
+    const [numerator, denominator = "1"] = fraction.split("/");
+    return Number(numerator) / Number(denominator) * 25.4;
   }
   return Number.parseFloat(size) || 1;
 }

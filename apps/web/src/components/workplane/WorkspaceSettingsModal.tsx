@@ -8,13 +8,12 @@ import { customThemeWithDefaults, THEME_PRESET_OPTIONS } from "@/lib/themes";
 import { gearCenterHoleLimits, gearToothPitch } from "@/lib/gearGeometry";
 import { normalizeScaleForUnits, parseMeasurementInput, scaleOptionsForUnits, WORKSPACE_UNIT_OPTIONS } from "@/lib/measurementUnits";
 import { shapeAssetDefaultDimensions, shapeAssetSpecialDefaults, toolbarShapeAssets } from "@/lib/shapeCatalog";
-import { DEFAULT_WORKPLANE_WORKSPACE, MAX_CUSTOM_SHAPE_DIMENSION, MAX_HIGH_RESOLUTION_SIDES, MIN_CUSTOM_SHAPE_DIMENSION } from "@/lib/workplaneSettings";
+import { DEFAULT_WORKPLANE_WORKSPACE, MAX_CUSTOM_SHAPE_DIMENSION, MAX_HIGH_RESOLUTION_SIDES, MIN_CUSTOM_SHAPE_DIMENSION, snapGridForUnits, snapGridOptionsForUnits } from "@/lib/workplaneSettings";
 import type { GearType, GridSize, ShapeCustomization, ShapeKind, WorkplaneWorkspaceSettings } from "@/types/sketchforge";
 
 type WorkspaceSettings = WorkplaneWorkspaceSettings;
 type WorkspaceSettingsSection = "appearance" | "measurement" | "workplane" | "shapes" | "history";
 
-const GRID_SIZES: GridSize[] = ["Off", "0.1 mm", "0.25 mm", "0.5 mm", "1.0 mm", "2.0 mm", "5.0 mm", "Brick"];
 const BACKGROUND_PRESETS = ["#ffffff", "#f8fbfc", "#e8e4e0", "#eaf7fb", "#9aa5b0", "#3a3f47", "#1e2028"];
 const MIN_WORKSPACE_SIZE = 60;
 const MAX_WORKSPACE_SIZE = 2000;
@@ -492,7 +491,10 @@ export function WorkspaceSettingsModal({
                     label="Units"
                     value={workspace.units}
                     options={WORKSPACE_UNIT_OPTIONS}
-                    onChange={(units) => patchWorkspace({ units })}
+                    onChange={(units) => {
+                      patchWorkspace({ units });
+                      onSnapChange(snapGridForUnits(units, snap));
+                    }}
                   />
                   <WorkspaceSelect
                     label="Scale"
@@ -509,7 +511,7 @@ export function WorkspaceSettingsModal({
                   <WorkspaceSelect
                     label="Snap Grid"
                     value={snap}
-                    options={GRID_SIZES}
+                    options={snapGridOptionsForUnits(workspace.units)}
                     onChange={(next) => {
                       setDefaultSaved(false);
                       onSnapChange(next as GridSize);

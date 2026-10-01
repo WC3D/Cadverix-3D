@@ -28,8 +28,11 @@ describe("3MF export", () => {
     expect(model).toContain('<metadata name="Title">Fixture &lt;v2&gt;</metadata>');
     expect(model).toContain('name="Bracket &amp; cap &quot;A&quot;"');
     expect(model).toContain('displaycolor="#1A2B3CFF"');
+    expect(model).toContain('xmlns:m="http://schemas.microsoft.com/3dmanufacturing/material/2015/02"');
+    expect(model).toContain('<m:colorgroup id="3">');
+    expect(model).toContain('<m:color color="#1A2B3CFF"/>');
     expect(model).toContain('<vertex x="1" y="-3" z="2"/>');
-    expect(model).toContain('<triangle v1="0" v2="1" v3="2"/>');
+    expect(model).toContain('<triangle v1="0" v2="1" v3="2" pid="3" p1="0"/>');
     expect(model).toContain('<item objectid="2"/>');
   });
 

@@ -10,6 +10,7 @@ import { normalizeSnapGrid, normalizeWorkspaceSettings } from "@/lib/workplaneSe
 import type { CadDisplayEdge, GridSize, ProjectAsset, ProjectAssetSourceFormat, SketchOperation, SketchRevolveSettings, WorkplaneShape, WorkplaneWorkspaceSettings } from "@/types/sketchforge";
 
 export const SKF_SCHEMA_ID = "com.sketchforge.project";
+export const LYL_SCHEMA_ID = "com.layerling.project";
 // Version 2 stores display edges as deduplicated archive assets instead of repeating
 // them inside every undo state. Version 1 packages are still read and migrated.
 export const SKF_FORMAT_VERSION = 2;
@@ -104,7 +105,7 @@ export type SkfFeatureV1 = {
 // The packaged graph layout is shared by V1 and V2. V2 moves display edges
 // from inline definitions to assets; keep the exported type name for callers.
 export type SkfProjectDocumentV1 = {
-  schema: typeof SKF_SCHEMA_ID;
+  schema: typeof SKF_SCHEMA_ID | typeof LYL_SCHEMA_ID;
   formatVersion: 1 | 2;
   minimumReaderVersion: number;
   createdWithVersion: string;
@@ -261,7 +262,8 @@ function encodeMeshCache(mesh: NonNullable<WorkplaneShape["importedMesh"]>) {
 }
 
 function decodeMeshCache(bytes: Uint8Array) {
-  if (bytes.byteLength < 16 || strFromU8(bytes.subarray(0, 8)) !== "SKFMSH1\0") {
+  const header = strFromU8(bytes.subarray(0, 8));
+  if (bytes.byteLength < 16 || header !== "SKFMSH1\0" && header !== "LYLMSH1\0") {
     throw new Error("A derived mesh asset has an invalid header");
   }
   const view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
@@ -311,7 +313,8 @@ function encodeDisplayEdges(edges: CadDisplayEdge[]) {
 }
 
 function decodeDisplayEdges(bytes: Uint8Array): CadDisplayEdge[] {
-  if (bytes.byteLength < 16 || strFromU8(bytes.subarray(0, 8)) !== "SKFEDG1\0") {
+  const header = strFromU8(bytes.subarray(0, 8));
+  if (bytes.byteLength < 16 || header !== "SKFEDG1\0" && header !== "LYLEDG1\0") {
     throw new Error("A display edge asset has an invalid header");
   }
   const view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
@@ -1259,7 +1262,8 @@ function validateFeatureGraph(features: unknown, activeObjectIds: Set<string>) {
 
 async function validateDocumentAndAssets(raw: unknown, files: ArchiveFiles) {
   const document = objectRecord(raw, "project.json") as unknown as SkfProjectDocumentV1;
-  if (document.schema !== SKF_SCHEMA_ID) throw new Error("This file is not a SketchForge project");
+  if (document.schema !== SKF_SCHEMA_ID && document.schema !== LYL_SCHEMA_ID) throw new Error("This file is not a SketchForge or Layerling project");
+  const layerlingProject = document.schema === LYL_SCHEMA_ID;
   if (!Number.isInteger(document.formatVersion)) throw new Error("SketchForge formatVersion is missing");
   if (document.formatVersion > SKF_FORMAT_VERSION) {
     throw new Error(`This project uses .skf format ${document.formatVersion}, which requires a newer SketchForge version`);
@@ -1311,6 +1315,16 @@ async function validateDocumentAndAssets(raw: unknown, files: ArchiveFiles) {
       const nodeId = stringValue(node?.nodeId, `states[${stateIndex}].nodes[${nodeIndex}].nodeId`);
       if (nodeById.has(nodeId)) throw new Error(`State '${stateId}' contains duplicate node ID '${nodeId}'`);
       const definition = objectRecord(node.definition, `node '${nodeId}'.definition`);
+      if (layerlingProject) {
+        const unsupportedFields = [
+          "extrudeTwist", "extrudeTopOffsetX", "extrudeTopOffsetZ",
+          "textCurved", "textRadius", "textSize", "textInward", "textFlipped",
+          "topWidth", "topDepth", "transparent",
+        ].filter((field) => definition[field] !== undefined);
+        if (unsupportedFields.length) {
+          throw new Error(`Layerling object '${node.objectId}' uses unsupported feature '${unsupportedFields[0]}'`);
+        }
+      }
       const objectId = validateShapeDefinition(definition, `node '${nodeId}'`);
       if (node.objectId !== objectId) throw new Error(`Node '${nodeId}' objectId does not match its shape definition`);
       if (node.importedMesh) {
@@ -1327,6 +1341,12 @@ async function validateDocumentAndAssets(raw: unknown, files: ArchiveFiles) {
       }
       nodeById.set(nodeId, node);
     });
+    if (layerlingProject) {
+      const layerlingState = state as SkfStateV1 & { notes?: unknown[] };
+      if (Array.isArray(layerlingState.notes) && layerlingState.notes.length) {
+        throw new Error("This Layerling project contains workplane notes, which this SketchForge version cannot import");
+      }
+    }
     const roots = stringArray(state.rootNodeIds, `state '${stateId}'.rootNodeIds`);
     const visiting = new Set<string>();
     const visited = new Set<string>();
@@ -1358,6 +1378,9 @@ async function validateDocumentAndAssets(raw: unknown, files: ArchiveFiles) {
   document.history.entries.forEach((entry, index) => {
     if (!stateById.has(entry.stateId)) throw new Error(`History entry ${index} references missing state '${entry.stateId}'`);
     stringArray(entry.selectedObjectIds, `history.entries[${index}].selectedObjectIds`);
+    if (layerlingProject && (entry as typeof entry & { workplane?: unknown }).workplane !== undefined) {
+      throw new Error("This Layerling project contains history-specific workplanes, which this SketchForge version cannot import");
+    }
   });
   if (document.history.entries[document.history.index]?.stateId !== document.sceneStateId) throw new Error("Active scene and undo history index do not match");
   validateFeatureGraph(document.features, activeObjectIds);
@@ -1697,7 +1720,7 @@ export async function importSkfProject(input: ArrayBuffer | Uint8Array, options:
       throw new Error("Legacy .skf JSON is malformed");
     }
     const document = objectRecord(raw, "Legacy .skf project");
-    if (document.schema !== SKF_SCHEMA_ID) throw new Error("This file is not a SketchForge project");
+    if (document.schema !== SKF_SCHEMA_ID && document.schema !== LYL_SCHEMA_ID) throw new Error("This file is not a SketchForge or Layerling project");
     if (document.formatVersion === 0) return migrateV0(document);
     if (typeof document.formatVersion === "number" && document.formatVersion > SKF_FORMAT_VERSION) {
       throw new Error(`This project uses .skf format ${document.formatVersion}, which requires a newer SketchForge version`);

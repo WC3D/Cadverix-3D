@@ -59,6 +59,8 @@ function displayColor(value: string | undefined) {
 function modelXml(meshes: ReadonlyArray<ThreeMfMesh>, title: string) {
   if (!meshes.length) throw new Error("Add a solid shape before exporting 3MF");
   const materials = meshes.map((mesh, index) => `      <base name="${xmlEscape(mesh.name || `Object ${index + 1}`)}" displaycolor="${displayColor(mesh.color)}"/>`);
+  const colorGroupId = meshes.length + 2;
+  const colors = meshes.map((mesh) => `      <m:color color="${displayColor(mesh.color)}"/>`);
   const objects = meshes.map((mesh, meshIndex) => {
     if (!mesh.vertices.length || !mesh.faces.length) throw new Error(`${mesh.name || "3MF object"} has no exportable triangles`);
     const vertices = mesh.vertices.map(([x, y, z]) => (
@@ -68,7 +70,7 @@ function modelXml(meshes: ReadonlyArray<ThreeMfMesh>, title: string) {
       if (![v1, v2, v3].every((index) => Number.isInteger(index) && index >= 0 && index < mesh.vertices.length)) {
         throw new Error(`${mesh.name || "3MF object"} contains an invalid triangle`);
       }
-      return `          <triangle v1="${v1}" v2="${v2}" v3="${v3}"/>`;
+      return `          <triangle v1="${v1}" v2="${v2}" v3="${v3}" pid="${colorGroupId}" p1="${meshIndex}"/>`;
     });
     return [
       `    <object id="${meshIndex + 2}" name="${xmlEscape(mesh.name || `Object ${meshIndex + 1}`)}" type="model" pid="1" pindex="${meshIndex}">`,
@@ -87,13 +89,16 @@ function modelXml(meshes: ReadonlyArray<ThreeMfMesh>, title: string) {
 
   return [
     '<?xml version="1.0" encoding="UTF-8"?>',
-    '<model unit="millimeter" xml:lang="en-US" xmlns="http://schemas.microsoft.com/3dmanufacturing/core/2015/02">',
+    '<model unit="millimeter" xml:lang="en-US" xmlns="http://schemas.microsoft.com/3dmanufacturing/core/2015/02" xmlns:m="http://schemas.microsoft.com/3dmanufacturing/material/2015/02">',
     `  <metadata name="Title">${xmlEscape(title.trim() || "SketchForge design")}</metadata>`,
     '  <metadata name="Application">SketchForge</metadata>',
     "  <resources>",
     '    <basematerials id="1">',
     ...materials,
     "    </basematerials>",
+    `    <m:colorgroup id="${colorGroupId}">`,
+    ...colors,
+    "    </m:colorgroup>",
     ...objects,
     "  </resources>",
     "  <build>",

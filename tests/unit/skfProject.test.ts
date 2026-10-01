@@ -10,6 +10,7 @@ import {
   exportSkfProject,
   importSkfProject,
   inspectSkfProjectPackage,
+  LYL_SCHEMA_ID,
   SKF_FORMAT_VERSION,
   SKF_LIMITS,
   SKF_SCHEMA_ID,
@@ -82,6 +83,56 @@ describe("SketchForge .skf project packages", () => {
   afterEach(() => {
     vi.unstubAllGlobals();
     vi.restoreAllMocks();
+  });
+
+  it("imports compatible Layerling packages and re-saves them as SKF", async () => {
+    const original = shape("mesh", "layerling-mesh", {
+      cadDisplayEdges: [{ points: [0, 0, 0, 1, 1, 1] }],
+      importedMesh: {
+        positions: [0, 0, 0, 1, 0, 0, 0, 1, 0],
+        baseWidth: 1,
+        baseDepth: 1,
+        baseHeight: 1,
+        triangleCount: 1,
+        sourceFormat: "json",
+      },
+    });
+    const { files, document } = packageDocument(await exportSkfProject(input([original])));
+    document.schema = LYL_SCHEMA_ID;
+    for (const asset of document.assets) {
+      if (asset.kind !== "derived-mesh" && asset.kind !== "display-edges") continue;
+      const bytes = files[asset.path];
+      bytes.set(strToU8(asset.kind === "derived-mesh" ? "LYLMSH1\0" : "LYLEDG1\0"), 0);
+      asset.sha256 = await projectAssets.sha256Hex(bytes);
+    }
+    files["project.json"] = strToU8(JSON.stringify(document));
+
+    const restored = await importSkfProject(zipSync(files));
+    expect(restored.shapes[0].importedMesh?.positions).toEqual(original.importedMesh?.positions);
+    expect(restored.shapes[0].cadDisplayEdges).toEqual(original.cadDisplayEdges);
+
+    const saved = packageDocument(await exportSkfProject(input(restored.shapes, {
+      history: restored.history,
+      historyIndex: restored.historyIndex,
+    })));
+    expect(saved.document.schema).toBe(SKF_SCHEMA_ID);
+    for (const asset of saved.document.assets) {
+      if (asset.kind === "derived-mesh") expect(strFromU8(saved.files[asset.path].subarray(0, 8))).toBe("SKFMSH1\0");
+      if (asset.kind === "display-edges") expect(strFromU8(saved.files[asset.path].subarray(0, 8))).toBe("SKFEDG1\0");
+    }
+  });
+
+  it("rejects Layerling features that SketchForge cannot preserve", async () => {
+    const bytes = await exportSkfProject(input([shape("box", "twisted")]));
+    await expect(importSkfProject(mutateProject(bytes, (document) => {
+      document.schema = LYL_SCHEMA_ID;
+      document.states[0].nodes[0].definition.extrudeTwist = 45;
+    }))).rejects.toThrow(/unsupported feature 'extrudeTwist'/);
+
+    await expect(importSkfProject(mutateProject(bytes, (document) => {
+      document.schema = LYL_SCHEMA_ID;
+      document.states[0].nodes[0].definition.kind = "roundedBox";
+    }))).rejects.toThrow(/unknown shape type 'roundedBox'/);
   });
 
   it("encodes shared geometry once across a long transform history and subsequent saves", async () => {

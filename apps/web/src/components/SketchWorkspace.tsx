@@ -1951,7 +1951,7 @@ export function SketchWorkspace({
         </div>
       ) : null}
       <div className="grid-settings sketch-grid-settings">
-        <SnapGridControl snap={snap} snapOpen={snapOpen} onSnapChange={setSnap} onSnapOpenChange={setSnapOpen} />
+        <SnapGridControl snap={snap} snapOpen={snapOpen} units={workspace.units} onSnapChange={setSnap} onSnapOpenChange={setSnapOpen} />
         <div className="sketch-snap-mode-buttons" role="group" aria-label="Sketch magnetic snapping">
           <button type="button" className={snapToGridLines ? "active" : ""} aria-pressed={snapToGridLines} onClick={() => setSnapToGridLines((enabled) => !enabled)}>Grid lines</button>
           <button type="button" className={snapToGeometry ? "active" : ""} aria-pressed={snapToGeometry} onClick={() => setSnapToGeometry((enabled) => !enabled)}>Geometry</button>

@@ -5830,7 +5830,7 @@ export function WorkplaneViewport({
 
       {!selectedShape ? (
         <div className="grid-settings">
-          <SnapGridControl snap={snap} snapOpen={snapOpen} onSnapChange={chooseSnapGrid} onSnapOpenChange={setSnapOpen} />
+          <SnapGridControl snap={snap} snapOpen={snapOpen} units={workspace.units} onSnapChange={chooseSnapGrid} onSnapOpenChange={setSnapOpen} />
         </div>
       ) : null}
 

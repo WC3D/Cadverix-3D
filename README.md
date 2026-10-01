@@ -38,7 +38,7 @@ No login. Private projects autosave locally in your browser, with optional share
 
 - **2D Sketching & Parametric Profiles** - draw parametric lines, Bézier curves, three-point arcs (start, end, then bulge), circles, rectangles, polygons, and text with constraints, distance dimensions, region selections, and revolve/extrude/sweep operations.
 - **Local-first projects** - designs live in browser storage with generated project thumbnails.
-- **Editable SKF project packages** - back up and transfer projects with their editable objects, imported assets, and available undo/redo history; optionally save to a shared Docker library.
+- **Editable SKF project packages** - back up and transfer projects with their editable objects, imported assets, and available undo/redo history; optionally save to a shared Docker library. Compatible Layerling `.lyl` files can also be opened and are converted to SKF when saved.
 - **Real 3D workplane** - grid, camera controls, snap settings, transform handles, outlines, and inspector controls.
 - **Associative construction planes** - create offset, angled, flipped, face-attached, and midplanes for sketches away from the base workplane.
 - **Primitive shape library** - boxes, cylinders, spheres, cones, pyramids, wedges, text, roofs, half spheres, torus shapes, tubes, and more.
