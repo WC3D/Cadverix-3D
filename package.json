@@ -1,6 +1,6 @@
 {
   "name": "sketchforge",
-  "version": "1.0.11",
+  "version": "1.0.12",
   "private": true,
   "description": "A local-first 3D design editor.",
   "author": {
@@ -14,6 +14,7 @@
     "node": ">=24"
   },
   "scripts": {
+    "postinstall": "patch-package --error-on-fail",
     "copy:occt": "node scripts/copy-occt-wasm.mjs",
     "predev": "npm run copy:occt",
     "dev": "next dev apps/web --webpack",
@@ -51,6 +52,7 @@
     "next": "^16.3.3",
     "node-gyp": "^12.4.0",
     "occt-wasm": "^3.6.1",
+    "patch-package": "8.0.1",
     "react": "^19.1.0",
     "react-colorful": "^5.8.0",
     "react-dom": "^19.1.0",

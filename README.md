@@ -19,7 +19,7 @@
     <a href="https://github.com/Formsmith746/SketchForge-3D/stargazers"><img alt="Star SketchForge on GitHub" src="https://img.shields.io/github/stars/Formsmith746/SketchForge-3D?style=flat&logo=github"></a>
     <a href="https://github.com/sponsors/Formsmith746"><img alt="Sponsor SketchForge on GitHub" src="https://img.shields.io/badge/GitHub-Sponsor-ea4aaa?logo=githubsponsors&logoColor=white"></a>
     <img alt="Local first" src="https://img.shields.io/badge/local--first-no%20account-0ea5e9">
-    <img alt="Version v1.0.11" src="https://img.shields.io/badge/version-v1.0.11-2563eb">
+    <img alt="Version v1.0.12" src="https://img.shields.io/badge/version-v1.0.12-2563eb">
     <a href="docs/MOBILE_ALPHA.md"><img alt="Mobile support: alpha" src="https://img.shields.io/badge/mobile-alpha-f59e0b"></a>
   </p>
 </div>
@@ -45,6 +45,7 @@ No login. Private projects autosave locally in your browser, with optional share
 - **Solid and hole workflow** - turn shapes into cutters and group them into final geometry.
 - **Boolean Intersection** - keep only the geometry where selected solid and hole shapes overlap.
 - **Reversible edge tools** - chamfer and fillet selected CAD edges, with history controls for removing applied edge features.
+- **Faceted mesh rim treatments** - dedicated chamfer and rounded Fillet paths for supported complete, convex, horizontal outer rims on imported meshes, with CAD validation and retained B-Rep geometry.
 - **Rotated solid edge treatment** - chamfer and fillet preserve analytic box topology after one-, two-, or three-axis rotations.
 - **Mesh sculpting** - Add, Subtract, and Smooth brushes with adjustable radius and strength, local remeshing, and undoable strokes processed in a background worker.
 - **Scene overview** - search shapes and features, inspect groups, control visibility, locking, and hole state, and toggle or remove supported features.
@@ -62,6 +63,14 @@ No login. Private projects autosave locally in your browser, with optional share
 - Press **R** to rotate selected objects by 45 degrees around the active workplane normal, or **Shift+R** for 22.5 degrees.
 - Arrow-key movement follows the snap grid; **Ctrl/Cmd+arrow** changes elevation. Holding a movement key produces one undo step when released.
 - Duplicating an object keeps it at the source object's exact position, ready to move or edit.
+
+### Fillet and chamfer on imported rims
+
+Select the imported object, open **Fillet** or **Chamfer**, enable **Select tangent chains**, and click or tap the rim. A densely faceted STL rim can contain many short edges; select the complete rim to use the dedicated planar-rim path. Chamfer uses a tapered cut, while Fillet uses circular profiles that follow the adjacent wall slopes. These paths apply to supported convex, horizontal outer rims; other selections use the normal CAD edge builder.
+
+Mobile **Multi** mode controls object selection and is hidden during edge treatment, so it no longer overrides tangent-chain selection. Kernel memory faults stop further retries and replace the worker. Diagnostic details are logged under **`[SketchForge CAD]`** in the browser console.
+
+See [CAD edge tools](docs/CAD_EDGE_TOOLS.md) for supported geometry, recovery, and regression-test instructions.
 
 ### Sculpting and scene management
 
@@ -105,6 +114,8 @@ SketchForge now includes **alpha mobile support** in the browser, with touch-fir
 | Top toolbar undo/redo | Access history without a keyboard |
 
 Pen input uses the active tool, and touch contacts are ignored while a pen is down. A second finger switches touch interaction to navigation; finish resize/rotate handle adjustments before starting a camera gesture.
+
+Wheel/trackpad zoom also works over selection handles. Workspace settings synchronize by value, and saved defaults seed the workspace once, preventing theme/snap update loops and preserving later user choices.
 
 **Status:** this is an early alpha/MVP. Automated Chromium/WebKit menu checks and Chromium touch/pen checks are available, but physical-device validation is still needed, especially for iOS Safari, Android Chrome, styluses, on-screen numeric entry, and large meshes.
 
@@ -391,6 +402,8 @@ npm install
 npm run dev
 ```
 
+Installation automatically applies the compatibility patches in [`patches/`](patches/README.md), including the updated BVH option used by the CSG dependency. Docker builds apply the same patches.
+
 If you use nvm, first run `nvm install` and `nvm use` in the project folder. The included `.nvmrc` selects Node 24. Older Node versions report an `EBADENGINE` warning for `brepjs`.
 
 Open:
@@ -474,10 +487,11 @@ npm run desktop:dist
 
 ## Documentation
 
-- [User manual](docs/SKETCHFORGE_USER_MANUAL.md) — modeling, sketch tools, import/export, and shortcuts.
+- [User manual (PDF)](docs/SketchForge-User-Manual.pdf) — modeling, sketch tools, import/export, and shortcuts.
 - [Mobile Alpha](docs/MOBILE_ALPHA.md) — touch/pen controls, LAN setup, and validation status.
+- [CAD edge tools](docs/CAD_EDGE_TOOLS.md) — imported rim fillets/chamfers, supported geometry, diagnostics, and tests.
 - [SKF project format](docs/SKF_PROJECT_FORMAT.md) — editable project packages and reader compatibility.
-- [Changelog](docs/CHANGELOG.md) — release notes and unreleased persistence improvements.
+- [Changelog](docs/CHANGELOG.md) — release notes, including CAD stability and editor fixes in 1.0.12.
 
 ## Contributing
 

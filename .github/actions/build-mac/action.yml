@@ -31,6 +31,16 @@ inputs:
 runs:
   using: composite
   steps:
+    - name: Validate macOS architecture
+      shell: bash
+      env:
+        ARCH: ${{ inputs.arch }}
+      run: |
+        case "$ARCH" in
+          x64|arm64) ;;
+          *) echo "Unsupported macOS architecture. Expected x64 or arm64." >&2; exit 1 ;;
+        esac
+
     - name: Resolve macOS signing state
       id: signing
       shell: bash
@@ -53,6 +63,9 @@ runs:
     - name: Build macOS package
       shell: bash
       env:
+        ARCH: ${{ inputs.arch }}
+        SIGNING_ENABLED: ${{ steps.signing.outputs.signing_enabled }}
+        ARTIFACT_SUFFIX: ${{ steps.signing.outputs.artifact_suffix }}
         CSC_LINK: ${{ inputs.csc-link }}
         CSC_KEY_PASSWORD: ${{ inputs.csc-key-password }}
         APPLE_API_KEY_INPUT: ${{ inputs.apple-api-key }}
@@ -60,13 +73,13 @@ runs:
         APPLE_API_ISSUER: ${{ inputs.apple-api-issuer }}
         CSC_IDENTITY_AUTO_DISCOVERY: ${{ steps.signing.outputs.signing_enabled }}
       run: |
-        if [[ "${{ steps.signing.outputs.signing_enabled }}" == "false" ]]; then
+        if [[ "$SIGNING_ENABLED" == "false" ]]; then
           unset CSC_LINK CSC_KEY_PASSWORD APPLE_API_KEY APPLE_API_KEY_ID APPLE_API_ISSUER
         else
           if [[ -f "$APPLE_API_KEY_INPUT" ]]; then
             export APPLE_API_KEY="$APPLE_API_KEY_INPUT"
           else
-            export APPLE_API_KEY="$RUNNER_TEMP/sketchforge-notary-${{ inputs.arch }}.p8"
+            export APPLE_API_KEY="$RUNNER_TEMP/sketchforge-notary-${ARCH}.p8"
             node <<'NODE'
             const fs = require("node:fs");
             const input = process.env.APPLE_API_KEY_INPUT || "";
@@ -78,21 +91,23 @@ runs:
               throw new Error("APPLE_API_KEY must be a .p8 path, key contents, or base64-encoded key contents.");
             }
             fs.writeFileSync(output, decoded, { mode: 0o600 });
-            NODE
+        NODE
           fi
         fi
-        npm run desktop:dist -- --publish never --mac --${{ inputs.arch }} \
-          "-c.mac.artifactName=\${productName}-\${version}-\${arch}${{ steps.signing.outputs.artifact_suffix }}.\${ext}"
+        npm run desktop:dist -- --publish never --mac "--${ARCH}" \
+          "-c.mac.artifactName=\${productName}-\${version}-\${arch}${ARTIFACT_SUFFIX}.\${ext}"
 
     - name: Verify macOS artifacts
       shell: bash
       env:
         VERSION: ${{ inputs.version }}
+        ARCH: ${{ inputs.arch }}
+        SIGNING_ENABLED: ${{ steps.signing.outputs.signing_enabled }}
+        ARTIFACT_SUFFIX: ${{ steps.signing.outputs.artifact_suffix }}
       run: |
-        suffix="${{ steps.signing.outputs.artifact_suffix }}"
-        test -f "dist/desktop/SketchForge-$VERSION-${{ inputs.arch }}${suffix}.dmg"
-        test -f "dist/desktop/SketchForge-$VERSION-${{ inputs.arch }}${suffix}.zip"
-        if [[ "${{ steps.signing.outputs.signing_enabled }}" == "true" ]]; then
+        test -f "dist/desktop/SketchForge-${VERSION}-${ARCH}${ARTIFACT_SUFFIX}.dmg"
+        test -f "dist/desktop/SketchForge-${VERSION}-${ARCH}${ARTIFACT_SUFFIX}.zip"
+        if [[ "$SIGNING_ENABLED" == "true" ]]; then
           test -f dist/desktop/latest-mac.yml
         else
           rm -f dist/desktop/latest-mac.yml
@@ -101,7 +116,9 @@ runs:
     - name: Rename macOS update manifest
       if: steps.signing.outputs.signing_enabled == 'true'
       shell: bash
-      run: mv dist/desktop/latest-mac.yml "dist/desktop/latest-mac-${{ inputs.arch }}.yml"
+      env:
+        ARCH: ${{ inputs.arch }}
+      run: mv dist/desktop/latest-mac.yml "dist/desktop/latest-mac-${ARCH}.yml"
 
     - name: Store macOS artifacts
       uses: actions/upload-artifact@v4

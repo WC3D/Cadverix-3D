@@ -2,8 +2,10 @@
 
 import { OcctError, OcctKernel, type ShapeHandle } from "occt-wasm";
 import type { CadModifierComponentMesh, CadModifierDisplayEdge, CadModifierEdge, CadModifierMeshPart, CadModifierPrimitivePart, CadModifierQuality, CadModifierWorkerRequest, CadModifierWorkerResponse } from "@/lib/cadModifierTypes";
-import { CAD_MODIFIER_MIN_AMOUNT, CAD_MODIFIER_RUNTIME_BASE, cadModifierMeshFallbackParts, cadModifierTopologyEdgeIsSelectable, cadTransformRequiresGeneralTransform, findCadModifierCompatibleSelection, fitCadModifierAmount, isCadModifierWasmMemoryFault, serializeOptionalCadModifierBreps } from "@/lib/cadModifierRuntime";
+import { CAD_MODIFIER_MIN_AMOUNT, CAD_MODIFIER_RUNTIME_BASE, cadModifierMeshFallbackParts, cadModifierTopologyEdgeIsSelectable, cadTransformRequiresGeneralTransform, findCadModifierCompatibleSelection, fitCadModifierAmount, isCadModifierWasmMemoryFault, rethrowCadModifierMemoryFault, serializeOptionalCadModifierBreps, validateCadModifierShape } from "@/lib/cadModifierRuntime";
 import { closedCadSolidComponents } from "@/lib/cadModifierGroups";
+import { planarRimChamferPlan, planarRimFilletPlan } from "@/lib/cadPlanarRim";
+import { cutPlanarCadRim } from "@/lib/cadPlanarRimKernel";
 
 const HASH_UPPER_BOUND = 2_147_483_647;
 const CAD_EDGE_WIREFRAME_DEFLECTION = 0.035;
@@ -16,6 +18,8 @@ let edgeHandles: ShapeHandle[] = [];
 let edgeOwners: number[] = [];
 let activeSessionId = 0;
 let usedExactMeshFallback = false;
+let meshRimSource: { edges: Map<ShapeHandle, number[]>; slopes: Map<ShapeHandle, number>; points: number[] } | null = null;
+let previewStrategy: "native-edge" | "planar-rim" = "native-edge";
 
 type CollectedCadEdgeGeometry = Omit<CadModifierEdge, "display" | "selectable"> & {
   curveType: string;
@@ -46,9 +50,9 @@ function kernel() {
   return kernelPromise;
 }
 
-function releaseSession(cad: OcctKernel) {
+function releaseSession(cad: OcctKernel, release = true) {
   try {
-    cad.releaseAll();
+    if (release) cad.releaseAll();
   } catch {
     // The arena may already be empty after an operation failure.
   }
@@ -58,16 +62,13 @@ function releaseSession(cad: OcctKernel) {
   edgeOwners = [];
   activeSessionId = 0;
   usedExactMeshFallback = false;
+  meshRimSource = null;
 }
 
 function cadShapeIsValid(cad: OcctKernel, shape: ShapeHandle) {
   const validator = (cad as { isValid?: unknown }).isValid;
   if (typeof validator !== "function") throw new Error("isValid is not a function");
-  try {
-    return Boolean(validator.call(cad, shape));
-  } catch {
-    return false;
-  }
+  return validateCadModifierShape(() => Boolean(validator.call(cad, shape)));
 }
 
 function orientedFaceNormal(cad: OcctKernel, face: ShapeHandle, point: { x: number; y: number; z: number }) {
@@ -110,8 +111,12 @@ function edgeAngle(cad: OcctKernel, points: number[], faceHashes: number[], face
     const b = orientedFaceNormal(cad, faceB, point);
     const dot = Math.max(-1, Math.min(1, a.x * b.x + a.y * b.y + a.z * b.z));
     const rawAngle = (Math.acos(dot) * 180) / Math.PI;
-    return { angle: Math.min(rawAngle, 180 - rawAngle), boundary: false, manifold: true };
-  } catch {
+    const wall = Math.abs(a.y) > 1 - 1e-6 ? b : Math.abs(b.y) > 1 - 1e-6 ? a : null;
+    const horizontal = wall ? Math.hypot(wall.x, wall.z) : 0;
+    const topWallSlope = wall && horizontal > 1e-6 ? -wall.y / horizontal : undefined;
+    return { angle: Math.min(rawAngle, 180 - rawAngle), boundary: false, manifold: true, topWallSlope };
+  } catch (error) {
+    rethrowCadModifierMemoryFault(error);
     return { angle: 0, boundary: false, manifold: false };
   }
 }
@@ -170,7 +175,8 @@ function applyCadTransform(cad: OcctKernel, shape: ShapeHandle, transform: numbe
   } else {
     try {
       transformed = cad.transform(shape, transform);
-    } catch {
+    } catch (error) {
+      rethrowCadModifierMemoryFault(error);
       transformed = cad.generalTransform(shape, transform);
     }
   }
@@ -253,7 +259,8 @@ function reconstructSolid(cad: OcctKernel, part: CadModifierMeshPart) {
       shape = cad.fixFaceOrientations(shape);
       shape = cad.removeDegenerateEdges(shape);
       shape = cad.unifySameDomain(shape);
-    } catch {
+    } catch (error) {
+      rethrowCadModifierMemoryFault(error);
       // Fall through to face sewing when the imported solid cannot be healed directly.
     }
     if (cad.isSolid(shape) && cadShapeIsValid(cad, shape)) return shape;
@@ -270,7 +277,8 @@ function reconstructSolid(cad: OcctKernel, part: CadModifierMeshPart) {
       candidate = cad.removeDegenerateEdges(candidate);
       candidate = cad.unifySameDomain(candidate);
       if (cad.isSolid(candidate) && cadShapeIsValid(cad, candidate)) return candidate;
-    } catch {
+    } catch (error) {
+      rethrowCadModifierMemoryFault(error);
       // Try the next tolerance. Curved tessellations can need looser vertex sewing.
     }
   }
@@ -325,7 +333,8 @@ function releaseHandles(cad: OcctKernel, handles: ShapeHandle[]) {
   handles.forEach((handle) => {
     try {
       cad.release(handle);
-    } catch {
+    } catch (error) {
+      rethrowCadModifierMemoryFault(error);
       // A failed topology operation can invalidate temporary handles.
     }
   });
@@ -359,7 +368,8 @@ function uniqueEdgeOrders(cad: OcctKernel, edges: ShapeHandle[], retryOrder: boo
       const lengths = new Map(edges.map((edge) => [edge, cad.getLength(edge)]));
       orders.push([...edges].sort((a, b) => (lengths.get(a) ?? 0) - (lengths.get(b) ?? 0)));
       orders.push([...edges].sort((a, b) => (lengths.get(b) ?? 0) - (lengths.get(a) ?? 0)));
-    } catch {
+    } catch (error) {
+      rethrowCadModifierMemoryFault(error);
       // Original and reversed orders still provide bounded topology retries.
     }
   }
@@ -372,6 +382,23 @@ function uniqueEdgeOrders(cad: OcctKernel, edges: ShapeHandle[], retryOrder: boo
   });
 }
 
+function modifyPlanarMeshRim(cad: OcctKernel, solid: ShapeHandle, edges: ShapeHandle[], kind: "fillet" | "chamfer", amount: number, angle: number) {
+  if (!meshRimSource) return null;
+  const selected = edges.map((edge) => meshRimSource!.edges.get(edge) ?? []);
+  const filletPlan = kind === "fillet"
+    ? planarRimFilletPlan(selected, [...meshRimSource.edges.values()], amount, edges.map((edge) => meshRimSource!.slopes.get(edge) ?? NaN))
+    : null;
+  const plan = kind === "fillet" ? filletPlan : planarRimChamferPlan(selected, meshRimSource.points, amount, angle);
+  if (!plan) return null;
+  previewStrategy = "planar-rim";
+  try {
+    return cutPlanarCadRim(cad, solid, { ...plan, profiles: filletPlan?.profiles });
+  } catch (error) {
+    rethrowCadModifierMemoryFault(error);
+    throw new CadEdgeOperationError(error instanceof Error ? error.message : `The rim ${kind} could not be built`);
+  }
+}
+
 function modifyCadSolid(
   cad: OcctKernel,
   solid: ShapeHandle,
@@ -380,6 +407,9 @@ function modifyCadSolid(
   amount: number,
   retryOrder: boolean,
 ) {
+  previewStrategy = "native-edge";
+  const rim = modifyPlanarMeshRim(cad, solid, edges, request.kind, amount, request.chamferAngle);
+  if (rim !== null) return rim;
   const orders = uniqueEdgeOrders(cad, edges, retryOrder);
   const operations = request.kind === "fillet"
     ? [
@@ -405,6 +435,7 @@ function modifyCadSolid(
         candidate = null;
         throw new CadEdgeOperationError("The chosen size creates invalid or overlapping edge geometry");
       } catch (error) {
+        rethrowCadModifierMemoryFault(error);
         if (candidate !== null) cad.release(candidate);
         if (!retryableCadEdgeOperationFailure(error)) throw error;
         firstError ??= error;
@@ -447,6 +478,7 @@ function buildCadComponentResult(
     }
     return { components, result };
   } catch (error) {
+    rethrowCadModifierMemoryFault(error);
     components.forEach((component) => cad.release(component));
     if (result !== null && components.length > 1) cad.release(result);
     throw error;
@@ -457,6 +489,7 @@ function collectEdges(cad: OcctKernel, shape: ShapeHandle, sharpAngle: number, s
   const handles = cad.getSubShapes(shape, "edge");
   const faces = cad.getSubShapes(shape, "face");
   let keepEdgeHandles = false;
+  let memoryFault = false;
   try {
     const faceByHash = new Map(faces.map((face) => [cad.hashCode(face, HASH_UPPER_BOUND), face]));
     const faceAreaByHash = new Map<number, number>();
@@ -465,7 +498,8 @@ function collectEdges(cad: OcctKernel, shape: ShapeHandle, sharpAngle: number, s
       let area = 0;
       try {
         area = Math.abs(cad.getSurfaceArea(face));
-      } catch {
+      } catch (error) {
+        rethrowCadModifierMemoryFault(error);
         area = 0;
       }
       faceAreaByHash.set(hash, area);
@@ -493,14 +527,16 @@ function collectEdges(cad: OcctKernel, shape: ShapeHandle, sharpAngle: number, s
         .map((face) => {
           try {
             return cad.surfaceType(face);
-          } catch {
+          } catch (error) {
+            rethrowCadModifierMemoryFault(error);
             return "unknown";
           }
         });
       let curveType = "line";
       try {
         curveType = cad.curveType(handle);
-      } catch {
+      } catch (error) {
+        rethrowCadModifierMemoryFault(error);
         curveType = "unknown";
       }
       return { id, points, ...classification, curveType, surfaceTypes, faceAreas };
@@ -517,9 +553,14 @@ function collectEdges(cad: OcctKernel, shape: ShapeHandle, sharpAngle: number, s
     const displayEdges = cadDisplayEdgesFromCollected(edges);
     keepEdgeHandles = retainEdgeHandles;
     return { handles, edges: edges.map(({ curveType: _curveType, surfaceTypes: _surfaceTypes, faceAreas: _faceAreas, ...edge }) => edge), selectableEdgeIds, displayEdges };
+  } catch (error) {
+    memoryFault = isCadModifierWasmMemoryFault(error instanceof Error ? error.message : String(error), error instanceof Error ? error.name : "");
+    throw error;
   } finally {
-    releaseHandles(cad, faces);
-    if (!keepEdgeHandles) releaseHandles(cad, handles);
+    if (!memoryFault) {
+      releaseHandles(cad, faces);
+      if (!keepEdgeHandles) releaseHandles(cad, handles);
+    }
   }
 }
 
@@ -555,14 +596,17 @@ function isMissingValidatorFault(message: string) {
 self.onmessage = async (event: MessageEvent<CadModifierWorkerRequest>) => {
   const request = event.data;
   let cad: OcctKernel | null = null;
+  let phase = "initializing kernel";
   try {
     cad = await kernel();
+    phase = "releasing session";
     if (request.type === "dispose") {
       releaseSession(cad);
       post({ type: "disposed", requestId: request.requestId });
       return;
     }
     if (request.type === "prepare") {
+      phase = "reconstructing source geometry";
       let activeCad = cad;
       releaseSession(activeCad);
       let reconstructed: ShapeHandle;
@@ -587,9 +631,19 @@ self.onmessage = async (event: MessageEvent<CadModifierWorkerRequest>) => {
       // OCCT wraps boolean-fused bodies in a compound even when the result is one solid.
       // Use that solid directly so overlapping grouped parts have one closed modifier body.
       baseShape = baseSolids.length === 1 ? baseSolids[0] : reconstructed;
+      phase = "collecting source edges";
       const collected = collectEdges(activeCad, baseShape, request.sharpAngle, Boolean(request.suppressTreatmentDetailEdges), true);
       edgeHandles = collected.handles;
+      if (usedExactMeshFallback || request.parts.some((part) => !part.primitive && !part.brep && !part.step)) {
+        meshRimSource = {
+          edges: new Map(collected.edges.map((edge) => [edgeHandles[edge.id]!, edge.points])),
+          slopes: new Map(collected.edges.filter((edge) => edge.topWallSlope !== undefined).map((edge) => [edgeHandles[edge.id]!, edge.topWallSlope!])),
+          points: collected.edges.flatMap((edge) => edge.points),
+        };
+      }
       const ownerEdgeHandles = baseSolids.map((solid) => activeCad.getSubShapes(solid, "edge"));
+      phase = "mapping edges to solids";
+      let ownerMappingComplete = false;
       try {
         const ownerCandidates = new Map<number, Array<{ owner: number; edge: ShapeHandle }>>();
         ownerEdgeHandles.forEach((componentEdges, owner) => {
@@ -607,8 +661,9 @@ self.onmessage = async (event: MessageEvent<CadModifierWorkerRequest>) => {
           if (!exact) throw new Error("A CAD edge could not be mapped to its solid component; restart the edge tool");
           return exact.owner;
         });
+        ownerMappingComplete = true;
       } finally {
-        ownerEdgeHandles.forEach((componentEdges) => releaseHandles(activeCad, componentEdges));
+        if (ownerMappingComplete) ownerEdgeHandles.forEach((componentEdges) => releaseHandles(activeCad, componentEdges));
       }
       activeSessionId = request.requestId;
       post({
@@ -628,7 +683,9 @@ self.onmessage = async (event: MessageEvent<CadModifierWorkerRequest>) => {
     if (selected.length === 0) throw new Error("Select at least one highlighted edge");
     let built: CadComponentResult | null = null;
     let resetKernelAfterPreview = false;
+    let memoryFault = false;
     try {
+      phase = "building edge preview";
       const fitSelection = (entries: Array<{ id: number; edge: ShapeHandle; owner: number }>) => fitCadModifierAmount(
           request.amount,
           (amount, retryOrder) => buildCadComponentResult(activeCad, entries, request, amount, retryOrder),
@@ -654,10 +711,14 @@ self.onmessage = async (event: MessageEvent<CadModifierWorkerRequest>) => {
       built = fitted.value;
       const componentHandles = built.components;
       const options = tessellationOptions(request.quality, fitted.amount);
+      phase = "tessellating preview";
       const mesh = copyCadMesh(activeCad.tessellate(built.result, options));
+      phase = "collecting preview edges";
       const displayEdges = collectEdges(activeCad, built.result, 0).displayEdges;
       const components: CadModifierComponentMesh[] = componentHandles.map((component, owner) => {
+        phase = "tessellating preview component";
         const componentMesh = copyCadMesh(activeCad.tessellate(component, options));
+        phase = "collecting component edges";
         return {
           owner,
           positions: componentMesh.positions,
@@ -667,6 +728,7 @@ self.onmessage = async (event: MessageEvent<CadModifierWorkerRequest>) => {
           displayEdges: collectEdges(activeCad, component, 0).displayEdges,
         };
       });
+      phase = "serializing preview";
       const serialized = serializeOptionalCadModifierBreps(
         built.result,
         componentHandles,
@@ -701,10 +763,16 @@ self.onmessage = async (event: MessageEvent<CadModifierWorkerRequest>) => {
           ...components.flatMap((component) => [component.positions.buffer, component.normals.buffer, component.indices.buffer]),
         ],
       );
+    } catch (error) {
+      memoryFault = isCadModifierWasmMemoryFault(error instanceof Error ? error.message : String(error), error instanceof Error ? error.name : "");
+      throw error;
     } finally {
-      if (built) releaseCadComponentResult(activeCad, built);
+      if (built && !memoryFault && !resetKernelAfterPreview) {
+        phase = "releasing preview geometry";
+        releaseCadComponentResult(activeCad, built);
+      }
       if (resetKernelAfterPreview) {
-        releaseSession(activeCad);
+        releaseSession(activeCad, false);
         kernelPromise = null;
       }
     }
@@ -712,18 +780,27 @@ self.onmessage = async (event: MessageEvent<CadModifierWorkerRequest>) => {
     const rawMessage = error instanceof Error ? error.message : String(error ?? "");
     const errorName = error instanceof Error ? error.name : "";
     if (isCadModifierWasmMemoryFault(rawMessage, errorName) || isImportStlWasmFault(rawMessage) || isMissingValidatorFault(rawMessage)) {
-      if (cad) releaseSession(cad);
+      if (cad) releaseSession(cad, false);
       kernelPromise = null;
       const message = isImportStlWasmFault(rawMessage)
         ? "The selected mesh could not be converted into a closed CAD solid. The CAD kernel reset; try Separate Parts, ungrouping, or simplifying the object before adding edge features."
         : isMissingValidatorFault(rawMessage)
           ? "The CAD kernel exposed an incomplete validation function and reset. Start the edge tool again; no page refresh is needed."
-        : "The CAD kernel hit a memory fault and reset. Start the edge tool again; no page refresh is needed.";
+        : `CAD memory fault while ${phase}${request.type === "preview" ? ` (${request.kind}, ${request.edgeIds.length} edges, ${previewStrategy})` : ""}. The worker has been reset. Details are in the browser console under SketchForge CAD.`;
       post({
         type: "error",
         requestId: request.requestId,
         message,
         resetSession: true,
+        diagnostic: {
+          phase,
+          operation: request.type === "preview" ? request.kind : request.type,
+          strategy: request.type === "preview" ? previewStrategy : "native-edge",
+          edgeIds: request.type === "preview" ? [...request.edgeIds] : [],
+          amount: request.type === "preview" ? request.amount : undefined,
+          rawMessage,
+          stack: error instanceof Error ? error.stack : undefined,
+        },
       });
       return;
     }

@@ -8,6 +8,7 @@ ENV NEXT_TELEMETRY_DISABLED=1
 ENV SKETCHFORGE_DOCKER_BUILD=true
 
 COPY package.json package-lock.json ./
+COPY patches ./patches
 RUN npm ci
 
 COPY . .

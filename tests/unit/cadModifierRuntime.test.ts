@@ -16,9 +16,31 @@ import {
   isCadModifierWasmMemoryFault,
   serializeOptionalCadModifierBreps,
   selectableCadModifierEdge,
+  validateCadModifierShape,
+  rethrowCadModifierMemoryFault,
 } from "@/lib/cadModifierRuntime";
 
 describe("CAD modifier runtime state", () => {
+  it("does not turn a validator memory trap into retryable invalid geometry", () => {
+    const fault = new WebAssembly.RuntimeError("memory access out of bounds");
+    let attempts = 0;
+    expect(() => fitCadModifierAmount(1, () => {
+      attempts++;
+      if (!validateCadModifierShape(() => { throw fault; })) throw new Error("invalid shape");
+      return 1;
+    }, () => {}, (error) => {
+      rethrowCadModifierMemoryFault(error);
+      return true;
+    })).toThrow(fault);
+    expect(attempts).toBe(1);
+  });
+
+  it("still treats ordinary validation failures as invalid geometry", () => {
+    expect(validateCadModifierShape(() => true)).toBe(true);
+    expect(validateCadModifierShape(() => false)).toBe(false);
+    expect(validateCadModifierShape(() => { throw new Error("invalid topology"); })).toBe(false);
+    expect(() => validateCadModifierShape(() => { throw new Error("isValid: memory access out of bounds"); })).toThrow("memory access out of bounds");
+  });
   it("uses the build-managed OCCT runtime", () => {
     expect(CAD_MODIFIER_RUNTIME_BASE).toBe("/occt");
   });

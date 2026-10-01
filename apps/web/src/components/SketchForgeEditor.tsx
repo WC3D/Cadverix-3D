@@ -6379,6 +6379,10 @@ export function SketchForgeEditor({
     };
     function handleWorkerMessage(event: MessageEvent<CadModifierWorkerResponse>) {
       const message = event.data;
+      if (message.type === "error" && message.diagnostic) {
+        lastMcpErrorRef.current = `${message.message}\n${JSON.stringify(message.diagnostic)}`;
+        console.warn("[SketchForge CAD]", JSON.stringify(message.diagnostic));
+      }
       clearCadModifierWatchdog(message.requestId);
       const pending = cadModifierPendingRef.current.get(message.requestId);
       if (pending) {
@@ -6415,6 +6419,7 @@ export function SketchForgeEditor({
       }
       if (message.type === "preview") {
         if (message.requestId !== cadModifierLatestPreviewRef.current) return;
+        if (message.exactSerializationFailed) createWorker();
         const base = cadModifierBaseShapeRef.current;
         const sourceParts = cadModifierSourcePartsRef.current.length ? cadModifierSourcePartsRef.current : (base ? [base] : []);
         const rawPreview = base ? shapeFromCadMesh(base, message.positions, message.normals, message.indices, message.brep) : null;
@@ -6460,6 +6465,9 @@ export function SketchForgeEditor({
       if (message.type === "error") {
         if (message.requestId < cadModifierLatestPreviewRef.current) return;
         if (message.resetSession) {
+          // Discard the entire worker after a WASM trap, including queued work
+          // and its heap. Reinitializing within the old worker is not enough.
+          createWorker();
           const requestId = cadModifierRequestRef.current + 1;
           cadModifierRequestRef.current = requestId;
           cadModifierLatestPreviewRef.current = requestId;
