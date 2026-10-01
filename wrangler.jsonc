@@ -1,0 +1,10 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "sketchforge-3d",
+  "compatibility_date": "2026-10-01",
+  "assets": {
+    "directory": "./apps/web/.next-export",
+    "html_handling": "auto-trailing-slash",
+    "not_found_handling": "single-page-application"
+  }
+}
