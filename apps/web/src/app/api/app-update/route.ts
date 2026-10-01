@@ -8,7 +8,6 @@ import { appUpdateIsAvailable, OFFICIAL_UPDATE_GUIDE_URL, type AppUpdateStatus }
 import { SKF_CREATED_WITH_VERSION } from "@/lib/skfProject";
 
 export const runtime = "nodejs";
-export const dynamic = "force-dynamic";
 export const revalidate = false;
 
 const DEFAULT_MANIFEST_URL = "https://raw.githubusercontent.com/Formsmith746/SketchForge-3D/main/package.json";
@@ -194,6 +193,9 @@ async function runLocalUpdate(repoRoot: string, expectedVersion: string) {
 }
 
 export async function GET(request: Request) {
+  if (process.env.NEXT_PUBLIC_STATIC_EXPORT === "true") {
+    return NextResponse.json({ error: "Application updates require a server deployment" });
+  }
   const force = new URL(request.url).searchParams.get("force") === "1";
   return NextResponse.json(await statusResponse(request, force), { headers: { "Cache-Control": "no-store" } });
 }

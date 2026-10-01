@@ -3,17 +3,30 @@ import type { ShapeAsset } from "@/types/sketchforge";
 import { makeShapeFromAsset, sceneShape, toolbarBasicShapeAssets, toolbarGeneratorAssets, toolbarShapeAssets } from "@/lib/shapeCatalog";
 
 describe("shape catalog", () => {
-  it("does not expose removed decorative shapes in the toolbar catalog", () => {
+  it("exposes the parametric profile shapes in the toolbar catalog", () => {
     const kinds = toolbarShapeAssets.map((asset) => asset.kind);
 
-    expect(kinds).not.toContain("star");
-    expect(kinds).not.toContain("heart");
+    expect(kinds).toEqual(expect.arrayContaining([
+      "roundedBox", "ellipse", "slot", "star", "heart", "crescent", "teardrop", "counterbore", "countersink", "dovetail", "spring", "honeycomb", "bentTube",
+    ]));
   });
 
   it("separates procedural generators from basic shapes", () => {
-    expect(toolbarGeneratorAssets.map((asset) => asset.kind)).toEqual(["gear", "screw", "washer", "nut"]);
+    expect(toolbarGeneratorAssets.map((asset) => asset.kind)).toEqual(["gear", "screw", "washer", "nut", "spring", "honeycomb", "bentTube"]);
     expect(toolbarBasicShapeAssets.map((asset) => asset.kind)).not.toContain("gear");
     expect(toolbarBasicShapeAssets.map((asset) => asset.kind)).not.toContain("screw");
+  });
+
+  it("creates the new parametric shapes with editable defaults", () => {
+    const byKind = (kind: ShapeAsset["kind"]) => makeShapeFromAsset(toolbarShapeAssets.find((asset) => asset.kind === kind)!);
+
+    expect(byKind("roundedBox")).toMatchObject({ width: 40, depth: 30, height: 20, cornerFillet: 5, topBottomFillet: 0, roundedBoxQuality: 8 });
+    expect(byKind("star")).toMatchObject({ starPoints: 5, starInnerSize: 20, starQuality: 16 });
+    expect(byKind("counterbore")).toMatchObject({ hole: true, screwHoleShaft: 3.4, screwHoleHeadDepth: 3.2 });
+    expect(byKind("countersink")).toMatchObject({ hole: true, screwHoleShaft: 3.4, screwHoleAngle: 90 });
+    expect(byKind("spring")).toMatchObject({ springTurns: 6, springWire: 3, springQuality: 36 });
+    expect(byKind("honeycomb")).toMatchObject({ honeycombCellSize: 8, honeycombWallThickness: 1.6, honeycombFrameWidth: 3 });
+    expect(byKind("bentTube")).toMatchObject({ bentTubeSize: 10, bentTubeWall: 1.5, bentTubeQuality: 32, bentTubeSegments: [{ length: 25, bendAngle: 90, bendRadius: 15, roll: 0 }, { length: 25, bendAngle: 0, bendRadius: 15, roll: 0 }] });
   });
 
   it("creates placed shapes from toolbar assets", () => {

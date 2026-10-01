@@ -40,6 +40,8 @@ const snapGridOptions: GridSize[] = [...METRIC_SNAP_GRIDS, ...IMPERIAL_SNAP_GRID
 const customizableShapeKinds: ShapeKind[] = [
   "box", "cylinder", "sphere", "sketch", "scribble", "cone", "pyramid", "roof", "text", "roundRoof",
   "halfSphere", "torus", "tube", "gear", "screw", "washer", "nut", "ring", "wedge", "polygon", "icosahedron", "mesh",
+  "roundedBox", "ellipse", "slot", "star", "heart", "crescent", "teardrop", "counterbore", "countersink", "dovetail", "spring", "honeycomb",
+  "bentTube",
 ];
 
 function numberOrDefault(value: unknown, fallback: number) {
@@ -103,7 +105,7 @@ export function normalizeShapeCustomizations(value: unknown, fallback: ShapeCust
     if (kind === "sphere" || kind === "halfSphere") {
       entry.steps = optionalShapeNumber(source.steps, fallbackEntry?.steps, 6, 64, true);
     }
-    if (kind === "cylinder" || kind === "cone") {
+    if (["cylinder", "cone", "ellipse", "slot", "teardrop", "counterbore", "countersink"].includes(kind)) {
       entry.sides = optionalShapeNumber(source.sides, fallbackEntry?.sides, 3, MAX_HIGH_RESOLUTION_SIDES, true);
     } else if (kind === "pyramid") {
       entry.sides = optionalShapeNumber(source.sides, fallbackEntry?.sides, 3, 24, true);
@@ -139,6 +141,54 @@ export function normalizeShapeCustomizations(value: unknown, fallback: ShapeCust
           : fallbackEntry?.gearType;
       entry.helixAngle = optionalShapeNumber(source.helixAngle, fallbackEntry?.helixAngle, -45, 45);
       entry.helixQuality = optionalShapeNumber(source.helixQuality, fallbackEntry?.helixQuality, 4, 32, true);
+    }
+    if (kind === "roundedBox") {
+      entry.cornerFillet = optionalShapeNumber(source.cornerFillet, fallbackEntry?.cornerFillet, 0, MAX_CUSTOM_SHAPE_DIMENSION / 2);
+      entry.topBottomFillet = optionalShapeNumber(source.topBottomFillet, fallbackEntry?.topBottomFillet, 0, MAX_CUSTOM_SHAPE_DIMENSION / 2);
+      entry.roundedBoxQuality = optionalShapeNumber(source.roundedBoxQuality, fallbackEntry?.roundedBoxQuality, 2, 32, true);
+    }
+    if (kind === "star") {
+      entry.starPoints = optionalShapeNumber(source.starPoints, fallbackEntry?.starPoints, 3, 32, true);
+      entry.starInnerSize = optionalShapeNumber(source.starInnerSize, fallbackEntry?.starInnerSize, 0.01, MAX_CUSTOM_SHAPE_DIMENSION);
+      entry.starOuterFillet = optionalShapeNumber(source.starOuterFillet, fallbackEntry?.starOuterFillet, 0, 80);
+      entry.starInnerFillet = optionalShapeNumber(source.starInnerFillet, fallbackEntry?.starInnerFillet, 0, 80);
+      entry.starQuality = optionalShapeNumber(source.starQuality, fallbackEntry?.starQuality, 4, 48, true);
+    }
+    if (kind === "heart") {
+      entry.heartTipFillet = optionalShapeNumber(source.heartTipFillet, fallbackEntry?.heartTipFillet, 0, 80);
+      entry.heartQuality = optionalShapeNumber(source.heartQuality, fallbackEntry?.heartQuality, 8, 96, true);
+    }
+    if (kind === "crescent") {
+      entry.crescentThickness = optionalShapeNumber(source.crescentThickness, fallbackEntry?.crescentThickness, 0.01, MAX_CUSTOM_SHAPE_DIMENSION);
+      entry.crescentTipFillet = optionalShapeNumber(source.crescentTipFillet, fallbackEntry?.crescentTipFillet, 0, 80);
+      entry.crescentQuality = optionalShapeNumber(source.crescentQuality, fallbackEntry?.crescentQuality, 8, 96, true);
+    }
+    if (kind === "counterbore" || kind === "countersink") {
+      entry.screwHoleShaft = optionalShapeNumber(source.screwHoleShaft, fallbackEntry?.screwHoleShaft, 0.01, MAX_CUSTOM_SHAPE_DIMENSION);
+      entry.screwHoleHeadDepth = optionalShapeNumber(source.screwHoleHeadDepth, fallbackEntry?.screwHoleHeadDepth, 0.01, MAX_CUSTOM_SHAPE_DIMENSION);
+      entry.screwHoleAngle = optionalShapeNumber(source.screwHoleAngle, fallbackEntry?.screwHoleAngle, 30, 150);
+    }
+    if (kind === "dovetail") {
+      entry.dovetailNeckWidth = optionalShapeNumber(source.dovetailNeckWidth, fallbackEntry?.dovetailNeckWidth, 0.01, MAX_CUSTOM_SHAPE_DIMENSION);
+      entry.dovetailClearance = optionalShapeNumber(source.dovetailClearance, fallbackEntry?.dovetailClearance, 0, 5);
+    }
+    if (kind === "spring") {
+      entry.springTurns = optionalShapeNumber(source.springTurns, fallbackEntry?.springTurns, 1, 40, true);
+      entry.springWire = optionalShapeNumber(source.springWire, fallbackEntry?.springWire, 0.2, MAX_CUSTOM_SHAPE_DIMENSION);
+      entry.springQuality = optionalShapeNumber(source.springQuality, fallbackEntry?.springQuality, 12, 96, true);
+    }
+    if (kind === "honeycomb") {
+      entry.honeycombCellSize = optionalShapeNumber(source.honeycombCellSize, fallbackEntry?.honeycombCellSize, 1, 50);
+      entry.honeycombWallThickness = optionalShapeNumber(source.honeycombWallThickness, fallbackEntry?.honeycombWallThickness, 0.1, 20);
+      entry.honeycombFrameWidth = optionalShapeNumber(source.honeycombFrameWidth, fallbackEntry?.honeycombFrameWidth, 0, 100);
+    }
+    if (kind === "bentTube") {
+      entry.bentTubeSize = optionalShapeNumber(source.bentTubeSize, fallbackEntry?.bentTubeSize, 1, 500);
+      entry.bentTubeWall = optionalShapeNumber(source.bentTubeWall, fallbackEntry?.bentTubeWall, 0.2, 250);
+      entry.bentTubeQuality = optionalShapeNumber(source.bentTubeQuality, fallbackEntry?.bentTubeQuality, 12, 96, true);
+      entry.bentTubeSegments = Array.isArray(source.bentTubeSegments)
+        ? source.bentTubeSegments.slice(0, 12).map((segment) => ({ ...segment }))
+        : fallbackEntry?.bentTubeSegments?.map((segment) => ({ ...segment }));
     }
     const compact = Object.fromEntries(Object.entries(entry).filter(([, entryValue]) => entryValue !== undefined)) as ShapeCustomization;
     if (Object.keys(compact).length > 0) normalized[kind] = compact;

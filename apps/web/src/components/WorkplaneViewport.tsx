@@ -30,6 +30,17 @@ import { cadModifierPrimitiveForBakedShape, cadTransformFromMatrix, cadTransform
 import { orthographicFramingZoom, perspectiveFramingDistance } from "@/lib/cameraFraming";
 import { createGearGeometry } from "@/lib/gearGeometry";
 import { createNutGeometry, createScrewGeometry, createThreadedCylinderGeometry, createWasherGeometry } from "@/lib/fastenerGeometry";
+import { createSlotGeometry } from "@/lib/slotGeometry";
+import { createStarGeometry } from "@/lib/starGeometry";
+import { createHeartGeometry } from "@/lib/heartGeometry";
+import { createCrescentGeometry } from "@/lib/crescentGeometry";
+import { createTeardropGeometry } from "@/lib/teardropGeometry";
+import { createRoundedBoxGeometry } from "@/lib/roundedBoxGeometry";
+import { createScrewHoleGeometry } from "@/lib/screwHoleGeometry";
+import { createDovetailGeometry } from "@/lib/dovetailGeometry";
+import { createSpringGeometry } from "@/lib/springGeometry";
+import { createHoneycombGeometry } from "@/lib/honeycombGeometry";
+import { createBentTubeGeometry } from "@/lib/bentTubeGeometry";
 import { parseMeasurementInput } from "@/lib/measurementUnits";
 import type { ModelSplitPlane } from "@/lib/modelSplit";
 import type { SculptBrushSettings, SculptPoint } from "@/lib/sculptBrush";
@@ -139,6 +150,19 @@ const SHAPE_KINDS = new Set<ShapeAsset["kind"]>([
   "wedge",
   "polygon",
   "icosahedron",
+  "roundedBox",
+  "ellipse",
+  "slot",
+  "star",
+  "heart",
+  "crescent",
+  "teardrop",
+  "counterbore",
+  "countersink",
+  "dovetail",
+  "spring",
+  "honeycomb",
+  "bentTube",
   "mesh",
 ]);
 const fontLoader = new FontLoader();
@@ -981,6 +1005,34 @@ function rulerShapeTopologyKey(shape: WorkplaneShape): string {
     segments: shape.segments,
     topRadius: shape.topRadius,
     baseRadius: shape.baseRadius,
+    cornerFillet: shape.cornerFillet,
+    topBottomFillet: shape.topBottomFillet,
+    roundedBoxQuality: shape.roundedBoxQuality,
+    starPoints: shape.starPoints,
+    starInnerSize: shape.starInnerSize,
+    starOuterFillet: shape.starOuterFillet,
+    starInnerFillet: shape.starInnerFillet,
+    starQuality: shape.starQuality,
+    heartTipFillet: shape.heartTipFillet,
+    heartQuality: shape.heartQuality,
+    crescentThickness: shape.crescentThickness,
+    crescentTipFillet: shape.crescentTipFillet,
+    crescentQuality: shape.crescentQuality,
+    screwHoleShaft: shape.screwHoleShaft,
+    screwHoleHeadDepth: shape.screwHoleHeadDepth,
+    screwHoleAngle: shape.screwHoleAngle,
+    dovetailNeckWidth: shape.dovetailNeckWidth,
+    dovetailClearance: shape.dovetailClearance,
+    springTurns: shape.springTurns,
+    springWire: shape.springWire,
+    springQuality: shape.springQuality,
+    honeycombCellSize: shape.honeycombCellSize,
+    honeycombWallThickness: shape.honeycombWallThickness,
+    honeycombFrameWidth: shape.honeycombFrameWidth,
+    bentTubeSize: shape.bentTubeSize,
+    bentTubeWall: shape.bentTubeWall,
+    bentTubeQuality: shape.bentTubeQuality,
+    bentTubeSegments: shape.bentTubeSegments,
     taperTopWidth: shape.taperTopWidth,
     taperTopDepth: shape.taperTopDepth,
     taperBottomWidth: shape.taperBottomWidth,
@@ -8208,6 +8260,43 @@ function createShapeObject(
       } else {
         addMesh(group, sharedShapeGeometry(geometryCacheKey, () => new THREE.CylinderGeometry(1, 1, 1, shape.sides ?? 96, shape.segments ?? 1)), material, shape, undefined, undefined, new THREE.Vector3(width / 2, height, depth / 2));
       }
+      break;
+    case "ellipse":
+      addMesh(group, sharedShapeGeometry(geometryCacheKey, () => new THREE.CylinderGeometry(1, 1, 1, shape.sides ?? 96)), material, shape, undefined, undefined, new THREE.Vector3(width / 2, height, depth / 2));
+      break;
+    case "slot":
+      addMesh(group, sharedShapeGeometry(geometryCacheKey, () => createSlotGeometry({ width, depth, height, sides: shape.sides ?? 96 })), material, shape);
+      break;
+    case "star":
+      addMesh(group, sharedShapeGeometry(geometryCacheKey, () => createStarGeometry({ ...shape, width, depth, height })), material, shape);
+      break;
+    case "heart":
+      addMesh(group, sharedShapeGeometry(geometryCacheKey, () => createHeartGeometry({ ...shape, width, depth, height })), material, shape);
+      break;
+    case "crescent":
+      addMesh(group, sharedShapeGeometry(geometryCacheKey, () => createCrescentGeometry({ ...shape, width, depth, height })), material, shape);
+      break;
+    case "teardrop":
+      addMesh(group, sharedShapeGeometry(geometryCacheKey, () => createTeardropGeometry({ width, depth, height, sides: shape.sides ?? 96 })), material, shape);
+      break;
+    case "roundedBox":
+      addMesh(group, sharedShapeGeometry(geometryCacheKey, () => createRoundedBoxGeometry({ ...shape, width, depth, height })), material, shape);
+      break;
+    case "counterbore":
+    case "countersink":
+      addMesh(group, sharedShapeGeometry(geometryCacheKey, () => createScrewHoleGeometry({ ...shape, kind: shape.kind === "counterbore" ? "counterbore" : "countersink", width, depth, height })), material, shape);
+      break;
+    case "dovetail":
+      addMesh(group, sharedShapeGeometry(geometryCacheKey, () => createDovetailGeometry({ ...shape, width, depth, height })), material, shape);
+      break;
+    case "spring":
+      addMesh(group, sharedShapeGeometry(geometryCacheKey, () => createSpringGeometry({ ...shape, width, depth, height })), material, shape);
+      break;
+    case "honeycomb":
+      addMesh(group, sharedShapeGeometry(geometryCacheKey, () => createHoneycombGeometry({ ...shape, width, depth, height })), material, shape);
+      break;
+    case "bentTube":
+      addMesh(group, sharedShapeGeometry(geometryCacheKey, () => createBentTubeGeometry({ ...shape, width, depth, height })), material, shape);
       break;
     case "sphere": {
       const { widthSegments, heightSegments } = sphereTessellation(shape.steps);

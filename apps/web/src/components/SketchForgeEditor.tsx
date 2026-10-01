@@ -22,6 +22,17 @@ import { manifoldWasmBase64 } from "@/generated/manifoldWasmBase64";
 import { sphereTessellation } from "@/lib/sphereTessellation";
 import { createGearGeometry } from "@/lib/gearGeometry";
 import { createNutGeometry, createScrewGeometry, createThreadedCylinderGeometry, createWasherGeometry } from "@/lib/fastenerGeometry";
+import { createSlotGeometry } from "@/lib/slotGeometry";
+import { createStarGeometry } from "@/lib/starGeometry";
+import { createHeartGeometry } from "@/lib/heartGeometry";
+import { createCrescentGeometry } from "@/lib/crescentGeometry";
+import { createTeardropGeometry } from "@/lib/teardropGeometry";
+import { createRoundedBoxGeometry } from "@/lib/roundedBoxGeometry";
+import { createScrewHoleGeometry } from "@/lib/screwHoleGeometry";
+import { createDovetailGeometry } from "@/lib/dovetailGeometry";
+import { createSpringGeometry } from "@/lib/springGeometry";
+import { createHoneycombGeometry } from "@/lib/honeycombGeometry";
+import { createBentTubeGeometry } from "@/lib/bentTubeGeometry";
 import { regularPolygonFootprintScale } from "@/lib/regularPolygonFootprint";
 import {
   ToolbarAlignIcon,
@@ -2587,6 +2598,44 @@ function geometryMeshForShape(shape: WorkplaneShape): MeshData | null {
         geometry = new THREE.CylinderGeometry(1, 1, height, shape.sides ?? 96, shape.segments ?? 1);
         geometry.scale(width / 2, 1, depth / 2);
       }
+      break;
+    case "ellipse":
+      geometry = new THREE.CylinderGeometry(1, 1, height, shape.sides ?? 96);
+      geometry.scale(width / 2, 1, depth / 2);
+      break;
+    case "slot":
+      geometry = createSlotGeometry({ width, depth, height, sides: shape.sides ?? 96 });
+      break;
+    case "star":
+      geometry = createStarGeometry({ ...shape, width, depth, height });
+      break;
+    case "heart":
+      geometry = createHeartGeometry({ ...shape, width, depth, height });
+      break;
+    case "crescent":
+      geometry = createCrescentGeometry({ ...shape, width, depth, height });
+      break;
+    case "teardrop":
+      geometry = createTeardropGeometry({ width, depth, height, sides: shape.sides ?? 96 });
+      break;
+    case "roundedBox":
+      geometry = createRoundedBoxGeometry({ ...shape, width, depth, height });
+      break;
+    case "counterbore":
+    case "countersink":
+      geometry = createScrewHoleGeometry({ ...shape, kind: shape.kind, width, depth, height });
+      break;
+    case "dovetail":
+      geometry = createDovetailGeometry({ ...shape, width, depth, height });
+      break;
+    case "spring":
+      geometry = createSpringGeometry({ ...shape, width, depth, height });
+      break;
+    case "honeycomb":
+      geometry = createHoneycombGeometry({ ...shape, width, depth, height });
+      break;
+    case "bentTube":
+      geometry = createBentTubeGeometry({ ...shape, width, depth, height });
       break;
     case "sphere":
       geometry = new THREE.SphereGeometry(1, sphereTessellation(shape.steps).widthSegments, sphereTessellation(shape.steps).heightSegments);

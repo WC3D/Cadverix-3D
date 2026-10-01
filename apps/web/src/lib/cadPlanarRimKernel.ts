@@ -47,14 +47,14 @@ export function cutPlanarCadRim(cad: OcctKernel, solid: ShapeHandle, plan: RimCu
     } else {
       keep = own(cad.loft([wire(plan.loop, plan.bottom), wire(plan.topLoop, plan.top)], true, true));
     }
-    const bounds = cad.getBoundingBox(solid);
+    const bounds = cad.getBoundingBox(solid, false);
     const slab = own(cad.makeBoxFromCorners(
       { x: bounds.xmin - 1, y: plan.bottom, z: bounds.zmin - 1 },
       { x: bounds.xmax + 1, y: plan.top, z: bounds.zmax + 1 },
     ));
     result = cad.cut(solid, own(cad.cut(slab, keep)));
     if (!validateCadModifierShape(() => cad.isValid(result!))) throw new Error("The rim treatment could not produce a valid solid");
-    if (cad.getBoundingBox(result).ymax < plan.height - 0.0001) throw new Error("The rim treatment removes the entire top face; use a smaller size");
+    if (cad.getBoundingBox(result, false).ymax < plan.height - 0.0001) throw new Error("The rim treatment removes the entire top face; use a smaller size");
     return result;
   } catch (error) {
     memoryFault = isCadModifierWasmMemoryFault(error instanceof Error ? error.message : String(error), error instanceof Error ? error.name : "");

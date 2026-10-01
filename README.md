@@ -462,18 +462,10 @@ Create a production build:
 npm run build
 ```
 
-Build a static export on Windows Command Prompt:
+Build a static export on Windows, macOS, or Linux:
 
 ```bash
 npm run export
-```
-
-On macOS or Linux, use the equivalent environment-variable syntax:
-
-```bash
-npm run copy:occt
-STATIC_EXPORT=true npx next build apps/web --webpack
-npm run verify:static-worker-assets
 ```
 
 Static hosting provides the browser editor; server-backed features such as the shared project library require a server deployment.

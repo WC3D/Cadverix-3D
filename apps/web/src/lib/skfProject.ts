@@ -35,6 +35,8 @@ export const SKF_LIMITS = {
 const SHAPE_KINDS = new Set([
   "box", "cylinder", "sphere", "sketch", "scribble", "cone", "pyramid", "roof", "text", "roundRoof",
   "halfSphere", "torus", "tube", "gear", "screw", "washer", "nut", "ring", "wedge", "polygon", "icosahedron", "constructionPlane", "mesh",
+  "roundedBox", "ellipse", "slot", "star", "heart", "crescent", "teardrop", "counterbore", "countersink", "dovetail", "spring", "honeycomb",
+  "bentTube",
 ]);
 
 const FEATURE_TYPES = new Set([
@@ -1131,6 +1133,22 @@ function validateShapeDefinition(definition: Record<string, unknown>, label: str
   }
   if ([definition.width, definition.depth, definition.height].some((value) => Math.abs(value as number) > 1e9)) {
     throw new Error(`${label} dimensions exceed the supported range`);
+  }
+  [
+    "cornerFillet", "topBottomFillet", "roundedBoxQuality", "starPoints", "starInnerSize", "starOuterFillet", "starInnerFillet", "starQuality",
+    "heartTipFillet", "heartQuality", "crescentThickness", "crescentTipFillet", "crescentQuality", "screwHoleShaft", "screwHoleHeadDepth",
+    "screwHoleAngle", "dovetailNeckWidth", "dovetailClearance", "springTurns", "springWire", "springQuality", "honeycombCellSize",
+    "honeycombWallThickness", "honeycombFrameWidth",
+    "bentTubeSize", "bentTubeWall", "bentTubeQuality",
+  ].forEach((field) => {
+    if (definition[field] !== undefined) finiteNumber(definition[field], `${label}.${field}`);
+  });
+  if (definition.bentTubeSegments !== undefined) {
+    if (!Array.isArray(definition.bentTubeSegments) || definition.bentTubeSegments.length < 1 || definition.bentTubeSegments.length > 12) throw new Error(`${label}.bentTubeSegments is invalid`);
+    definition.bentTubeSegments.forEach((rawSegment, index) => {
+      const segment = objectRecord(rawSegment, `${label}.bentTubeSegments[${index}]`);
+      ["length", "bendAngle", "bendRadius", "roll"].forEach((field) => finiteNumber(segment[field], `${label}.bentTubeSegments[${index}].${field}`));
+    });
   }
   if (definition.importedMesh || definition.groupedShapes || definition.edgeTreatmentHistory || definition.cadBrep) {
     throw new Error(`${label} contains inline package-only geometry fields`);

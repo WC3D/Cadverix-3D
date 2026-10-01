@@ -36,6 +36,7 @@ import { snapGridOptionsForUnits } from "@/lib/workplaneSettings";
 import { resizedShapeSize, shapeDepth, shapeHasTaper, shapeOverallFootprintDimensions, shapeTaperDimensions, shapeWidth } from "@/lib/workplaneShapes";
 import { normalizeSketchRevolveSettings } from "@/lib/sketchRevolve";
 import { MAX_HIGH_RESOLUTION_SIDES } from "@/lib/workplaneSettings";
+import { normalizeBentTubeSegments } from "@/lib/bentTubeGeometry";
 import type { GearType, GridSize, MeasurementAccuracy, WorkplaneShape, WorkplaneWorkspaceSettings } from "@/types/sketchforge";
 
 const MIN_SHAPE_SIZE = 0.01;
@@ -290,6 +291,124 @@ function getShapePropertiesWithAppLimits(shape: WorkplaneShape, onUpdate: ShapeI
       { label: "Width", value: width, min: MIN_SHAPE_SIZE, max: 160, onChange: setWidth },
       { label: "Height", value: shape.height, min: MIN_SHAPE_SIZE, max: 160, onChange: setHeight },
     ];
+  }
+
+  if (shape.kind === "roundedBox") {
+    return [
+      { label: "Corner Fillet", value: shape.cornerFillet ?? 5, min: 0, max: Math.min(width, depth) / 2, step: 0.1, onChange: (cornerFillet) => onUpdate({ cornerFillet }) },
+      { label: "Top/Bottom Fillet", value: shape.topBottomFillet ?? 0, min: 0, max: Math.min(width, depth, shape.height) / 2, step: 0.1, onChange: (topBottomFillet) => onUpdate({ topBottomFillet }) },
+      { label: "Quality", value: shape.roundedBoxQuality ?? 8, min: 2, max: 32, step: 1, onChange: (roundedBoxQuality) => onUpdate({ roundedBoxQuality: Math.round(roundedBoxQuality) }) },
+      { label: "Length", value: depth, min: MIN_SHAPE_SIZE, max: 160, onChange: setDepth },
+      { label: "Width", value: width, min: MIN_SHAPE_SIZE, max: 160, onChange: setWidth },
+      { label: "Height", value: shape.height, min: MIN_SHAPE_SIZE, max: 160, onChange: setHeight },
+    ];
+  }
+
+  if (shape.kind === "ellipse" || shape.kind === "slot" || shape.kind === "teardrop") {
+    return [
+      { label: "Sides", value: shape.sides ?? 96, min: 8, max: MAX_HIGH_RESOLUTION_SIDES, step: 1, onChange: (sides) => onUpdate({ sides: Math.round(sides) }) },
+      { label: "Length", value: depth, min: MIN_SHAPE_SIZE, max: 160, onChange: setDepth },
+      { label: "Width", value: width, min: MIN_SHAPE_SIZE, max: 160, onChange: setWidth },
+      { label: "Height", value: shape.height, min: MIN_SHAPE_SIZE, max: 160, onChange: setHeight },
+    ];
+  }
+
+  if (shape.kind === "star") {
+    return [
+      { label: "Points", value: shape.starPoints ?? 5, min: 3, max: 32, step: 1, onChange: (starPoints) => onUpdate({ starPoints: Math.round(starPoints) }) },
+      { label: "Inner Size", value: shape.starInnerSize ?? Math.max(width, depth) / 2, min: 1, max: Math.max(width, depth) * 0.95, step: 0.1, onChange: (starInnerSize) => onUpdate({ starInnerSize }) },
+      { label: "Outer Fillet", value: shape.starOuterFillet ?? 0, min: 0, max: 80, step: 0.5, onChange: (starOuterFillet) => onUpdate({ starOuterFillet }) },
+      { label: "Inner Fillet", value: shape.starInnerFillet ?? 0, min: 0, max: 80, step: 0.5, onChange: (starInnerFillet) => onUpdate({ starInnerFillet }) },
+      { label: "Quality", value: shape.starQuality ?? 16, min: 4, max: 48, step: 1, onChange: (starQuality) => onUpdate({ starQuality: Math.round(starQuality) }) },
+      { label: "Length", value: depth, min: MIN_SHAPE_SIZE, max: 160, onChange: setDepth },
+      { label: "Width", value: width, min: MIN_SHAPE_SIZE, max: 160, onChange: setWidth },
+      { label: "Height", value: shape.height, min: MIN_SHAPE_SIZE, max: 160, onChange: setHeight },
+    ];
+  }
+
+  if (shape.kind === "heart" || shape.kind === "crescent") {
+    const properties: ShapePropertyConfig[] = [];
+    if (shape.kind === "crescent") properties.push({ label: "Thickness", value: shape.crescentThickness ?? width * 0.35, min: 1, max: width * 0.85, step: 0.1, onChange: (crescentThickness) => onUpdate({ crescentThickness }) });
+    properties.push(
+      { label: "Tip Fillet", value: shape.kind === "heart" ? shape.heartTipFillet ?? 0 : shape.crescentTipFillet ?? 0.5, min: 0, max: 80, step: 0.5, onChange: (value) => onUpdate(shape.kind === "heart" ? { heartTipFillet: value } : { crescentTipFillet: value }) },
+      { label: "Quality", value: shape.kind === "heart" ? shape.heartQuality ?? 32 : shape.crescentQuality ?? 32, min: 8, max: 96, step: 1, onChange: (value) => onUpdate(shape.kind === "heart" ? { heartQuality: Math.round(value) } : { crescentQuality: Math.round(value) }) },
+      { label: "Length", value: depth, min: MIN_SHAPE_SIZE, max: 160, onChange: setDepth },
+      { label: "Width", value: width, min: MIN_SHAPE_SIZE, max: 160, onChange: setWidth },
+      { label: "Height", value: shape.height, min: MIN_SHAPE_SIZE, max: 160, onChange: setHeight },
+    );
+    return properties;
+  }
+
+  if (shape.kind === "counterbore" || shape.kind === "countersink") {
+    return [
+      { label: "Shaft Diameter", value: shape.screwHoleShaft ?? 3.4, min: 0.1, max: width * 0.95, step: 0.1, onChange: (screwHoleShaft) => onUpdate({ screwHoleShaft }) },
+      ...(shape.kind === "counterbore"
+        ? [{ label: "Head Depth", value: shape.screwHoleHeadDepth ?? 3.2, min: 0.1, max: shape.height - 0.1, step: 0.1, onChange: (screwHoleHeadDepth: number) => onUpdate({ screwHoleHeadDepth }) }]
+        : [{ label: "Head Angle", value: shape.screwHoleAngle ?? 90, min: 30, max: 150, step: 1, onChange: (screwHoleAngle: number) => onUpdate({ screwHoleAngle }) }]),
+      { label: "Sides", value: shape.sides ?? 96, min: 8, max: MAX_HIGH_RESOLUTION_SIDES, step: 1, onChange: (sides) => onUpdate({ sides: Math.round(sides) }) },
+      { label: "Length", value: depth, min: MIN_SHAPE_SIZE, max: 160, onChange: setDepth },
+      { label: "Width", value: width, min: MIN_SHAPE_SIZE, max: 160, onChange: setWidth },
+      { label: "Height", value: shape.height, min: MIN_SHAPE_SIZE, max: 160, onChange: setHeight },
+    ];
+  }
+
+  if (shape.kind === "dovetail") {
+    return [
+      { label: "Neck Width", value: shape.dovetailNeckWidth ?? width / 2, min: 0.1, max: width, step: 0.1, onChange: (dovetailNeckWidth) => onUpdate({ dovetailNeckWidth }) },
+      { label: "Clearance", value: shape.dovetailClearance ?? 0.2, min: 0, max: 5, step: 0.05, onChange: (dovetailClearance) => onUpdate({ dovetailClearance }) },
+      { label: "Length", value: depth, min: MIN_SHAPE_SIZE, max: 160, onChange: setDepth },
+      { label: "Width", value: width, min: MIN_SHAPE_SIZE, max: 160, onChange: setWidth },
+      { label: "Height", value: shape.height, min: MIN_SHAPE_SIZE, max: 160, onChange: setHeight },
+    ];
+  }
+
+  if (shape.kind === "spring") {
+    return [
+      { label: "Turns", value: shape.springTurns ?? 6, min: 1, max: 40, step: 1, onChange: (springTurns) => onUpdate({ springTurns: Math.round(springTurns) }) },
+      { label: "Wire Diameter", value: shape.springWire ?? 3, min: 0.2, max: Math.min(width, depth, shape.height) * 0.4, step: 0.1, onChange: (springWire) => onUpdate({ springWire }) },
+      { label: "Quality", value: shape.springQuality ?? 36, min: 12, max: 96, step: 4, onChange: (springQuality) => onUpdate({ springQuality: Math.round(springQuality / 4) * 4 }) },
+      { label: "Length", value: depth, min: MIN_SHAPE_SIZE, max: 160, onChange: setDepth },
+      { label: "Width", value: width, min: MIN_SHAPE_SIZE, max: 160, onChange: setWidth },
+      { label: "Height", value: shape.height, min: MIN_SHAPE_SIZE, max: 160, onChange: setHeight },
+    ];
+  }
+
+  if (shape.kind === "honeycomb") {
+    return [
+      { label: "Cell Size", value: shape.honeycombCellSize ?? 8, min: 1, max: 50, step: 0.1, onChange: (honeycombCellSize) => onUpdate({ honeycombCellSize }) },
+      { label: "Wall Thickness", value: shape.honeycombWallThickness ?? 1.6, min: 0.1, max: 20, step: 0.1, onChange: (honeycombWallThickness) => onUpdate({ honeycombWallThickness }) },
+      { label: "Frame Width", value: shape.honeycombFrameWidth ?? 3, min: 0, max: 100, step: 0.1, onChange: (honeycombFrameWidth) => onUpdate({ honeycombFrameWidth }) },
+      { label: "Length", value: depth, min: MIN_SHAPE_SIZE, max: 160, onChange: setDepth },
+      { label: "Width", value: width, min: MIN_SHAPE_SIZE, max: 160, onChange: setWidth },
+      { label: "Height", value: shape.height, min: MIN_SHAPE_SIZE, max: 160, onChange: setHeight },
+    ];
+  }
+
+  if (shape.kind === "bentTube") {
+    const tubeSize = shape.bentTubeSize ?? 10;
+    const segments = normalizeBentTubeSegments(shape.bentTubeSegments, tubeSize);
+    const updateSegment = (index: number, patch: Partial<(typeof segments)[number]>) => onUpdate({
+      bentTubeSegments: segments.map((segment, position) => position === index ? { ...segment, ...patch } : segment),
+    });
+    const properties: ShapePropertyConfig[] = [
+      { label: "Tube Diameter", value: tubeSize, min: 1, max: 100, step: 0.1, onChange: (bentTubeSize) => onUpdate({ bentTubeSize, bentTubeSegments: normalizeBentTubeSegments(segments, bentTubeSize) }) },
+      { label: "Wall Thickness", value: shape.bentTubeWall ?? 1.5, min: 0.2, max: Math.max(0.2, tubeSize / 2 - 0.1), step: 0.1, onChange: (bentTubeWall) => onUpdate({ bentTubeWall }) },
+      { label: "Quality", value: shape.bentTubeQuality ?? 32, min: 12, max: 96, step: 4, onChange: (bentTubeQuality) => onUpdate({ bentTubeQuality: Math.round(bentTubeQuality / 4) * 4 }) },
+    ];
+    segments.forEach((segment, index) => {
+      properties.push(
+        { label: `Segment ${index + 1} Length`, value: segment.length, min: 0, max: 200, step: 0.5, onChange: (length) => updateSegment(index, { length }) },
+        { label: `Segment ${index + 1} Bend`, value: segment.bendAngle, min: -180, max: 180, step: 1, onChange: (bendAngle) => updateSegment(index, { bendAngle }) },
+        { label: `Segment ${index + 1} Radius`, value: segment.bendRadius, min: tubeSize / 2 + 0.1, max: 200, step: 0.5, onChange: (bendRadius) => updateSegment(index, { bendRadius }) },
+        { label: `Segment ${index + 1} Roll`, value: segment.roll, min: -180, max: 180, step: 1, onChange: (roll) => updateSegment(index, { roll }) },
+      );
+    });
+    properties.push(
+      { label: "Length", value: depth, min: MIN_SHAPE_SIZE, max: 160, onChange: setDepth },
+      { label: "Width", value: width, min: MIN_SHAPE_SIZE, max: 160, onChange: setWidth },
+      { label: "Height", value: shape.height, min: MIN_SHAPE_SIZE, max: 160, onChange: setHeight },
+    );
+    return properties;
   }
 
   if (shape.kind === "sphere") {

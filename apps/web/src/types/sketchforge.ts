@@ -19,6 +19,19 @@ export type ShapeKind =
   | "screw"
   | "washer"
   | "nut"
+  | "roundedBox"
+  | "ellipse"
+  | "slot"
+  | "star"
+  | "heart"
+  | "crescent"
+  | "teardrop"
+  | "counterbore"
+  | "countersink"
+  | "dovetail"
+  | "spring"
+  | "honeycomb"
+  | "bentTube"
   | "ring"
   | "wedge"
   | "polygon"
@@ -34,6 +47,8 @@ export type ShapeAsset = {
   color: string;
   hole?: boolean;
 };
+
+export type BentTubeSegment = { length: number; bendAngle: number; bendRadius: number; roll: number };
 
 export type ProjectAssetSourceFormat = "stl" | "3mf" | "obj" | "svg" | "step";
 
@@ -83,6 +98,34 @@ export type ShapeCustomization = {
   boreDiameter?: number;
   shaftDiameter?: number;
   headHeight?: number;
+  cornerFillet?: number;
+  topBottomFillet?: number;
+  roundedBoxQuality?: number;
+  starPoints?: number;
+  starInnerSize?: number;
+  starOuterFillet?: number;
+  starInnerFillet?: number;
+  starQuality?: number;
+  heartTipFillet?: number;
+  heartQuality?: number;
+  crescentThickness?: number;
+  crescentTipFillet?: number;
+  crescentQuality?: number;
+  screwHoleShaft?: number;
+  screwHoleHeadDepth?: number;
+  screwHoleAngle?: number;
+  dovetailNeckWidth?: number;
+  dovetailClearance?: number;
+  springTurns?: number;
+  springWire?: number;
+  springQuality?: number;
+  honeycombCellSize?: number;
+  honeycombWallThickness?: number;
+  honeycombFrameWidth?: number;
+  bentTubeSize?: number;
+  bentTubeWall?: number;
+  bentTubeQuality?: number;
+  bentTubeSegments?: BentTubeSegment[];
   text?: string;
   font?: string;
 };
@@ -322,6 +365,34 @@ export type WorkplaneShape = {
   boreDiameter?: number;
   shaftDiameter?: number;
   headHeight?: number;
+  cornerFillet?: number;
+  topBottomFillet?: number;
+  roundedBoxQuality?: number;
+  starPoints?: number;
+  starInnerSize?: number;
+  starOuterFillet?: number;
+  starInnerFillet?: number;
+  starQuality?: number;
+  heartTipFillet?: number;
+  heartQuality?: number;
+  crescentThickness?: number;
+  crescentTipFillet?: number;
+  crescentQuality?: number;
+  screwHoleShaft?: number;
+  screwHoleHeadDepth?: number;
+  screwHoleAngle?: number;
+  dovetailNeckWidth?: number;
+  dovetailClearance?: number;
+  springTurns?: number;
+  springWire?: number;
+  springQuality?: number;
+  honeycombCellSize?: number;
+  honeycombWallThickness?: number;
+  honeycombFrameWidth?: number;
+  bentTubeSize?: number;
+  bentTubeWall?: number;
+  bentTubeQuality?: number;
+  bentTubeSegments?: BentTubeSegment[];
   text?: string;
   font?: string;
   importedMesh?: {

@@ -290,6 +290,34 @@ export function workplaneShapesEqual(a: WorkplaneShape, b: WorkplaneShape) {
     a.boreDiameter === b.boreDiameter &&
     a.shaftDiameter === b.shaftDiameter &&
     a.headHeight === b.headHeight &&
+    a.cornerFillet === b.cornerFillet &&
+    a.topBottomFillet === b.topBottomFillet &&
+    a.roundedBoxQuality === b.roundedBoxQuality &&
+    a.starPoints === b.starPoints &&
+    a.starInnerSize === b.starInnerSize &&
+    a.starOuterFillet === b.starOuterFillet &&
+    a.starInnerFillet === b.starInnerFillet &&
+    a.starQuality === b.starQuality &&
+    a.heartTipFillet === b.heartTipFillet &&
+    a.heartQuality === b.heartQuality &&
+    a.crescentThickness === b.crescentThickness &&
+    a.crescentTipFillet === b.crescentTipFillet &&
+    a.crescentQuality === b.crescentQuality &&
+    a.screwHoleShaft === b.screwHoleShaft &&
+    a.screwHoleHeadDepth === b.screwHoleHeadDepth &&
+    a.screwHoleAngle === b.screwHoleAngle &&
+    a.dovetailNeckWidth === b.dovetailNeckWidth &&
+    a.dovetailClearance === b.dovetailClearance &&
+    a.springTurns === b.springTurns &&
+    a.springWire === b.springWire &&
+    a.springQuality === b.springQuality &&
+    a.honeycombCellSize === b.honeycombCellSize &&
+    a.honeycombWallThickness === b.honeycombWallThickness &&
+    a.honeycombFrameWidth === b.honeycombFrameWidth &&
+    a.bentTubeSize === b.bentTubeSize &&
+    a.bentTubeWall === b.bentTubeWall &&
+    a.bentTubeQuality === b.bentTubeQuality &&
+    JSON.stringify(a.bentTubeSegments) === JSON.stringify(b.bentTubeSegments) &&
     a.text === b.text &&
     a.font === b.font &&
     a.importedMesh === b.importedMesh &&

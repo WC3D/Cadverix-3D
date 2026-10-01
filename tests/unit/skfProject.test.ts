@@ -131,8 +131,8 @@ describe("SketchForge .skf project packages", () => {
 
     await expect(importSkfProject(mutateProject(bytes, (document) => {
       document.schema = LYL_SCHEMA_ID;
-      document.states[0].nodes[0].definition.kind = "roundedBox";
-    }))).rejects.toThrow(/unknown shape type 'roundedBox'/);
+      document.states[0].nodes[0].definition.kind = "thread";
+    }))).rejects.toThrow(/unknown shape type 'thread'/);
   });
 
   it("encodes shared geometry once across a long transform history and subsequent saves", async () => {
