@@ -41,6 +41,7 @@ import { createDovetailGeometry } from "@/lib/dovetailGeometry";
 import { createSpringGeometry } from "@/lib/springGeometry";
 import { createHoneycombGeometry } from "@/lib/honeycombGeometry";
 import { createBentTubeGeometry } from "@/lib/bentTubeGeometry";
+import { parametricShapeGeometryFields } from "@/lib/parametricShapeGeometry";
 import { parseMeasurementInput } from "@/lib/measurementUnits";
 import type { ModelSplitPlane } from "@/lib/modelSplit";
 import type { SculptBrushSettings, SculptPoint } from "@/lib/sculptBrush";
@@ -1055,6 +1056,7 @@ function rulerShapeTopologyKey(shape: WorkplaneShape): string {
     boreDiameter: shape.boreDiameter,
     shaftDiameter: shape.shaftDiameter,
     headHeight: shape.headHeight,
+    parametric: parametricShapeGeometryFields(shape),
     text: shape.text,
     font: shape.font,
     mesh: [positions.length, positionSample],

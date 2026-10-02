@@ -29,6 +29,15 @@ describe("shape catalog", () => {
     expect(byKind("bentTube")).toMatchObject({ bentTubeSize: 10, bentTubeWall: 1.5, bentTubeQuality: 32, bentTubeSegments: [{ length: 25, bendAngle: 90, bendRadius: 15, roll: 0 }, { length: 25, bendAngle: 0, bendRadius: 15, roll: 0 }] });
   });
 
+  it("uses dedicated icons for the new shapes", () => {
+    const expected = ["rounded-box", "ellipse", "slot", "star", "heart", "crescent", "teardrop", "counterbore", "countersink", "dovetail", "spring", "honeycomb"];
+    for (const id of expected) {
+      const asset = toolbarShapeAssets.find((candidate) => candidate.id === id)!;
+      expect(asset.src).toBe(`assets/sketchforge/shape-icons-gray/${id}.svg`);
+      expect(asset.menuIcon).toBe(asset.src);
+    }
+  });
+
   it("creates placed shapes from toolbar assets", () => {
     const asset: ShapeAsset = { id: "box", name: "Box", src: "box.png", kind: "box", color: "#d41721" };
     const placed = makeShapeFromAsset(asset, { x: 12, z: -8, elevation: 4 });

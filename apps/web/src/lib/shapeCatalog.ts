@@ -22,8 +22,8 @@ import { DEFAULT_HEART_QUALITY, DEFAULT_HEART_TIP_FILLET } from "@/lib/heartGeom
 import { DEFAULT_CRESCENT_QUALITY, DEFAULT_CRESCENT_TIP_FILLET } from "@/lib/crescentGeometry";
 import { DEFAULT_SCREW_HOLE_ANGLE, DEFAULT_SCREW_HOLE_HEAD_DEPTH, DEFAULT_SCREW_HOLE_SHAFT } from "@/lib/screwHoleGeometry";
 import { DEFAULT_DOVETAIL_CLEARANCE, DEFAULT_DOVETAIL_NECK_RATIO } from "@/lib/dovetailGeometry";
-import { DEFAULT_SPRING_QUALITY, DEFAULT_SPRING_TURNS, DEFAULT_SPRING_WIRE } from "@/lib/springGeometry";
-import { DEFAULT_HONEYCOMB_CELL_SIZE, DEFAULT_HONEYCOMB_FRAME_WIDTH, DEFAULT_HONEYCOMB_WALL_THICKNESS } from "@/lib/honeycombGeometry";
+import { DEFAULT_SPRING_QUALITY, DEFAULT_SPRING_TURNS, DEFAULT_SPRING_WIRE, springSettings } from "@/lib/springGeometry";
+import { DEFAULT_HONEYCOMB_CELL_SIZE, DEFAULT_HONEYCOMB_FRAME_WIDTH, DEFAULT_HONEYCOMB_WALL_THICKNESS, normalizeHoneycombCellSize, normalizeHoneycombFrameWidth, normalizeHoneycombWallThickness } from "@/lib/honeycombGeometry";
 import { teardropHeightForTipAngle } from "@/lib/teardropGeometry";
 import { DEFAULT_BENT_TUBE_SEGMENTS } from "@/lib/bentTubeGeometry";
 import type { ShapeAsset, ShapeCustomization, ShapeKind, WorkplaneShape } from "@/types/sketchforge";
@@ -32,21 +32,21 @@ export type ToolbarShapeAsset = ShapeAsset & { menuIcon: string };
 
 export const toolbarShapeAssets: ToolbarShapeAsset[] = [
   { id: "box", name: "Box", src: "assets/sketchforge/shape-icons-gray/box.png", menuIcon: "assets/sketchforge/shape-icons-gray/box.png", kind: "box", color: "#d41721" },
-  { id: "rounded-box", name: "Rounded Box", src: "assets/sketchforge/shape-icons-gray/box.png", menuIcon: "assets/sketchforge/shape-icons-gray/box.png", kind: "roundedBox", color: "#d94a32" },
+  { id: "rounded-box", name: "Rounded Box", src: "assets/sketchforge/shape-icons-gray/rounded-box.svg", menuIcon: "assets/sketchforge/shape-icons-gray/rounded-box.svg", kind: "roundedBox", color: "#d94a32" },
   { id: "cylinder", name: "Cylinder", src: "assets/sketchforge/shape-icons-gray/cylinder.png", menuIcon: "assets/sketchforge/shape-icons-gray/cylinder.png", kind: "cylinder", color: "#d97813" },
-  { id: "ellipse", name: "Ellipse", src: "assets/sketchforge/shape-icons-gray/cylinder.png", menuIcon: "assets/sketchforge/shape-icons-gray/cylinder.png", kind: "ellipse", color: "#e08a25" },
-  { id: "slot", name: "Capsule", src: "assets/sketchforge/shape-icons-gray/round-roof.png", menuIcon: "assets/sketchforge/shape-icons-gray/round-roof.png", kind: "slot", color: "#26a69a" },
+  { id: "ellipse", name: "Ellipse", src: "assets/sketchforge/shape-icons-gray/ellipse.svg", menuIcon: "assets/sketchforge/shape-icons-gray/ellipse.svg", kind: "ellipse", color: "#e08a25" },
+  { id: "slot", name: "Capsule", src: "assets/sketchforge/shape-icons-gray/slot.svg", menuIcon: "assets/sketchforge/shape-icons-gray/slot.svg", kind: "slot", color: "#26a69a" },
   { id: "sphere", name: "Sphere", src: "assets/sketchforge/shape-icons-gray/sphere.png", menuIcon: "assets/sketchforge/shape-icons-gray/sphere.png", kind: "sphere", color: "#0098c7" },
   { id: "cone", name: "Cone", src: "assets/sketchforge/shape-icons-gray/cone.png", menuIcon: "assets/sketchforge/shape-icons-gray/cone.png", kind: "cone", color: "#6e2786" },
   { id: "pyramid", name: "Pyramid", src: "assets/sketchforge/shape-icons-gray/pyramid.png", menuIcon: "assets/sketchforge/shape-icons-gray/pyramid.png", kind: "pyramid", color: "#f2cf10" },
   { id: "wedge", name: "Wedge", src: "assets/sketchforge/shape-icons-gray/wedge.png", menuIcon: "assets/sketchforge/shape-icons-gray/wedge.png", kind: "wedge", color: "#33983d" },
-  { id: "star", name: "Star", src: "assets/sketchforge/shape-icons-gray/gear.svg", menuIcon: "assets/sketchforge/shape-icons-gray/gear.svg", kind: "star", color: "#f2cf10" },
-  { id: "heart", name: "Heart", src: "assets/sketchforge/shape-icons-gray/half-sphere.png", menuIcon: "assets/sketchforge/shape-icons-gray/half-sphere.png", kind: "heart", color: "#e83e6f" },
-  { id: "crescent", name: "Crescent", src: "assets/sketchforge/shape-icons-gray/half-sphere.png", menuIcon: "assets/sketchforge/shape-icons-gray/half-sphere.png", kind: "crescent", color: "#7c6bd0" },
-  { id: "teardrop", name: "Teardrop", src: "assets/sketchforge/shape-icons-gray/cone.png", menuIcon: "assets/sketchforge/shape-icons-gray/cone.png", kind: "teardrop", color: "#4aa6c7", hole: true },
-  { id: "counterbore", name: "Counterbore", src: "assets/sketchforge/shape-icons-gray/tube.png", menuIcon: "assets/sketchforge/shape-icons-gray/tube.png", kind: "counterbore", color: "#8a98a6", hole: true },
-  { id: "countersink", name: "Countersink", src: "assets/sketchforge/shape-icons-gray/cone.png", menuIcon: "assets/sketchforge/shape-icons-gray/cone.png", kind: "countersink", color: "#8a98a6", hole: true },
-  { id: "dovetail", name: "Dovetail", src: "assets/sketchforge/shape-icons-gray/wedge.png", menuIcon: "assets/sketchforge/shape-icons-gray/wedge.png", kind: "dovetail", color: "#7f8c4f" },
+  { id: "star", name: "Star", src: "assets/sketchforge/shape-icons-gray/star.svg", menuIcon: "assets/sketchforge/shape-icons-gray/star.svg", kind: "star", color: "#f2cf10" },
+  { id: "heart", name: "Heart", src: "assets/sketchforge/shape-icons-gray/heart.svg", menuIcon: "assets/sketchforge/shape-icons-gray/heart.svg", kind: "heart", color: "#e83e6f" },
+  { id: "crescent", name: "Crescent", src: "assets/sketchforge/shape-icons-gray/crescent.svg", menuIcon: "assets/sketchforge/shape-icons-gray/crescent.svg", kind: "crescent", color: "#7c6bd0" },
+  { id: "teardrop", name: "Teardrop", src: "assets/sketchforge/shape-icons-gray/teardrop.svg", menuIcon: "assets/sketchforge/shape-icons-gray/teardrop.svg", kind: "teardrop", color: "#4aa6c7", hole: true },
+  { id: "counterbore", name: "Counterbore", src: "assets/sketchforge/shape-icons-gray/counterbore.svg", menuIcon: "assets/sketchforge/shape-icons-gray/counterbore.svg", kind: "counterbore", color: "#8a98a6", hole: true },
+  { id: "countersink", name: "Countersink", src: "assets/sketchforge/shape-icons-gray/countersink.svg", menuIcon: "assets/sketchforge/shape-icons-gray/countersink.svg", kind: "countersink", color: "#8a98a6", hole: true },
+  { id: "dovetail", name: "Dovetail", src: "assets/sketchforge/shape-icons-gray/dovetail.svg", menuIcon: "assets/sketchforge/shape-icons-gray/dovetail.svg", kind: "dovetail", color: "#7f8c4f" },
   { id: "text", name: "Text", src: "assets/sketchforge/shape-icons-gray/text.png", menuIcon: "assets/sketchforge/shape-icons-gray/text.png", kind: "text", color: "#cf101b" },
   { id: "round-roof", name: "Round Roof", src: "assets/sketchforge/shape-icons-gray/round-roof.png", menuIcon: "assets/sketchforge/shape-icons-gray/round-roof.png", kind: "roundRoof", color: "#67c4ce" },
   { id: "half-sphere", name: "Half Sphere", src: "assets/sketchforge/shape-icons-gray/half-sphere.png", menuIcon: "assets/sketchforge/shape-icons-gray/half-sphere.png", kind: "halfSphere", color: "#c9009a" },
@@ -56,8 +56,8 @@ export const toolbarShapeAssets: ToolbarShapeAsset[] = [
   { id: "screw", name: "Screw", src: "assets/sketchforge/shape-icons-gray/screw.svg", menuIcon: "assets/sketchforge/shape-icons-gray/screw.svg", kind: "screw", color: "#677786" },
   { id: "washer", name: "Washer", src: "assets/sketchforge/shape-icons-gray/washer.svg", menuIcon: "assets/sketchforge/shape-icons-gray/washer.svg", kind: "washer", color: "#81909d" },
   { id: "nut", name: "Nut", src: "assets/sketchforge/shape-icons-gray/nut.svg", menuIcon: "assets/sketchforge/shape-icons-gray/nut.svg", kind: "nut", color: "#596976" },
-  { id: "spring", name: "Spring", src: "assets/sketchforge/shape-icons-gray/torus.png", menuIcon: "assets/sketchforge/shape-icons-gray/torus.png", kind: "spring", color: "#667784" },
-  { id: "honeycomb", name: "Honeycomb", src: "assets/sketchforge/shape-icons-gray/gear.svg", menuIcon: "assets/sketchforge/shape-icons-gray/gear.svg", kind: "honeycomb", color: "#d4a017" },
+  { id: "spring", name: "Spring", src: "assets/sketchforge/shape-icons-gray/spring.svg", menuIcon: "assets/sketchforge/shape-icons-gray/spring.svg", kind: "spring", color: "#667784" },
+  { id: "honeycomb", name: "Honeycomb", src: "assets/sketchforge/shape-icons-gray/honeycomb.svg", menuIcon: "assets/sketchforge/shape-icons-gray/honeycomb.svg", kind: "honeycomb", color: "#d4a017" },
   { id: "bent-tube", name: "Bent Tube", src: "assets/sketchforge/shape-icons-gray/tube.png", menuIcon: "assets/sketchforge/shape-icons-gray/tube.png", kind: "bentTube", color: "#3d91a8" },
 ];
 
@@ -247,6 +247,11 @@ export function makeShapeFromAsset(
   const gearTeeth = asset.kind === "gear" ? normalizeGearTeeth(customization.teeth ?? DEFAULT_GEAR_TEETH) : undefined;
   const gearToothSize = asset.kind === "gear" ? normalizeGearToothSize(customization.toothSize ?? DEFAULT_GEAR_TOOTH_SIZE, width, depth) : undefined;
   const special = shapeAssetSpecialDefaults(asset.kind, { width, depth, height });
+  const spring = asset.kind === "spring" ? springSettings({
+    springTurns: customization.springTurns ?? special.springTurns,
+    springWire: customization.springWire ?? special.springWire,
+    springQuality: customization.springQuality ?? special.springQuality,
+  }, Math.max(width, depth), height) : undefined;
 
   return {
     id: createLocalId(asset.id),
@@ -268,7 +273,7 @@ export function makeShapeFromAsset(
     text: asset.kind === "text" ? customization.text ?? "TEXT" : undefined,
     font: asset.kind === "text" ? customization.font ?? "Multilanguage" : undefined,
     steps: asset.kind === "box" ? 10 : asset.kind === "sphere" ? customization.steps ?? 24 : asset.kind === "halfSphere" ? customization.steps ?? 32 : undefined,
-    sides: asset.kind === "cylinder" || asset.kind === "cone" ? customization.sides ?? 96 : asset.kind === "roundRoof" ? customization.sides ?? 64 : asset.kind === "pyramid" ? customization.sides ?? 4 : undefined,
+    sides: ["cylinder", "cone", "ellipse", "slot", "teardrop", "counterbore", "countersink"].includes(asset.kind) ? customization.sides ?? special.sides ?? 96 : asset.kind === "roundRoof" ? customization.sides ?? 64 : asset.kind === "pyramid" ? customization.sides ?? 4 : undefined,
     bevel: asset.kind === "cylinder" ? 0 : asset.kind === "tube" || asset.kind === "ring" ? customization.bevel ?? 4 : asset.kind === "text" ? customization.bevel : undefined,
     segments: asset.kind === "cylinder" ? 1 : asset.kind === "text" ? customization.segments : undefined,
     topRadius: asset.kind === "cone" ? customization.topRadius ?? 0 : undefined,
@@ -310,12 +315,12 @@ export function makeShapeFromAsset(
     screwHoleAngle: customization.screwHoleAngle ?? special.screwHoleAngle,
     dovetailNeckWidth: customization.dovetailNeckWidth ?? special.dovetailNeckWidth,
     dovetailClearance: customization.dovetailClearance ?? special.dovetailClearance,
-    springTurns: customization.springTurns ?? special.springTurns,
-    springWire: customization.springWire ?? special.springWire,
-    springQuality: customization.springQuality ?? special.springQuality,
-    honeycombCellSize: customization.honeycombCellSize ?? special.honeycombCellSize,
-    honeycombWallThickness: customization.honeycombWallThickness ?? special.honeycombWallThickness,
-    honeycombFrameWidth: customization.honeycombFrameWidth ?? special.honeycombFrameWidth,
+    springTurns: spring?.turns,
+    springWire: spring?.wire,
+    springQuality: spring?.quality,
+    honeycombCellSize: asset.kind === "honeycomb" ? normalizeHoneycombCellSize(customization.honeycombCellSize ?? special.honeycombCellSize) : undefined,
+    honeycombWallThickness: asset.kind === "honeycomb" ? normalizeHoneycombWallThickness(customization.honeycombWallThickness ?? special.honeycombWallThickness) : undefined,
+    honeycombFrameWidth: asset.kind === "honeycomb" ? Math.min(normalizeHoneycombFrameWidth(customization.honeycombFrameWidth ?? special.honeycombFrameWidth), Math.max(0, Math.min(width, depth) / 2 - 0.5)) : undefined,
     bentTubeSize: customization.bentTubeSize ?? special.bentTubeSize,
     bentTubeWall: customization.bentTubeWall ?? special.bentTubeWall,
     bentTubeQuality: customization.bentTubeQuality ?? special.bentTubeQuality,

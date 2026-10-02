@@ -173,13 +173,13 @@ export function normalizeShapeCustomizations(value: unknown, fallback: ShapeCust
       entry.dovetailClearance = optionalShapeNumber(source.dovetailClearance, fallbackEntry?.dovetailClearance, 0, 5);
     }
     if (kind === "spring") {
-      entry.springTurns = optionalShapeNumber(source.springTurns, fallbackEntry?.springTurns, 1, 40, true);
-      entry.springWire = optionalShapeNumber(source.springWire, fallbackEntry?.springWire, 0.2, MAX_CUSTOM_SHAPE_DIMENSION);
+      entry.springTurns = optionalShapeNumber(source.springTurns, fallbackEntry?.springTurns, 1, 60, true);
+      entry.springWire = optionalShapeNumber(source.springWire, fallbackEntry?.springWire, 0.3, MAX_CUSTOM_SHAPE_DIMENSION);
       entry.springQuality = optionalShapeNumber(source.springQuality, fallbackEntry?.springQuality, 12, 96, true);
     }
     if (kind === "honeycomb") {
-      entry.honeycombCellSize = optionalShapeNumber(source.honeycombCellSize, fallbackEntry?.honeycombCellSize, 1, 50);
-      entry.honeycombWallThickness = optionalShapeNumber(source.honeycombWallThickness, fallbackEntry?.honeycombWallThickness, 0.1, 20);
+      entry.honeycombCellSize = optionalShapeNumber(source.honeycombCellSize, fallbackEntry?.honeycombCellSize, 2, 100);
+      entry.honeycombWallThickness = optionalShapeNumber(source.honeycombWallThickness, fallbackEntry?.honeycombWallThickness, 0.4, 50);
       entry.honeycombFrameWidth = optionalShapeNumber(source.honeycombFrameWidth, fallbackEntry?.honeycombFrameWidth, 0, 100);
     }
     if (kind === "bentTube") {

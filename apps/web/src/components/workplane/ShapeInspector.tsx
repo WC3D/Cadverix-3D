@@ -37,6 +37,8 @@ import { resizedShapeSize, shapeDepth, shapeHasTaper, shapeOverallFootprintDimen
 import { normalizeSketchRevolveSettings } from "@/lib/sketchRevolve";
 import { MAX_HIGH_RESOLUTION_SIDES } from "@/lib/workplaneSettings";
 import { normalizeBentTubeSegments } from "@/lib/bentTubeGeometry";
+import { normalizeHoneycombCellSize, normalizeHoneycombFrameWidth, normalizeHoneycombWallThickness } from "@/lib/honeycombGeometry";
+import { normalizeSpringQuality, normalizeSpringTurns, normalizeSpringWire, springTurnLimits, springWireLimits } from "@/lib/springGeometry";
 import type { GearType, GridSize, MeasurementAccuracy, WorkplaneShape, WorkplaneWorkspaceSettings } from "@/types/sketchforge";
 
 const MIN_SHAPE_SIZE = 0.01;
@@ -116,7 +118,8 @@ function formatPropertyNumber(value: number, accuracy: MeasurementAccuracy, step
 }
 
 function propertyUsesLengthUnit(label: string) {
-  return ["Radius", "Length", "Width", "Height", "Bevel", "Top Radius", "Base Radius", "Thickness", "Tooth Size", "Tooth Width", "Center Hole", "Top Length", "Top Width", "Bottom Length", "Bottom Width", "Bore Diameter", "Shaft Diameter", "Head Height", "Head Across Flats", "Across Flats", "Thread Pitch", "Thread Depth"].includes(label);
+  return ["Radius", "Length", "Width", "Height", "Bevel", "Top Radius", "Base Radius", "Thickness", "Tooth Size", "Tooth Width", "Center Hole", "Top Length", "Top Width", "Bottom Length", "Bottom Width", "Bore Diameter", "Shaft Diameter", "Head Height", "Head Across Flats", "Across Flats", "Thread Pitch", "Thread Depth", "Corner Fillet", "Top/Bottom Fillet", "Inner Size", "Outer Fillet", "Inner Fillet", "Tip Fillet", "Head Depth", "Neck Width", "Clearance", "Wire Diameter", "Cell Size", "Wall Thickness", "Frame Width", "Tube Diameter"].includes(label)
+    || /^Segment \d+ (Length|Radius)$/.test(label);
 }
 
 function getShapePropertiesWithAppLimits(shape: WorkplaneShape, onUpdate: ShapeInspectorUpdate, textWidthMax = 260): ShapePropertyConfig[] {
@@ -363,10 +366,18 @@ function getShapePropertiesWithAppLimits(shape: WorkplaneShape, onUpdate: ShapeI
   }
 
   if (shape.kind === "spring") {
+    const diameter = Math.max(width, depth);
+    const wire = normalizeSpringWire(shape.springWire, diameter, shape.height);
+    const wireLimits = springWireLimits(diameter, shape.height);
+    const turns = normalizeSpringTurns(shape.springTurns, diameter, shape.height, wire);
+    const turnLimits = springTurnLimits(diameter, shape.height, wire);
     return [
-      { label: "Turns", value: shape.springTurns ?? 6, min: 1, max: 40, step: 1, onChange: (springTurns) => onUpdate({ springTurns: Math.round(springTurns) }) },
-      { label: "Wire Diameter", value: shape.springWire ?? 3, min: 0.2, max: Math.min(width, depth, shape.height) * 0.4, step: 0.1, onChange: (springWire) => onUpdate({ springWire }) },
-      { label: "Quality", value: shape.springQuality ?? 36, min: 12, max: 96, step: 4, onChange: (springQuality) => onUpdate({ springQuality: Math.round(springQuality / 4) * 4 }) },
+      { label: "Turns", value: turns, min: turnLimits.min, max: turnLimits.max, step: 1, onChange: (springTurns) => onUpdate({ springTurns: normalizeSpringTurns(springTurns, diameter, shape.height, wire) }) },
+      { label: "Wire Diameter", value: wire, min: wireLimits.min, max: wireLimits.max, step: 0.1, onChange: (springWire) => {
+        const nextWire = normalizeSpringWire(springWire, diameter, shape.height);
+        onUpdate({ springWire: nextWire, springTurns: normalizeSpringTurns(shape.springTurns, diameter, shape.height, nextWire) });
+      } },
+      { label: "Quality", value: normalizeSpringQuality(shape.springQuality), min: 12, max: 96, step: 4, onChange: (springQuality) => onUpdate({ springQuality: normalizeSpringQuality(springQuality) }) },
       { label: "Length", value: depth, min: MIN_SHAPE_SIZE, max: 160, onChange: setDepth },
       { label: "Width", value: width, min: MIN_SHAPE_SIZE, max: 160, onChange: setWidth },
       { label: "Height", value: shape.height, min: MIN_SHAPE_SIZE, max: 160, onChange: setHeight },
@@ -374,10 +385,12 @@ function getShapePropertiesWithAppLimits(shape: WorkplaneShape, onUpdate: ShapeI
   }
 
   if (shape.kind === "honeycomb") {
+    const maxFrameWidth = Math.max(0, Math.min(width, depth) / 2 - 0.5);
+    const frameWidth = Math.min(normalizeHoneycombFrameWidth(shape.honeycombFrameWidth), maxFrameWidth);
     return [
-      { label: "Cell Size", value: shape.honeycombCellSize ?? 8, min: 1, max: 50, step: 0.1, onChange: (honeycombCellSize) => onUpdate({ honeycombCellSize }) },
-      { label: "Wall Thickness", value: shape.honeycombWallThickness ?? 1.6, min: 0.1, max: 20, step: 0.1, onChange: (honeycombWallThickness) => onUpdate({ honeycombWallThickness }) },
-      { label: "Frame Width", value: shape.honeycombFrameWidth ?? 3, min: 0, max: 100, step: 0.1, onChange: (honeycombFrameWidth) => onUpdate({ honeycombFrameWidth }) },
+      { label: "Cell Size", value: normalizeHoneycombCellSize(shape.honeycombCellSize), min: 2, max: 100, step: 0.1, onChange: (honeycombCellSize) => onUpdate({ honeycombCellSize: normalizeHoneycombCellSize(honeycombCellSize) }) },
+      { label: "Wall Thickness", value: normalizeHoneycombWallThickness(shape.honeycombWallThickness), min: 0.4, max: 50, step: 0.1, onChange: (honeycombWallThickness) => onUpdate({ honeycombWallThickness: normalizeHoneycombWallThickness(honeycombWallThickness) }) },
+      { label: "Frame Width", value: frameWidth, min: 0, max: maxFrameWidth, step: 0.1, onChange: (honeycombFrameWidth) => onUpdate({ honeycombFrameWidth: Math.min(normalizeHoneycombFrameWidth(honeycombFrameWidth), maxFrameWidth) }) },
       { label: "Length", value: depth, min: MIN_SHAPE_SIZE, max: 160, onChange: setDepth },
       { label: "Width", value: width, min: MIN_SHAPE_SIZE, max: 160, onChange: setWidth },
       { label: "Height", value: shape.height, min: MIN_SHAPE_SIZE, max: 160, onChange: setHeight },

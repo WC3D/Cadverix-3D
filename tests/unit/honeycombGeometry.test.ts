@@ -68,6 +68,20 @@ describe("honeycomb geometry", () => {
     expect(geometry.boundingBox?.max.y).toBeCloseTo(2, 4);
   });
 
+  it("stays valid across the full inspector limits", () => {
+    const cases = [
+      { honeycombCellSize: 2, honeycombWallThickness: 0.4, honeycombFrameWidth: 0 },
+      { honeycombCellSize: 100, honeycombWallThickness: 50, honeycombFrameWidth: 29.5 },
+      { honeycombCellSize: 7.3, honeycombWallThickness: 11.7, honeycombFrameWidth: 20 },
+    ];
+    for (const settings of cases) {
+      const geometry = createHoneycombGeometry({ width: 60, depth: 60, height: 3, ...settings });
+      expect(signedVolume(geometry)).toBeGreaterThan(0);
+      expect([...edgeUseCounts(geometry).values()].every((uses) => uses === 2)).toBe(true);
+      geometry.dispose();
+    }
+  });
+
   it("participates cleanly in CSG subtraction", () => {
     const honeycomb = new Brush(createHoneycombGeometry({ width: 40, depth: 40, height: 4, honeycombCellSize: 8, honeycombWallThickness: 1.6, honeycombFrameWidth: 3 }));
     const boxGeometry = new THREE.BoxGeometry(50, 4, 50);

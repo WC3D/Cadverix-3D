@@ -1,0 +1,16 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 96 96">
+  <defs>
+    <linearGradient id="spring-metal" x1="18" y1="12" x2="78" y2="84" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#f4f6f7"/>
+      <stop offset=".45" stop-color="#c4ccd1"/>
+      <stop offset="1" stop-color="#7f8d96"/>
+    </linearGradient>
+    <filter id="spring-shadow" x="-20%" y="-15%" width="140%" height="140%">
+      <feDropShadow dx="0" dy="3" stdDeviation="2.5" flood-color="#34434d" flood-opacity=".3"/>
+    </filter>
+  </defs>
+  <g fill="none" stroke="url(#spring-metal)" stroke-width="8" stroke-linecap="round" stroke-linejoin="round" filter="url(#spring-shadow)">
+    <path d="M27 17c0-7 42-7 42 0s-42 7-42 14 42 7 42 14-42 7-42 14 42 7 42 14-42 7-42 6"/>
+  </g>
+  <path d="M27 17c0-7 42-7 42 0s-42 7-42 14 42 7 42 14-42 7-42 14 42 7 42 14-42 7-42 6" fill="none" stroke="#65737d" stroke-width="2" stroke-linecap="round"/>
+</svg>
