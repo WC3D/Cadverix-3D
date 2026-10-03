@@ -1,10 +1,10 @@
 # Copy this server block into your Codex config.toml and replace the script
-# path with the absolute path to your SketchForge checkout.
+# path with the absolute path to your Cadverix 3D checkout.
 #
 # Windows paths can use forward slashes:
-# C:/Users/you/Desktop/SketchForge-3D/scripts/sketchforge-mcp-server.mjs
+# C:/Users/you/Desktop/cadverix-3d/scripts/cadverix-mcp-server.mjs
 
-[mcp_servers.sketchforge]
+[mcp_servers.cadverix]
 command = "node"
-args = ["/absolute/path/to/SketchForge-3D/scripts/sketchforge-mcp-server.mjs"]
+args = ["/absolute/path/to/cadverix-3d/scripts/cadverix-mcp-server.mjs"]
 startup_timeout_sec = 20

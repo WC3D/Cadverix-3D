@@ -24,7 +24,7 @@ function safeFillColor(value: string) {
   return /^(?:#[0-9a-f]{3,8}|(?:rgb|hsl)a?\([^<>]+\))$/i.test(value.trim()) ? value.trim() : "#0098c7";
 }
 
-export function toSvgProjection(layers: ReadonlyArray<SvgProjectionLayer>, title = "SketchForge design") {
+export function toSvgProjection(layers: ReadonlyArray<SvgProjectionLayer>, title = "Cadverix 3D design") {
   const cleanLayers = layers.flatMap((layer) => {
     const polygons = layer.polygons.filter(
       (polygon) => polygon.length >= 3 && polygon.every(([x, y]) => Number.isFinite(x) && Number.isFinite(y)),
@@ -60,7 +60,7 @@ export function toSvgProjection(layers: ReadonlyArray<SvgProjectionLayer>, title
     '<?xml version="1.0" encoding="UTF-8"?>',
     `<svg xmlns="http://www.w3.org/2000/svg" version="1.1" width="${svgNumber(width)}mm" height="${svgNumber(height)}mm" viewBox="${svgNumber(minX)} ${svgNumber(minY)} ${svgNumber(width)} ${svgNumber(height)}">`,
     `  <title>${xmlEscape(title)}</title>`,
-    "  <desc>Top-view vector projection exported by SketchForge</desc>",
+    "  <desc>Top-view vector projection exported by Cadverix 3D</desc>",
     ...body,
     "</svg>",
   ].join("\n");

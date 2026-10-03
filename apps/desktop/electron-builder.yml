@@ -1,5 +1,5 @@
 appId: com.sketchforge.desktop
-productName: SketchForge
+productName: Cadverix 3D
 asar: true
 
 directories:
@@ -7,7 +7,7 @@ directories:
 
 publish:
   provider: github
-  owner: Formsmith746
+  owner: WC3D
   repo: SketchForge-3D
   releaseType: release
 
@@ -25,7 +25,7 @@ extraResources:
     to: web/apps/web/public
 
 win:
-  icon: apps/web/public/assets/sketchforge/sketchforge-logo.png
+  icon: apps/web/public/assets/cadverix/cadverix-logo.png
   target:
     - target: nsis
       arch:
@@ -39,7 +39,7 @@ nsis:
   createStartMenuShortcut: true
 
 mac:
-  icon: apps/web/public/assets/sketchforge/sketchforge-logo.png
+  icon: apps/web/public/assets/cadverix/cadverix-logo.png
   target:
     - dmg
     - zip
@@ -48,7 +48,7 @@ mac:
 
 linux:
   syncDesktopName: true
-  icon: apps/web/public/assets/sketchforge/sketchforge-logo.png
+  icon: apps/web/public/assets/cadverix/cadverix-logo.png
   target:
     - AppImage
   category: Graphics

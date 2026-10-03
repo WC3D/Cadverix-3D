@@ -27,7 +27,7 @@ const STEPS: TutorialStep[] = [
     title: "Build a Key Tag",
     body: "Set Snap Grid to 0.5 mm, then build the Key Tag from simple shapes.",
     image: "/assets/challenges/key-tag/01-finished-target.png",
-    alt: "Finished Key Tag shown in the SketchForge workplane",
+    alt: "Finished Key Tag shown in the Cadverix 3D workplane",
     snapGrid: "0.5 mm",
   },
   {
@@ -35,7 +35,7 @@ const STEPS: TutorialStep[] = [
     title: "Make the middle",
     body: "Add a Box, then set its size in the shape panel.",
     image: "/assets/challenges/key-tag/02-middle-box.png",
-    alt: "The middle box of the Key Tag in SketchForge",
+    alt: "The middle box of the Key Tag in Cadverix 3D",
     dimensions: [
       { label: "Length", value: "25.50 mm", slider: 38 },
       { label: "Width", value: "11.50 mm", slider: 20 },
@@ -66,7 +66,7 @@ const STEPS: TutorialStep[] = [
     title: "Lock the left circle",
     body: "Select the left solid cylinder and press Lock. It will be the alignment reference.",
     image: "/assets/challenges/key-tag/05-select-left-circle.png",
-    alt: "The left solid cylinder selected in the SketchForge workplane",
+    alt: "The left solid cylinder selected in the Cadverix 3D workplane",
   },
   {
     eyebrow: "Step 5",
@@ -99,7 +99,7 @@ const STEPS: TutorialStep[] = [
     title: "Group the Key Tag",
     body: "Select the box, both solid circles, and the hole. Press Group.",
     image: "/assets/challenges/key-tag/09-grouped-key-tag.png",
-    alt: "The finished grouped Key Tag selected in SketchForge",
+    alt: "The finished grouped Key Tag selected in Cadverix 3D",
   },
 ];
 

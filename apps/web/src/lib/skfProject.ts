@@ -241,7 +241,7 @@ function extensionForAsset(kind: SkfAssetKind, mediaType: string, sourceFormat?:
 
 function encodeMeshCache(mesh: NonNullable<WorkplaneShape["importedMesh"]>) {
   if (mesh.positions.length > SKF_LIMITS.meshNumbers || (mesh.normals?.length ?? 0) > SKF_LIMITS.meshNumbers) {
-    throw new Error("Imported mesh is too large for a SketchForge project file");
+    throw new Error("Imported mesh is too large for a Cadverix 3D project file");
   }
   const normalLength = mesh.normals?.length ?? 0;
   const bytes = new Uint8Array(16 + (mesh.positions.length + normalLength) * 8);
@@ -296,7 +296,7 @@ function encodeDisplayEdges(edges: CadDisplayEdge[]) {
     if (!Array.isArray(edge?.points)) throw new Error("A display edge is missing its point list");
     numbers += edge.points.length;
   }
-  if (numbers > SKF_LIMITS.displayEdgeNumbers) throw new Error("Display edges are too large for a SketchForge project file");
+  if (numbers > SKF_LIMITS.displayEdgeNumbers) throw new Error("Display edges are too large for a Cadverix 3D project file");
   const bytes = new Uint8Array(16 + edges.length * 4 + numbers * 8);
   bytes.set(strToU8("SKFEDG1\0"), 0);
   const view = new DataView(bytes.buffer);
@@ -898,7 +898,7 @@ export async function exportSkfProject(input: SkfProjectExportInput) {
     createdWithVersion: SKF_CREATED_WITH_VERSION,
     metadata: {
       ...(input.projectId ? { projectId: input.projectId } : {}),
-      projectName: input.projectName.trim() || "SketchForge design",
+      projectName: input.projectName.trim() || "Cadverix 3D design",
       units: normalizeWorkspaceSettings(input.workspace).units,
       createdAt: safeIsoTimestamp(input.createdAt, now),
       modifiedAt: safeIsoTimestamp(input.modifiedAt, now),
@@ -1280,17 +1280,17 @@ function validateFeatureGraph(features: unknown, activeObjectIds: Set<string>) {
 
 async function validateDocumentAndAssets(raw: unknown, files: ArchiveFiles) {
   const document = objectRecord(raw, "project.json") as unknown as SkfProjectDocumentV1;
-  if (document.schema !== SKF_SCHEMA_ID && document.schema !== LYL_SCHEMA_ID) throw new Error("This file is not a SketchForge or Layerling project");
+  if (document.schema !== SKF_SCHEMA_ID && document.schema !== LYL_SCHEMA_ID) throw new Error("This file is not a supported Cadverix 3D (.skf) or Layerling project");
   const layerlingProject = document.schema === LYL_SCHEMA_ID;
-  if (!Number.isInteger(document.formatVersion)) throw new Error("SketchForge formatVersion is missing");
+  if (!Number.isInteger(document.formatVersion)) throw new Error("Cadverix 3D project formatVersion is missing");
   if (document.formatVersion > SKF_FORMAT_VERSION) {
-    throw new Error(`This project uses .skf format ${document.formatVersion}, which requires a newer SketchForge version`);
+    throw new Error(`This project uses .skf format ${document.formatVersion}, which requires a newer Cadverix 3D version`);
   }
   if (document.formatVersion < SKF_OLDEST_READABLE_FORMAT_VERSION) {
     throw new Error(`Packaged .skf format ${document.formatVersion} requires migration support that is not available`);
   }
   if (!Number.isInteger(document.minimumReaderVersion) || document.minimumReaderVersion > SKF_FORMAT_VERSION) {
-    throw new Error("This project requires a newer SketchForge reader and was not opened");
+    throw new Error("This project requires a newer Cadverix 3D reader and was not opened");
   }
   const metadata = objectRecord(document.metadata, "metadata");
   stringValue(metadata.projectName, "metadata.projectName");
@@ -1362,7 +1362,7 @@ async function validateDocumentAndAssets(raw: unknown, files: ArchiveFiles) {
     if (layerlingProject) {
       const layerlingState = state as SkfStateV1 & { notes?: unknown[] };
       if (Array.isArray(layerlingState.notes) && layerlingState.notes.length) {
-        throw new Error("This Layerling project contains workplane notes, which this SketchForge version cannot import");
+        throw new Error("This Layerling project contains workplane notes, which this Cadverix 3D version cannot import");
       }
     }
     const roots = stringArray(state.rootNodeIds, `state '${stateId}'.rootNodeIds`);
@@ -1397,7 +1397,7 @@ async function validateDocumentAndAssets(raw: unknown, files: ArchiveFiles) {
     if (!stateById.has(entry.stateId)) throw new Error(`History entry ${index} references missing state '${entry.stateId}'`);
     stringArray(entry.selectedObjectIds, `history.entries[${index}].selectedObjectIds`);
     if (layerlingProject && (entry as typeof entry & { workplane?: unknown }).workplane !== undefined) {
-      throw new Error("This Layerling project contains history-specific workplanes, which this SketchForge version cannot import");
+      throw new Error("This Layerling project contains history-specific workplanes, which this Cadverix 3D version cannot import");
     }
   });
   if (document.history.entries[document.history.index]?.stateId !== document.sceneStateId) throw new Error("Active scene and undo history index do not match");
@@ -1429,7 +1429,7 @@ async function defaultSourceImporter(asset: ProjectAsset) {
     const { importedShapeFromStep } = await import("@/lib/stepImport");
     return (await importedShapeFromStep(asset.name, exactArrayBuffer(asset.bytes))).importedMesh as NonNullable<WorkplaneShape["importedMesh"]>;
   }
-  throw new Error("SketchForge cannot reconstruct this source asset format");
+  throw new Error("Cadverix 3D cannot reconstruct this source asset format");
 }
 
 class RestoredResourceCache {
@@ -1649,7 +1649,7 @@ function migrateV0(raw: Record<string, unknown>): SkfRestoredProject {
   const now = Date.now();
   return {
     sourceProjectId: typeof project.id === "string" ? project.id : undefined,
-    projectName: typeof project.name === "string" && project.name.trim() ? project.name : "Imported SketchForge project",
+    projectName: typeof project.name === "string" && project.name.trim() ? project.name : "Imported Cadverix 3D project",
     createdAt: safeTimestamp(typeof project.createdAt === "number" ? project.createdAt : now, now),
     modifiedAt: safeTimestamp(typeof project.modifiedAt === "number" ? project.modifiedAt : now, now),
     shapes: hydrated.entries[hydrated.index]?.shapes ?? shapes,
@@ -1738,10 +1738,10 @@ export async function importSkfProject(input: ArrayBuffer | Uint8Array, options:
       throw new Error("Legacy .skf JSON is malformed");
     }
     const document = objectRecord(raw, "Legacy .skf project");
-    if (document.schema !== SKF_SCHEMA_ID && document.schema !== LYL_SCHEMA_ID) throw new Error("This file is not a SketchForge or Layerling project");
+    if (document.schema !== SKF_SCHEMA_ID && document.schema !== LYL_SCHEMA_ID) throw new Error("This file is not a supported Cadverix 3D (.skf) or Layerling project");
     if (document.formatVersion === 0) return migrateV0(document);
     if (typeof document.formatVersion === "number" && document.formatVersion > SKF_FORMAT_VERSION) {
-      throw new Error(`This project uses .skf format ${document.formatVersion}, which requires a newer SketchForge version`);
+      throw new Error(`This project uses .skf format ${document.formatVersion}, which requires a newer Cadverix 3D version`);
     }
     throw new Error("This legacy .skf version is not supported");
   }

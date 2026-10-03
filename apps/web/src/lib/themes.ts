@@ -47,7 +47,7 @@ export type AppTheme = {
 };
 
 export const THEME_PRESET_OPTIONS = [
-  { value: "sketchforge", label: "SketchForge (Current)" },
+  { value: "sketchforge", label: "Cadverix 3D (Current)" },
   { value: "light", label: "Light" },
   { value: "solidworks", label: "SolidWorks" },
   { value: "inventor", label: "Inventor" },
@@ -61,7 +61,7 @@ export function appColorModeForThemePreset(themeId: string): "light" | "dark" {
 export const defaultThemes: Record<string, AppTheme> = {
   sketchforge: {
     id: "sketchforge",
-    name: "SketchForge",
+    name: "Cadverix 3D",
     ui: {
       background: "#101820",
       foreground: "#d8e6f1",

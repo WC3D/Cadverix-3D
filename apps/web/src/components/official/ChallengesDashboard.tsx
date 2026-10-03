@@ -9,12 +9,12 @@ function KeyTagPreview() {
       <img
         className="challenge-key-tag-photo challenge-key-tag-photo-light"
         src="/assets/challenges/key-tag/card-key-tag-light.webp"
-        alt="Finished red Key Tag model on the SketchForge workplane"
+        alt="Finished red Key Tag model on the Cadverix 3D workplane"
       />
       <img
         className="challenge-key-tag-photo challenge-key-tag-photo-dark"
         src="/assets/challenges/key-tag/card-key-tag-dark.webp"
-        alt="Finished red Key Tag model on the dark SketchForge workplane"
+        alt="Finished red Key Tag model on the dark Cadverix 3D workplane"
       />
     </>
   );
@@ -26,12 +26,12 @@ function NameplatePreview() {
       <img
         className="challenge-key-tag-photo challenge-key-tag-photo-light"
         src="/assets/challenges/nameplate/card-nameplate-light.webp"
-        alt="Finished blue ALEX nameplate on the SketchForge workplane"
+        alt="Finished blue ALEX nameplate on the Cadverix 3D workplane"
       />
       <img
         className="challenge-key-tag-photo challenge-key-tag-photo-dark"
         src="/assets/challenges/nameplate/card-nameplate-dark.webp"
-        alt="Finished blue ALEX nameplate on the dark SketchForge workplane"
+        alt="Finished blue ALEX nameplate on the dark Cadverix 3D workplane"
       />
     </>
   );

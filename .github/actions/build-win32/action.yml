@@ -23,8 +23,8 @@ runs:
         VERSION: ${{ inputs.version }}
       run: |
         $required = @(
-          "dist/desktop/SketchForge-Setup-$env:VERSION-x64.exe",
-          "dist/desktop/SketchForge-Setup-$env:VERSION-x64.exe.blockmap",
+          "dist/desktop/Cadverix 3D-Setup-$env:VERSION-x64.exe",
+          "dist/desktop/Cadverix 3D-Setup-$env:VERSION-x64.exe.blockmap",
           "dist/desktop/latest.yml"
         )
         foreach ($file in $required) {
@@ -38,7 +38,7 @@ runs:
       with:
         name: ${{ inputs.artifact-name }}
         path: |
-          dist/desktop/SketchForge-Setup-*-x64.exe
-          dist/desktop/SketchForge-Setup-*-x64.exe.blockmap
+          dist/desktop/Cadverix 3D-Setup-*-x64.exe
+          dist/desktop/Cadverix 3D-Setup-*-x64.exe.blockmap
           dist/desktop/latest.yml
         if-no-files-found: error

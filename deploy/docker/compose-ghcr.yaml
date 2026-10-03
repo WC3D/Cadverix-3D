@@ -1,15 +1,15 @@
 services:
   sketchforge:
-    image: ghcr.io/formsmith746/sketchforge-3d:latest
+    image: ghcr.io/wc3d/sketchforge-3d:latest
     ports:
-      - "${SKETCHFORGE_PORT:-3000}:3000"
+      - "${CADVERIX_PORT:-${SKETCHFORGE_PORT:-3000}}:3000"
     environment:
-      SKETCHFORGE_SHARED_PROJECTS_DIR: /data/projects
-      SKETCHFORGE_UPDATE_TRIGGER_URL: "${SKETCHFORGE_UPDATE_TRIGGER_URL:-}"
-      SKETCHFORGE_UPDATE_ADMIN_KEY: "${SKETCHFORGE_UPDATE_ADMIN_KEY:-}"
-      SKETCHFORGE_UPDATE_TRIGGER_TOKEN: "${SKETCHFORGE_UPDATE_TRIGGER_TOKEN:-}"
+      CADVERIX_SHARED_PROJECTS_DIR: /data/projects
+      CADVERIX_UPDATE_TRIGGER_URL: "${CADVERIX_UPDATE_TRIGGER_URL:-${SKETCHFORGE_UPDATE_TRIGGER_URL:-}}"
+      CADVERIX_UPDATE_ADMIN_KEY: "${CADVERIX_UPDATE_ADMIN_KEY:-${SKETCHFORGE_UPDATE_ADMIN_KEY:-}}"
+      CADVERIX_UPDATE_TRIGGER_TOKEN: "${CADVERIX_UPDATE_TRIGGER_TOKEN:-${SKETCHFORGE_UPDATE_TRIGGER_TOKEN:-}}"
     volumes:
-      - "${SKETCHFORGE_SHARED_PROJECTS_VOLUME:-sketchforge-shared-projects}:/data/projects"
+      - "${CADVERIX_SHARED_PROJECTS_VOLUME:-${SKETCHFORGE_SHARED_PROJECTS_VOLUME:-sketchforge-shared-projects}}:/data/projects"
     restart: unless-stopped
 
 volumes:

@@ -5,7 +5,7 @@ FROM --platform=$BUILDPLATFORM node:24-alpine AS builder
 WORKDIR /app
 
 ENV NEXT_TELEMETRY_DISABLED=1
-ENV SKETCHFORGE_DOCKER_BUILD=true
+ENV CADVERIX_DOCKER_BUILD=true
 
 COPY package.json package-lock.json ./
 COPY patches ./patches
@@ -22,7 +22,7 @@ ENV NODE_ENV=production
 ENV NEXT_TELEMETRY_DISABLED=1
 ENV HOSTNAME=0.0.0.0
 ENV PORT=3000
-ENV SKETCHFORGE_SHARED_PROJECTS_DIR=/data/projects
+ENV CADVERIX_SHARED_PROJECTS_DIR=/data/projects
 
 RUN apk add --no-cache libcap \
   && setcap cap_net_bind_service=+ep /usr/local/bin/node \

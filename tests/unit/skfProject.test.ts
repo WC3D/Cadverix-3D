@@ -783,7 +783,7 @@ describe("SketchForge .skf project packages", () => {
       (document as { formatVersion: number }).formatVersion = SKF_FORMAT_VERSION + 1;
     });
 
-    await expect(importSkfProject(future)).rejects.toThrow("requires a newer SketchForge version");
+    await expect(importSkfProject(future)).rejects.toThrow("requires a newer Cadverix 3D version");
   });
 
   it("rejects missing references, duplicate IDs, cyclic groups, unknown operations, and corrupt assets", async () => {

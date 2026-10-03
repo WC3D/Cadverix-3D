@@ -1,0 +1,71 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img" aria-labelledby="title description">
+  <title id="title">Cadverix 3D — C3D</title>
+  <desc id="description">An isometric modeling cube, a drafting pencil and a curved sketch path above the C3D monogram, on a blue drafting-grid badge.</desc>
+  <defs>
+    <linearGradient id="badge" x1="0" y1="0" x2="1" y2="1">
+      <stop stop-color="#163858"/>
+      <stop offset="1" stop-color="#07172d"/>
+    </linearGradient>
+    <linearGradient id="top" x1="0" y1="0" x2="1" y2="1">
+      <stop stop-color="#9aeaff"/>
+      <stop offset="1" stop-color="#39b9fa"/>
+    </linearGradient>
+    <linearGradient id="left" x1="0" y1="0" x2="1" y2="1">
+      <stop stop-color="#258ffc"/>
+      <stop offset="1" stop-color="#1051c6"/>
+    </linearGradient>
+    <linearGradient id="right" x1="0" y1="0" x2="1" y2="1">
+      <stop stop-color="#127acb"/>
+      <stop offset="1" stop-color="#08356e"/>
+    </linearGradient>
+    <clipPath id="badge-clip">
+      <rect x="16" y="16" width="480" height="480" rx="100"/>
+    </clipPath>
+  </defs>
+
+  <rect x="16" y="16" width="480" height="480" rx="100" fill="url(#badge)"/>
+  <g clip-path="url(#badge-clip)">
+    <path d="M0 112h512M0 184h512M0 256h512M0 328h512M0 400h512M112 0v512M184 0v512M256 0v512M328 0v512M400 0v512"
+      fill="none" stroke="#b3e7ff" stroke-width="2" opacity=".075"/>
+    <path d="M83 302 232 388 415 282" fill="none" stroke="#53cfff" stroke-width="3" stroke-dasharray="8 9" opacity=".32"/>
+  </g>
+  <rect x="19" y="19" width="474" height="474" rx="97" fill="none" stroke="#78caff" stroke-width="2" opacity=".2"/>
+
+  <!-- The three shaded faces make the modeling solid readable at icon size. -->
+  <g stroke="#b8ecff" stroke-width="5" stroke-linejoin="round">
+    <path d="m232 78 129 74-129 74-129-74Z" fill="url(#top)"/>
+    <path d="m103 152 129 74v124l-129-74Z" fill="url(#left)"/>
+    <path d="m232 226 129-74v124l-129 74Z" fill="url(#right)"/>
+  </g>
+  <path d="m103 276 129-74 129 74M232 78v124" fill="none" stroke="#e0f8ff" stroke-width="3" stroke-dasharray="8 8" opacity=".22"/>
+
+  <!-- Drafting dimension ticks and editable sketch points. -->
+  <g fill="none" stroke="#64d9ff" stroke-width="4" stroke-linecap="round">
+    <path d="M78 164v104m-7-97 14-14m-14 118 14-14"/>
+    <path d="M290 266c-3 26-20 38-47 42" stroke-width="5"/>
+  </g>
+  <g fill="#0d2644" stroke="#b0edff" stroke-width="4">
+    <circle cx="232" cy="78" r="6"/>
+    <circle cx="103" cy="152" r="6"/>
+    <circle cx="243" cy="308" r="6"/>
+  </g>
+
+  <!-- A warm pencil contrasts with the CAD blue and points into the sketch. -->
+  <g transform="translate(364 172) rotate(38)" stroke="#081b32" stroke-width="6" stroke-linejoin="round">
+    <path d="M-17-76v-20a17 17 0 0 1 34 0v20Z" fill="#ff8c79"/>
+    <path d="M-17-76h34v22h-34Z" fill="#d9eaf4"/>
+    <path d="M-17-54h34V68L0 111-17 68Z" fill="#ffcd52"/>
+    <path d="M5-51h9V66H5Z" fill="#f4a52d" stroke="none"/>
+    <path d="M-12-51h9V66h-9Z" fill="#ffe796" stroke="none"/>
+    <path d="M-17 68h34L0 111Z" fill="#ffe3b5"/>
+    <path d="m-6 96 6 15 6-15Z" fill="#10243a" stroke="none"/>
+    <path d="M-11-65h22" stroke="#8eabbf" stroke-width="3"/>
+  </g>
+
+  <!-- Font-independent C3D lettering renders identically in SVG, PNG and ICNS. -->
+  <g transform="translate(30 0)" fill="none" stroke="#f4fbff" stroke-width="17" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M164 381c-9-9-19-12-31-12-21 0-37 15-37 35s16 35 37 35c12 0 23-5 31-14"/>
+    <path d="M199 373h24c26 0 28 28 4 30 27 1 27 34-1 34h-27m16-34h12"/>
+    <path d="M281 373v64h21c46 0 46-64 0-64Z"/>
+  </g>
+</svg>

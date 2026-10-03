@@ -10,10 +10,10 @@ type Probe = Window & {
 
 // The user's project remains outside the repository. Normal browser runs skip
 // this optional regression; synthetic rim geometry is covered by unit tests.
-const project = process.env.SKETCHFORGE_CAD_REPRO_PROJECT;
+const project = process.env.CADVERIX_CAD_REPRO_PROJECT ?? process.env.SKETCHFORGE_CAD_REPRO_PROJECT;
 test.use({ viewport: { width: 1366, height: 1024 } });
 for (const kind of ["Chamfer", "Fillet"] as const) for (const multiSelect of [false, true]) test(`${kind} previews and applies the imported door mesh outer rim (Multi ${multiSelect})`, async ({ page }) => {
-  test.skip(!project, "Set SKETCHFORGE_CAD_REPRO_PROJECT to the local door SKF fixture.");
+  test.skip(!project, "Set CADVERIX_CAD_REPRO_PROJECT to the local door SKF fixture.");
   test.setTimeout(180_000);
   await page.addInitScript(() => {
     const probe = window as Probe;
@@ -46,7 +46,7 @@ for (const kind of ["Chamfer", "Fillet"] as const) for (const multiSelect of [fa
     };
   });
   await page.goto("/?editor=1");
-  await page.locator('input[type="file"][accept=".skf"]').setInputFiles(project!);
+  await page.locator('input[type="file"][accept=".skf,.lyl"]').setInputFiles(project!);
   const row = page.locator(".scene-shape-row").filter({ hasText: "Bifold_Door_Hole_Repair" });
   await expect(row).toBeVisible({ timeout: 60_000 });
   await row.click();

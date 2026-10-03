@@ -79,7 +79,7 @@ runs:
           if [[ -f "$APPLE_API_KEY_INPUT" ]]; then
             export APPLE_API_KEY="$APPLE_API_KEY_INPUT"
           else
-            export APPLE_API_KEY="$RUNNER_TEMP/sketchforge-notary-${ARCH}.p8"
+            export APPLE_API_KEY="$RUNNER_TEMP/cadverix-notary-${ARCH}.p8"
             node <<'NODE'
             const fs = require("node:fs");
             const input = process.env.APPLE_API_KEY_INPUT || "";
@@ -105,8 +105,8 @@ runs:
         SIGNING_ENABLED: ${{ steps.signing.outputs.signing_enabled }}
         ARTIFACT_SUFFIX: ${{ steps.signing.outputs.artifact_suffix }}
       run: |
-        test -f "dist/desktop/SketchForge-${VERSION}-${ARCH}${ARTIFACT_SUFFIX}.dmg"
-        test -f "dist/desktop/SketchForge-${VERSION}-${ARCH}${ARTIFACT_SUFFIX}.zip"
+        test -f "dist/desktop/Cadverix 3D-${VERSION}-${ARCH}${ARTIFACT_SUFFIX}.dmg"
+        test -f "dist/desktop/Cadverix 3D-${VERSION}-${ARCH}${ARTIFACT_SUFFIX}.zip"
         if [[ "$SIGNING_ENABLED" == "true" ]]; then
           test -f dist/desktop/latest-mac.yml
         else
@@ -125,7 +125,7 @@ runs:
       with:
         name: ${{ inputs.artifact-name }}
         path: |
-          dist/desktop/SketchForge-*-${{ inputs.arch }}*.dmg
-          dist/desktop/SketchForge-*-${{ inputs.arch }}*.zip
+          dist/desktop/Cadverix 3D-*-${{ inputs.arch }}*.dmg
+          dist/desktop/Cadverix 3D-*-${{ inputs.arch }}*.zip
           dist/desktop/latest-mac-${{ inputs.arch }}.yml
         if-no-files-found: error

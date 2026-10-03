@@ -26,9 +26,9 @@ function runNode(args, env = process.env) {
 }
 
 runNode([copyOcctScript]);
-runNode([nextBin, "build", "apps/web"], {
+runNode([nextBin, "build", "apps/web", "--webpack"], {
   ...process.env,
-  SKETCHFORGE_DOCKER_BUILD: "true",
+  CADVERIX_DOCKER_BUILD: "true",
   NEXT_TELEMETRY_DISABLED: "1",
 });
 
@@ -45,4 +45,4 @@ for (const requiredPath of requiredPaths) {
   }
 }
 
-console.log("[desktop:web:build] Standalone SketchForge web bundle is ready.");
+console.log("[desktop:web:build] Standalone Cadverix 3D web bundle is ready.");

@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import { appColorModeForThemePreset, defaultThemes, THEME_PRESET_OPTIONS } from "@/lib/themes";
 
 describe("theme presets", () => {
-  it("includes the current SketchForge appearance as a selectable preset", () => {
+  it("keeps the legacy theme ID with the Cadverix 3D display name", () => {
     expect(THEME_PRESET_OPTIONS.map((option) => option.value)).toEqual([
       "sketchforge",
       "light",
@@ -12,7 +12,7 @@ describe("theme presets", () => {
     ]);
     expect(defaultThemes.sketchforge).toMatchObject({
       id: "sketchforge",
-      name: "SketchForge",
+      name: "Cadverix 3D",
       ui: { background: "#101820", primary: "#0e69f1" },
       viewport: { background: "#101820", gridAxis: "#65c9df" },
     });

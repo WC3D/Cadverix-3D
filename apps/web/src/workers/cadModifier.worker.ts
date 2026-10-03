@@ -124,7 +124,7 @@ function edgeAngle(cad: OcctKernel, points: number[], faceHashes: number[], face
 function meshPartToAsciiStl(part: CadModifierMeshPart) {
   if (!part.positions || !part.indices) throw new Error("The selected object has no mesh data");
   const lines = new Array<string>(part.indices.length / 3 + 2);
-  lines[0] = "solid sketchforge";
+  lines[0] = "solid cadverix";
   const { positions, indices } = part;
   for (let offset = 0, face = 1; offset + 2 < indices.length; offset += 3, face += 1) {
     const ai = indices[offset] * 3;
@@ -154,7 +154,7 @@ function meshPartToAsciiStl(part: CadModifierMeshPart) {
     nz /= length;
     lines[face] = `facet normal ${nx} ${ny} ${nz}\n outer loop\n  vertex ${ax} ${ay} ${az}\n  vertex ${bx} ${by} ${bz}\n  vertex ${cx} ${cy} ${cz}\n endloop\nendfacet`;
   }
-  lines[lines.length - 1] = "endsolid sketchforge";
+  lines[lines.length - 1] = "endsolid cadverix";
   return lines.join("\n");
 }
 
@@ -786,7 +786,7 @@ self.onmessage = async (event: MessageEvent<CadModifierWorkerRequest>) => {
         ? "The selected mesh could not be converted into a closed CAD solid. The CAD kernel reset; try Separate Parts, ungrouping, or simplifying the object before adding edge features."
         : isMissingValidatorFault(rawMessage)
           ? "The CAD kernel exposed an incomplete validation function and reset. Start the edge tool again; no page refresh is needed."
-        : `CAD memory fault while ${phase}${request.type === "preview" ? ` (${request.kind}, ${request.edgeIds.length} edges, ${previewStrategy})` : ""}. The worker has been reset. Details are in the browser console under SketchForge CAD.`;
+        : `CAD memory fault while ${phase}${request.type === "preview" ? ` (${request.kind}, ${request.edgeIds.length} edges, ${previewStrategy})` : ""}. The worker has been reset. Details are in the browser console under Cadverix 3D CAD.`;
       post({
         type: "error",
         requestId: request.requestId,

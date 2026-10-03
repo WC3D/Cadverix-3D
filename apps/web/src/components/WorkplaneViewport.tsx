@@ -1166,6 +1166,9 @@ function shapeGeometrySignature(shape: WorkplaneShape): string {
   return JSON.stringify({
     kind: shape.kind,
     geometryRevision: shape.kind === "pyramid" ? 2 : undefined,
+    // Shape-specific edits must rebuild the rendered mesh as well as update
+    // ruler topology; otherwise the shared geometry cache returns stale data.
+    parametric: parametricShapeGeometryFields(shape),
     width: shapeWidth(shape),
     depth: shapeDepth(shape),
     height: shape.height,

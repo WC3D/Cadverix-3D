@@ -2,6 +2,12 @@
 
 ## Unreleased
 
+- Added color-coded toolbar group outlines and wide Shapes and Generators palettes, with generator entries appearing only in Generators. Palettes adapt between three, two, and one column, stay inside the viewport, and keep their title/close control visible while scrolling. Bent Tube now has a dedicated curved-tube menu icon.
+- Fixed Honeycomb and Bent Tube previews retaining stale geometry after parameter edits. The viewport's shared geometry cache now includes the complete parametric input set, with rendered-image regressions for immediate updates, undo/redo, autosave, and reload in Chromium and WebKit.
+- Redesigned the Cadverix 3D logo with a C3D monogram, isometric cube, drafting pencil, sketch curve, and measurement/grid details; added dedicated Apple touch and PNG favicon assets.
+- Renamed the product to **Cadverix 3D** across the browser editor, dashboard, desktop application, installers, export labels, current documentation, and MCP tooling, with a new vector/native application icon.
+- Added `CADVERIX_` configuration names, `cadverix_*` MCP tools, and `/api/cadverix-mcp`, retaining legacy aliases and persisted project/storage identifiers for compatibility. Release/update links now use the existing WC3D repository. See [rename compatibility](CADVERIX_REBRAND.md).
+- Updated installer verification for the spaced `Cadverix 3D` product name and aligned desktop web builds with the configured Webpack pipeline. New OBJ exports explicitly declare Y-up coordinates while legacy branded Z-up files remain readable.
 - Hardened the macOS release action against shell template injection: architecture, signing state, and artifact suffixes now pass through quoted environment variables, and the architecture input is restricted to `x64` or `arm64` before building.
 
 ## 1.0.12

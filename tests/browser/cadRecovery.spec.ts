@@ -2,7 +2,7 @@ import { expect, test } from "@playwright/test";
 
 test("a faulted CAD worker is replaced and the next chamfer can preview", async ({ page }) => {
   const diagnostics: string[] = [];
-  page.on("console", (message) => { if (message.text().startsWith("[SketchForge CAD]")) diagnostics.push(message.text()); });
+  page.on("console", (message) => { if (message.text().startsWith("[Cadverix 3D CAD]")) diagnostics.push(message.text()); });
   await page.addInitScript(() => {
     const Base = window.Worker;
     let faultInjected = false;

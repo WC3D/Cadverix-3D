@@ -47,7 +47,7 @@ async function waitForUrl(url, child, timeoutMs = 45_000) {
   }
 
   const detail = lastError instanceof Error ? ` ${lastError.message}` : "";
-  throw new Error(`Timed out waiting for SketchForge dev server.${detail}`);
+  throw new Error(`Timed out waiting for Cadverix 3D dev server.${detail}`);
 }
 
 const copyResult = spawnSync(process.execPath, [copyOcctScript], {
@@ -71,7 +71,7 @@ const nextProcess = spawn(
     stdio: "inherit",
     env: {
       ...process.env,
-      SKETCHFORGE_SHARED_PROJECTS_DIR: "",
+      CADVERIX_SHARED_PROJECTS_DIR: "",
       NEXT_TELEMETRY_DISABLED: "1",
     },
   },
@@ -116,7 +116,7 @@ try {
     stdio: "inherit",
     env: {
       ...process.env,
-      SKETCHFORGE_DESKTOP_DEV_URL: url,
+      CADVERIX_DESKTOP_DEV_URL: url,
     },
   });
 

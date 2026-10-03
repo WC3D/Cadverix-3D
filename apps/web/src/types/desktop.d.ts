@@ -1,6 +1,6 @@
 ﻿export {};
 
-type SketchForgeDesktopUpdateResult = {
+type CadverixDesktopUpdateResult = {
   currentVersion: string;
   latestVersion: string | null;
   updateAvailable: boolean;
@@ -11,10 +11,11 @@ type SketchForgeDesktopUpdateResult = {
 
 declare global {
   interface Window {
-    sketchforgeDesktop?: {
+    cadverixDesktop?: {
       getVersion: () => Promise<string>;
-      checkForUpdates: () => Promise<SketchForgeDesktopUpdateResult>;
-      installUpdate: () => Promise<SketchForgeDesktopUpdateResult>;
+      checkForUpdates: () => Promise<CadverixDesktopUpdateResult>;
+      installUpdate: () => Promise<CadverixDesktopUpdateResult>;
     };
+    sketchforgeDesktop?: Window["cadverixDesktop"];
   }
 }

@@ -90,8 +90,8 @@ function modelXml(meshes: ReadonlyArray<ThreeMfMesh>, title: string) {
   return [
     '<?xml version="1.0" encoding="UTF-8"?>',
     '<model unit="millimeter" xml:lang="en-US" xmlns="http://schemas.microsoft.com/3dmanufacturing/core/2015/02" xmlns:m="http://schemas.microsoft.com/3dmanufacturing/material/2015/02">',
-    `  <metadata name="Title">${xmlEscape(title.trim() || "SketchForge design")}</metadata>`,
-    '  <metadata name="Application">SketchForge</metadata>',
+    `  <metadata name="Title">${xmlEscape(title.trim() || "Cadverix 3D design")}</metadata>`,
+    '  <metadata name="Application">Cadverix 3D</metadata>',
     "  <resources>",
     '    <basematerials id="1">',
     ...materials,
@@ -109,7 +109,7 @@ function modelXml(meshes: ReadonlyArray<ThreeMfMesh>, title: string) {
   ].join("\n");
 }
 
-export function exportMeshesTo3mf(meshes: ReadonlyArray<ThreeMfMesh>, title = "SketchForge design") {
+export function exportMeshesTo3mf(meshes: ReadonlyArray<ThreeMfMesh>, title = "Cadverix 3D design") {
   const triangleCount = meshes.reduce((total, mesh) => total + mesh.faces.length, 0);
   if (triangleCount > Math.floor(THREE_MF_LIMITS.meshNumbers / 9)) throw new Error("3MF export exceeds the supported triangle limit");
   const model = strToU8(modelXml(meshes, title));

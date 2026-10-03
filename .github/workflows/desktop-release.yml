@@ -265,8 +265,8 @@ jobs:
             echo "Using existing draft release $TAG."
           else
             gh release create "$TAG" --draft --verify-tag \
-              --title "SketchForge $VERSION" \
-              --notes "SketchForge desktop $VERSION"
+              --title "Cadverix 3D $VERSION" \
+              --notes "Cadverix 3D desktop $VERSION"
           fi
 
       - name: Upload desktop packages
@@ -276,7 +276,7 @@ jobs:
         run: |
           while IFS= read -r asset; do
             case "$asset" in
-              SketchForge-*|latest.yml|latest-linux.yml|latest-mac.yml)
+              "Cadverix 3D-"*|SketchForge-*|latest.yml|latest-linux.yml|latest-mac.yml)
                 gh release delete-asset "$TAG" "$asset" --yes
                 ;;
             esac
@@ -302,15 +302,15 @@ jobs:
             suffix="-unsigned"
           fi
           for expected in \
-            "SketchForge-Setup-$VERSION-x64.exe" \
-            "SketchForge-Setup-$VERSION-x64.exe.blockmap" \
+            "Cadverix 3D-Setup-$VERSION-x64.exe" \
+            "Cadverix 3D-Setup-$VERSION-x64.exe.blockmap" \
             "latest.yml" \
-            "SketchForge-$VERSION-x86_64.AppImage" \
+            "Cadverix 3D-$VERSION-x86_64.AppImage" \
             "latest-linux.yml" \
-            "SketchForge-$VERSION-x64${suffix}.dmg" \
-            "SketchForge-$VERSION-x64${suffix}.zip" \
-            "SketchForge-$VERSION-arm64${suffix}.dmg" \
-            "SketchForge-$VERSION-arm64${suffix}.zip"; do
+            "Cadverix 3D-$VERSION-x64${suffix}.dmg" \
+            "Cadverix 3D-$VERSION-x64${suffix}.zip" \
+            "Cadverix 3D-$VERSION-arm64${suffix}.dmg" \
+            "Cadverix 3D-$VERSION-arm64${suffix}.zip"; do
             grep -Fxq "$expected" <<< "$names" || {
               echo "GitHub release is missing $expected" >&2
               exit 1

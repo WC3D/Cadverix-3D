@@ -611,7 +611,7 @@ export function WorkspaceSettingsModal({
                     <div className="workspace-shape-card-heading">
                       <span>
                         <strong>{selectedShapeAsset.name}</strong>
-                        <small>{selectedShapeCustomized ? "Custom settings active" : "Using SketchForge defaults"}</small>
+                        <small>{selectedShapeCustomized ? "Custom settings active" : "Using Cadverix 3D defaults"}</small>
                       </span>
                       <button type="button" onClick={resetSelectedShapeCustomization} disabled={!selectedShapeCustomized}>
                         <RotateCcw size={14} />

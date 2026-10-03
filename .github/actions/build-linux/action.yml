@@ -22,7 +22,7 @@ runs:
       env:
         VERSION: ${{ inputs.version }}
       run: |
-        test -f "dist/desktop/SketchForge-$VERSION-x86_64.AppImage"
+        test -f "dist/desktop/Cadverix 3D-$VERSION-x86_64.AppImage"
         test -f dist/desktop/latest-linux.yml
 
     - name: Store Linux artifacts
@@ -30,6 +30,6 @@ runs:
       with:
         name: ${{ inputs.artifact-name }}
         path: |
-          dist/desktop/SketchForge-*.AppImage
+          dist/desktop/Cadverix 3D-*.AppImage
           dist/desktop/latest-linux.yml
         if-no-files-found: error

@@ -10,8 +10,8 @@ import { SKF_CREATED_WITH_VERSION } from "@/lib/skfProject";
 export const runtime = "nodejs";
 export const revalidate = false;
 
-const DEFAULT_MANIFEST_URL = "https://raw.githubusercontent.com/Formsmith746/SketchForge-3D/main/package.json";
-const OFFICIAL_REPO_URL = "https://github.com/Formsmith746/SketchForge-3D.git";
+const DEFAULT_MANIFEST_URL = "https://raw.githubusercontent.com/WC3D/SketchForge-3D/main/package.json";
+const OFFICIAL_REPO_URL = "https://github.com/WC3D/SketchForge-3D.git";
 const UPDATE_CACHE_MS = 5 * 60 * 1000;
 const UPDATE_TRIGGER_COOLDOWN_MS = 15 * 1000;
 const execFileAsync = promisify(execFile);
@@ -75,7 +75,7 @@ function packageVersion(root: string | null) {
 }
 
 function currentAppVersion() {
-  const configured = process.env.SKETCHFORGE_APP_VERSION?.trim();
+  const configured = (process.env.CADVERIX_APP_VERSION ?? process.env.SKETCHFORGE_APP_VERSION)?.trim();
   if (configured && VERSION_PATTERN.test(configured)) return configured;
   return packageVersion(findParentRoot(false)) || SKF_CREATED_WITH_VERSION;
 }
@@ -86,7 +86,7 @@ function localRepoForRequest(request: Request) {
 }
 
 function updateTriggerUrl() {
-  const configured = process.env.SKETCHFORGE_UPDATE_TRIGGER_URL?.trim();
+  const configured = (process.env.CADVERIX_UPDATE_TRIGGER_URL ?? process.env.SKETCHFORGE_UPDATE_TRIGGER_URL)?.trim();
   if (!configured) return null;
   try {
     const url = new URL(configured);
@@ -101,9 +101,9 @@ async function latestOfficialVersion(force = false) {
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), 7_500);
   try {
-    const response = await fetch(process.env.SKETCHFORGE_UPDATE_MANIFEST_URL?.trim() || DEFAULT_MANIFEST_URL, {
+    const response = await fetch((process.env.CADVERIX_UPDATE_MANIFEST_URL ?? process.env.SKETCHFORGE_UPDATE_MANIFEST_URL)?.trim() || DEFAULT_MANIFEST_URL, {
       cache: "no-store",
-      headers: { Accept: "application/json", "User-Agent": "SketchForge update checker" },
+      headers: { Accept: "application/json", "User-Agent": "Cadverix 3D update checker" },
       signal: controller.signal,
     });
     if (!response.ok) throw new Error(`Update server returned ${response.status}`);
@@ -120,12 +120,12 @@ async function latestOfficialVersion(force = false) {
 }
 
 function updateGuideUrl() {
-  return process.env.SKETCHFORGE_UPDATE_GUIDE_URL?.trim() || OFFICIAL_UPDATE_GUIDE_URL;
+  return (process.env.CADVERIX_UPDATE_GUIDE_URL ?? process.env.SKETCHFORGE_UPDATE_GUIDE_URL)?.trim() || OFFICIAL_UPDATE_GUIDE_URL;
 }
 
 async function statusResponse(request: Request, force = false): Promise<AppUpdateStatus> {
   const trigger = updateTriggerUrl();
-  const adminKeyConfigured = Boolean(process.env.SKETCHFORGE_UPDATE_ADMIN_KEY?.trim());
+  const adminKeyConfigured = Boolean((process.env.CADVERIX_UPDATE_ADMIN_KEY ?? process.env.SKETCHFORGE_UPDATE_ADMIN_KEY)?.trim());
   const localRepo = localRepoForRequest(request);
   const currentVersion = currentAppVersion();
   try {
@@ -159,7 +159,7 @@ async function runLocalUpdate(repoRoot: string, expectedVersion: string) {
   const gitOptions = { cwd: repoRoot, timeout: 120_000, maxBuffer: 2 * 1024 * 1024 };
   const { stdout: dirtyOutput } = await execFileAsync("git", ["status", "--porcelain", "--untracked-files=no"], gitOptions);
   if (dirtyOutput.trim()) {
-    throw new Error("Local SketchForge has uncommitted code changes. Commit or stash them before updating so the updater does not overwrite your work.");
+    throw new Error("Local Cadverix 3D has uncommitted code changes. Commit or stash them before updating so the updater does not overwrite your work.");
   }
 
   await execFileAsync("git", ["fetch", "--no-tags", OFFICIAL_REPO_URL, "main"], gitOptions);
@@ -211,7 +211,7 @@ export async function POST(request: Request) {
     const status = await statusResponse(request, true);
     if (status.checkError) return NextResponse.json({ error: status.checkError }, { status: 502 });
     if (!status.updateAvailable || !status.latestVersion) {
-      return NextResponse.json({ error: "SketchForge is already up to date", status }, { status: 409 });
+      return NextResponse.json({ error: "Cadverix 3D is already up to date", status }, { status: 409 });
     }
 
     nextTriggerAt = Date.now() + UPDATE_TRIGGER_COOLDOWN_MS;
@@ -229,12 +229,12 @@ export async function POST(request: Request) {
       );
     } catch (error) {
       nextTriggerAt = 0;
-      return NextResponse.json({ error: error instanceof Error ? error.message : "Could not update local SketchForge" }, { status: 409 });
+      return NextResponse.json({ error: error instanceof Error ? error.message : "Could not update local Cadverix 3D" }, { status: 409 });
     }
   }
 
   const trigger = updateTriggerUrl();
-  const adminKey = process.env.SKETCHFORGE_UPDATE_ADMIN_KEY?.trim() || "";
+  const adminKey = (process.env.CADVERIX_UPDATE_ADMIN_KEY ?? process.env.SKETCHFORGE_UPDATE_ADMIN_KEY)?.trim() || "";
   if (!trigger || !adminKey) {
     return NextResponse.json(
       { error: "One-click installation is not configured on this server", updateUrl: updateGuideUrl() },
@@ -242,7 +242,7 @@ export async function POST(request: Request) {
     );
   }
 
-  const suppliedKey = request.headers.get("x-sketchforge-update-key")?.trim() || "";
+  const suppliedKey = (request.headers.get("x-cadverix-update-key") ?? request.headers.get("x-sketchforge-update-key"))?.trim() || "";
   if (!suppliedKey || !safeEqual(suppliedKey, adminKey)) {
     return NextResponse.json({ error: "The update key is incorrect" }, { status: 401 });
   }
@@ -253,14 +253,14 @@ export async function POST(request: Request) {
   const status = await statusResponse(request, true);
   if (status.checkError) return NextResponse.json({ error: status.checkError }, { status: 502 });
   if (!status.updateAvailable || !status.latestVersion) {
-    return NextResponse.json({ error: "SketchForge is already up to date", status }, { status: 409 });
+    return NextResponse.json({ error: "Cadverix 3D is already up to date", status }, { status: 409 });
   }
 
   nextTriggerAt = Date.now() + UPDATE_TRIGGER_COOLDOWN_MS;
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), 10_000);
   try {
-    const triggerToken = process.env.SKETCHFORGE_UPDATE_TRIGGER_TOKEN?.trim();
+    const triggerToken = (process.env.CADVERIX_UPDATE_TRIGGER_TOKEN ?? process.env.SKETCHFORGE_UPDATE_TRIGGER_TOKEN)?.trim();
     const response = await fetch(trigger, {
       method: "POST",
       headers: {
@@ -269,7 +269,7 @@ export async function POST(request: Request) {
         ...(triggerToken ? { Authorization: `Bearer ${triggerToken}` } : {}),
       },
       body: JSON.stringify({
-        application: "SketchForge",
+        application: "Cadverix 3D",
         currentVersion: status.currentVersion,
         latestVersion: status.latestVersion,
         preserveProjectStorage: true,

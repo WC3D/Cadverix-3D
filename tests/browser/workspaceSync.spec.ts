@@ -10,7 +10,7 @@ test("workspace theme and snap changes settle without an update loop", async ({ 
     // Settings do not use the dev-only MCP bridge. Keep its requests local so
     // WebKit reload cancellation cannot surface an unrelated network error.
     const fetch = window.fetch.bind(window);
-    window.fetch = (input, init) => String(input).includes("/api/sketchforge-mcp")
+    window.fetch = (input, init) => /\/api\/(?:cadverix|sketchforge)-mcp/.test(String(input))
       ? Promise.resolve(new Response("", { status: 404 }))
       : fetch(input, init);
     const key = "sketchForge.workspaceDefault.local-workplane";

@@ -182,7 +182,9 @@ function importedObjShapeFromTriangles(
 }
 
 export function importedShapeFromObj(fileName: string, source: string): WorkplaneShape {
-  const sketchForgeZUpExport = /^# SketchForge OBJ export\b/m.test(source);
+  // Older branded files used Z-up; new Cadverix exports declare the standard
+  // OBJ Y-up convention explicitly. A display-name change must not rotate them.
+  const sketchForgeZUpExport = /^# SketchForge OBJ export\b/m.test(source) && !/^# Coordinate system: Y-up\b/m.test(source);
   const vertices: THREE.Vector3[] = [];
   const normals: THREE.Vector3[] = [];
   const rawPositions: number[] = [];

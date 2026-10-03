@@ -4,11 +4,16 @@ const { spawn } = require("node:child_process");
 const fs = require("node:fs");
 const path = require("node:path");
 
-const devUrl = process.env.SKETCHFORGE_DESKTOP_DEV_URL?.trim() || "";
+app.setName("Cadverix 3D");
+// Retain the installed application's profile across the product-name change.
+// Chromium stores local projects under this directory as well as by origin.
+app.setPath("userData", path.join(app.getPath("appData"), app.isPackaged ? "SketchForge" : "sketchforge"));
+
+const devUrl = (process.env.CADVERIX_DESKTOP_DEV_URL ?? process.env.SKETCHFORGE_DESKTOP_DEV_URL)?.trim() || "";
 // Keep the desktop origin stable. localStorage and IndexedDB are scoped to the
 // full origin (including the port), so a random port made projects appear to
 // vanish after every restart.
-const DESKTOP_PORT = Number.parseInt(process.env.SKETCHFORGE_DESKTOP_PORT || "62158", 10);
+const DESKTOP_PORT = Number.parseInt((process.env.CADVERIX_DESKTOP_PORT ?? process.env.SKETCHFORGE_DESKTOP_PORT) || "62158", 10);
 
 let mainWindow = null;
 let tray = null;
@@ -37,7 +42,7 @@ async function waitForServer(url, timeoutMs = 30_000) {
 
   while (Date.now() < deadline) {
     if (webServer && webServer.exitCode !== null) {
-      throw new Error(`SketchForge web process exited with code ${webServer.exitCode}.`);
+      throw new Error(`Cadverix 3D web process exited with code ${webServer.exitCode}.`);
     }
 
     try {
@@ -51,7 +56,7 @@ async function waitForServer(url, timeoutMs = 30_000) {
   }
 
   const detail = lastError instanceof Error ? ` ${lastError.message}` : "";
-  throw new Error(`SketchForge did not start its local web process in time.${detail}`);
+  throw new Error(`Cadverix 3D did not start its local web process in time.${detail}`);
 }
 
 async function startPackagedWebServer() {
@@ -74,9 +79,9 @@ async function startPackagedWebServer() {
       NODE_PATH: [packagedNodeModules, process.env.NODE_PATH].filter(Boolean).join(path.delimiter),
       HOSTNAME: "127.0.0.1",
       PORT: String(port),
-      SKETCHFORGE_DESKTOP: "1",
-      SKETCHFORGE_DESKTOP_VERSION: app.getVersion(),
-      SKETCHFORGE_SHARED_PROJECTS_DIR: "",
+      CADVERIX_DESKTOP: "1",
+      CADVERIX_DESKTOP_VERSION: app.getVersion(),
+      CADVERIX_SHARED_PROJECTS_DIR: "",
       NEXT_TELEMETRY_DISABLED: "1",
     },
   });
@@ -100,8 +105,8 @@ function stopPackagedWebServer() {
 
 function appIconPath() {
   return devUrl
-    ? path.join(__dirname, "..", "web", "public", "assets", "sketchforge", "sketchforge-logo.png")
-    : path.join(process.resourcesPath, "web", "apps", "web", "public", "assets", "sketchforge", "sketchforge-logo.png");
+    ? path.join(__dirname, "..", "web", "public", "assets", "cadverix", "cadverix-logo.png")
+    : path.join(process.resourcesPath, "web", "apps", "web", "public", "assets", "cadverix", "cadverix-logo.png");
 }
 
 function showMainWindow() {
@@ -120,7 +125,7 @@ function installDownloadedUpdate() {
 
 async function downloadAndInstallDesktopUpdate() {
   if (!app.isPackaged) {
-    return desktopUpdatePayload(null, "Updates can only be installed from the packaged SketchForge app.");
+    return desktopUpdatePayload(null, "Updates can only be installed from the packaged Cadverix 3D app.");
   }
 
   lastUpdateCheckError = "";
@@ -161,8 +166,8 @@ async function checkForDesktopUpdates(manual = false) {
     if (manual) {
       await dialog.showMessageBox({
         type: "info",
-        title: "SketchForge updates",
-        message: "Automatic updates are tested from the installed SketchForge app.",
+        title: "Cadverix 3D updates",
+        message: "Automatic updates are tested from the installed Cadverix 3D app.",
       });
     }
     return desktopUpdatePayload(null);
@@ -216,8 +221,8 @@ function setupDesktopUpdater() {
     manualUpdateCheck = false;
     void dialog.showMessageBox({
       type: "info",
-      title: "SketchForge update",
-      message: `SketchForge ${info.version} is available.`,
+      title: "Cadverix 3D update",
+      message: `Cadverix 3D ${info.version} is available.`,
       detail: "Open Settings and press Update to install it.",
     });
   });
@@ -227,26 +232,26 @@ function setupDesktopUpdater() {
     manualUpdateCheck = false;
     void dialog.showMessageBox({
       type: "info",
-      title: "SketchForge updates",
-      message: "SketchForge is up to date.",
+      title: "Cadverix 3D updates",
+      message: "Cadverix 3D is up to date.",
     });
   });
 
   autoUpdater.on("download-progress", (progress) => {
-    if (tray) tray.setToolTip(`SketchForge - downloading update ${Math.round(progress.percent)}%`);
+    if (tray) tray.setToolTip(`Cadverix 3D - downloading update ${Math.round(progress.percent)}%`);
   });
 
   autoUpdater.on("update-downloaded", (info) => {
     downloadedUpdateReady = true;
-    if (tray) tray.setToolTip(`SketchForge ${info.version} ready to install`);
+    if (tray) tray.setToolTip(`Cadverix 3D ${info.version} ready to install`);
     if (updateInstallRequested) installDownloadedUpdate();
   });
 
   autoUpdater.on("error", (error) => {
-    if (tray) tray.setToolTip("SketchForge");
+    if (tray) tray.setToolTip("Cadverix 3D");
     if (!manualUpdateCheck) return;
     manualUpdateCheck = false;
-    dialog.showErrorBox("Could not update SketchForge", error instanceof Error ? error.message : String(error));
+    dialog.showErrorBox("Could not update Cadverix 3D", error instanceof Error ? error.message : String(error));
   });
 
   setTimeout(() => void checkForDesktopUpdates(false), 4_000).unref();
@@ -258,10 +263,10 @@ function createTray() {
 
   const icon = nativeImage.createFromPath(appIconPath()).resize({ width: 20, height: 20 });
   tray = new Tray(icon);
-  tray.setToolTip("SketchForge");
+  tray.setToolTip("Cadverix 3D");
   tray.setContextMenu(Menu.buildFromTemplate([
     {
-      label: "Open SketchForge",
+      label: "Open Cadverix 3D",
       click: showMainWindow,
     },
     {
@@ -270,7 +275,7 @@ function createTray() {
     },
     { type: "separator" },
     {
-      label: "Quit SketchForge",
+      label: "Quit Cadverix 3D",
       click: () => {
         if (downloadedUpdateReady) {
           installDownloadedUpdate();
@@ -294,7 +299,7 @@ function createMainWindow(url) {
     minWidth: 1100,
     minHeight: 700,
     show: false,
-    title: "SketchForge",
+    title: "Cadverix 3D",
     icon: iconPath,
     webPreferences: {
       contextIsolation: true,
@@ -362,7 +367,7 @@ async function startDesktop() {
     const message = error instanceof Error ? error.message : String(error);
     const detail = webServerOutput.trim();
     dialog.showErrorBox(
-      "SketchForge could not start",
+      "Cadverix 3D could not start",
       detail ? `${message}\n\n${detail}` : message,
     );
     app.quit();
@@ -396,6 +401,6 @@ app.on("before-quit", () => {
 });
 
 app.on("window-all-closed", () => {
-  // Keep SketchForge available from the system tray. Use Quit SketchForge
+  // Keep Cadverix 3D available from the system tray. Use Quit Cadverix 3D
   // from the tray menu when the user wants to fully stop the application.
 });

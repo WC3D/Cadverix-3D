@@ -1533,7 +1533,7 @@ button {
   }
 }
 
-.sketchforge-editor {
+.cadverix-editor {
   width: 100vw;
   height: 100vh;
   min-width: 320px;
@@ -8518,7 +8518,7 @@ html[data-theme="dark"] .move-dimension-projection {
 
 html[data-theme="dark"] body,
 html[data-theme="dark"] .dashboard-shell,
-html[data-theme="dark"] .sketchforge-editor,
+html[data-theme="dark"] .cadverix-editor,
 html[data-theme="dark"] .editor-body,
 html[data-theme="dark"] .workplane-stage {
   color: var(--foreground);

@@ -58,7 +58,7 @@ export const toolbarShapeAssets: ToolbarShapeAsset[] = [
   { id: "nut", name: "Nut", src: "assets/sketchforge/shape-icons-gray/nut.svg", menuIcon: "assets/sketchforge/shape-icons-gray/nut.svg", kind: "nut", color: "#596976" },
   { id: "spring", name: "Spring", src: "assets/sketchforge/shape-icons-gray/spring.svg", menuIcon: "assets/sketchforge/shape-icons-gray/spring.svg", kind: "spring", color: "#667784" },
   { id: "honeycomb", name: "Honeycomb", src: "assets/sketchforge/shape-icons-gray/honeycomb.svg", menuIcon: "assets/sketchforge/shape-icons-gray/honeycomb.svg", kind: "honeycomb", color: "#d4a017" },
-  { id: "bent-tube", name: "Bent Tube", src: "assets/sketchforge/shape-icons-gray/tube.png", menuIcon: "assets/sketchforge/shape-icons-gray/tube.png", kind: "bentTube", color: "#3d91a8" },
+  { id: "bent-tube", name: "Bent Tube", src: "assets/cadverix/shapes/bent-tube.svg", menuIcon: "assets/cadverix/shapes/bent-tube.svg", kind: "bentTube", color: "#3d91a8" },
 ];
 
 const GENERATOR_KINDS: ReadonlySet<ShapeKind> = new Set(["gear", "screw", "washer", "nut", "spring", "honeycomb", "bentTube"]);

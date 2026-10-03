@@ -2,14 +2,14 @@
 
 ## Repository owner
 
-The desktop updater publishes releases for `Formsmith746/SketchForge-3D`.
+The Cadverix 3D desktop updater publishes releases for `WC3D/SketchForge-3D`. The repository slug is the existing hosting address; it is not the product display name.
 
 Keep these values in `apps/desktop/electron-builder.yml`:
 
 ```yaml
 publish:
   provider: github
-  owner: Formsmith746
+  owner: WC3D
   repo: SketchForge-3D
 ```
 
@@ -56,19 +56,19 @@ The macOS job reads these repository secrets:
 When all signing and Apple notarization variables are present, the macOS artifacts use their normal names:
 
 ```text
-SketchForge-VERSION-x64.dmg
-SketchForge-VERSION-x64.zip
-SketchForge-VERSION-arm64.dmg
-SketchForge-VERSION-arm64.zip
+Cadverix 3D-VERSION-x64.dmg
+Cadverix 3D-VERSION-x64.zip
+Cadverix 3D-VERSION-arm64.dmg
+Cadverix 3D-VERSION-arm64.zip
 ```
 
 When one or more signing or Apple notarization variables are missing, the workflow marks the packages as unsigned:
 
 ```text
-SketchForge-VERSION-x64-unsigned.dmg
-SketchForge-VERSION-x64-unsigned.zip
-SketchForge-VERSION-arm64-unsigned.dmg
-SketchForge-VERSION-arm64-unsigned.zip
+Cadverix 3D-VERSION-x64-unsigned.dmg
+Cadverix 3D-VERSION-x64-unsigned.zip
+Cadverix 3D-VERSION-arm64-unsigned.dmg
+Cadverix 3D-VERSION-arm64-unsigned.zip
 ```
 
 Unsigned packages trigger a Gatekeeper warning. Add the signing and notarization secrets before public distribution.

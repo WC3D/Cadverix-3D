@@ -1,6 +1,6 @@
 # Contributing
 
-Thanks for helping improve SketchForge.
+Thanks for helping improve Cadverix 3D.
 
 ## Local Setup
 

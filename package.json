@@ -1,13 +1,14 @@
 {
-  "name": "sketchforge",
+  "name": "cadverix-3d",
+  "productName": "Cadverix 3D",
   "version": "1.0.12",
   "private": true,
   "description": "A local-first 3D design editor.",
   "author": {
     "name": "SketchForge contributors"
   },
-  "homepage": "https://sketchforge3d.com",
-  "desktopName": "sketchforge",
+  "homepage": "https://github.com/WC3D/SketchForge-3D",
+  "desktopName": "cadverix-3d",
   "main": "apps/desktop/main.cjs",
   "license": "AGPL-3.0-only",
   "engines": {
@@ -16,6 +17,7 @@
   "scripts": {
     "postinstall": "patch-package --error-on-fail",
     "copy:occt": "node scripts/copy-occt-wasm.mjs",
+    "brand:icons": "node scripts/generate-brand-icons.mjs",
     "predev": "npm run copy:occt",
     "dev": "next dev apps/web --webpack",
     "prebuild": "npm run copy:occt",
@@ -31,15 +33,16 @@
     "test:mobile": "playwright test --config tests/playwright.mobile.config.ts",
     "perf": "vitest run --config tests/vitest.perf.config.ts --reporter verbose",
     "ci": "npm run typecheck && npm run test",
-    "docker:build": "docker build -f deploy/docker/Dockerfile -t sketchforge:local .",
-    "docker:run": "docker run --rm -p 3000:3000 -e SKETCHFORGE_SHARED_PROJECTS_DIR=/data/projects -v sketchforge-shared-projects:/data/projects sketchforge:local",
+    "docker:build": "docker build -f deploy/docker/Dockerfile -t cadverix-3d:local .",
+    "docker:run": "docker run --rm -p 3000:3000 -e CADVERIX_SHARED_PROJECTS_DIR=/data/projects -v sketchforge-shared-projects:/data/projects cadverix-3d:local",
     "docker:up": "docker compose -f deploy/docker/compose.yaml up --build -d",
     "docker:down": "docker compose -f deploy/docker/compose.yaml down",
     "desktop:dev": "node apps/desktop/dev.mjs",
     "desktop:web:build": "node apps/desktop/build-web.mjs",
     "desktop:pack": "npm run desktop:web:build && electron-builder --dir --config apps/desktop/electron-builder.yml",
     "desktop:dist": "npm run desktop:web:build && electron-builder --config apps/desktop/electron-builder.yml",
-    "mcp:sketchforge": "node scripts/sketchforge-mcp-server.mjs"
+    "mcp:cadverix": "node scripts/cadverix-mcp-server.mjs",
+    "mcp:sketchforge": "node scripts/cadverix-mcp-server.mjs"
   },
   "dependencies": {
     "@tailwindcss/postcss": "^4.1.8",

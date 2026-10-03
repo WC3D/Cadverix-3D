@@ -28,7 +28,7 @@ const STEPS: TutorialStep[] = [
     title: "Build a Nameplate",
     body: "Create a rounded base, personalize a Text object, then combine both parts into one printable design.",
     image: "/assets/challenges/nameplate/01-finished-target.webp",
-    alt: "Finished blue ALEX nameplate on the SketchForge workplane",
+    alt: "Finished blue ALEX nameplate on the Cadverix 3D workplane",
     snapGrid: "0.5 mm",
   },
   {

@@ -2,7 +2,7 @@
 
 ## Fillet and Chamfer on imported mesh rims
 
-SketchForge 1.0.12 adds dedicated treatment paths for supported faceted STL rims that can fail in the native edge builder. These paths operate on a **complete, closed, convex outer rim on a horizontal top plane**, with enough material for the requested treatment.
+Cadverix 3D includes dedicated treatment paths for supported faceted STL rims that can fail in the native edge builder. These paths operate on a **complete, closed, convex outer rim on a horizontal top plane**, with enough material for the requested treatment.
 
 1. Select the imported object and open **Fillet** or **Chamfer** in the Geometry toolbar.
 2. Enable **Select tangent chains** and click or tap the rim. A single visual rim may contain many short STL edges.
@@ -19,9 +19,9 @@ The floating **Multi** control selects objects. It is hidden while Fillet/Chamfe
 
 ## Fault recovery and diagnostics
 
-A WebAssembly memory fault is not treated as an ordinary invalid-shape result. SketchForge stops further topology retries, discards the worker, and creates a fresh worker. Restart the edge tool to prepare the object again. A preview whose optional exact serialization fails can still be applied as mesh geometry through the existing preview-only workflow.
+A WebAssembly memory fault is not treated as an ordinary invalid-shape result. Cadverix 3D stops further topology retries, discards the worker, and creates a fresh worker. Restart the edge tool to prepare the object again. A preview whose optional exact serialization fails can still be applied as mesh geometry through the existing preview-only workflow.
 
-Fault messages identify the phase, operation, edge count, and geometry strategy. The browser console entry beginning **`[SketchForge CAD]`** includes:
+Fault messages identify the phase, operation, edge count, and geometry strategy. The browser console entry beginning **`[Cadverix 3D CAD]`** includes:
 
 - The stage, such as building the preview, tessellating it, or collecting edges.
 - Fillet/Chamfer, selected edge IDs, and requested amount.
@@ -48,13 +48,13 @@ The geometry tests check circular radius and wall tangency, exclude inappropriat
 `tests/browser/cadImportedRim.spec.ts` is an opt-in regression for the original door-repair project containing `Bifold_Door_Hole_Repair`. The fixture is not committed, and an arbitrary SKF file is not a substitute. On macOS/Linux, run it with a local copy of that fixture:
 
 ```bash
-SKETCHFORGE_CAD_REPRO_PROJECT="/path/to/door-repair-project.skf" npm run test:mobile -- cadImportedRim.spec.ts
+CADVERIX_CAD_REPRO_PROJECT="/path/to/door-repair-project.skf" npm run test:mobile -- cadImportedRim.spec.ts
 ```
 
 On PowerShell:
 
 ```powershell
-$env:SKETCHFORGE_CAD_REPRO_PROJECT = "C:\path\to\door-repair-project.skf"
+$env:CADVERIX_CAD_REPRO_PROJECT = "C:\path\to\door-repair-project.skf"
 npm run test:mobile -- cadImportedRim.spec.ts
 ```
 

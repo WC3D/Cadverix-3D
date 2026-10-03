@@ -7,7 +7,7 @@ import { inspectSkfProjectPackage, SKF_LIMITS, SKF_MEDIA_TYPE } from "@/lib/skfP
 export const runtime = "nodejs";
 export const revalidate = false;
 
-const SHARED_PROJECTS_ENV = "SKETCHFORGE_SHARED_PROJECTS_DIR";
+const SHARED_PROJECTS_ENV = "CADVERIX_SHARED_PROJECTS_DIR";
 const SHARED_THUMBNAILS_DIR = ".thumbnails";
 const MAX_THUMBNAIL_BYTES = 5 * 1024 * 1024;
 const MAX_MULTIPART_OVERHEAD_BYTES = 1024 * 1024;
@@ -23,7 +23,7 @@ type SharedProjectFile = {
 };
 
 function sharedProjectsDirectory() {
-  const configured = process.env[SHARED_PROJECTS_ENV]?.trim();
+  const configured = (process.env[SHARED_PROJECTS_ENV] ?? process.env.SKETCHFORGE_SHARED_PROJECTS_DIR)?.trim();
   return configured ? path.resolve(configured) : null;
 }
 

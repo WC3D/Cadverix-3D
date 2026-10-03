@@ -18,7 +18,7 @@ function weldMeshVertices(mesh: ObjExportMesh) {
   const remappedIndices: number[] = [];
 
   mesh.vertices.forEach((sourceVertex) => {
-    // OBJ tools conventionally treat Y as up. Keep SketchForge's Y-up
+    // OBJ tools conventionally treat Y as up. Keep Cadverix 3D's Y-up
     // coordinates here so slicers do not apply their OBJ axis conversion a
     // second time. STL is exported separately using explicit Z-up coordinates.
     const vertex: [number, number, number] = [...sourceVertex];
@@ -64,7 +64,7 @@ function objNumber(value: number) {
 }
 
 export function exportMeshesToObj(meshes: readonly ObjExportMesh[]) {
-  const lines = ["# SketchForge OBJ export"];
+  const lines = ["# Cadverix 3D OBJ export", "# Coordinate system: Y-up"];
   let offset = 1;
 
   meshes.forEach((mesh) => {

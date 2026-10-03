@@ -1,4 +1,4 @@
-export const OFFICIAL_UPDATE_GUIDE_URL = "https://github.com/Formsmith746/SketchForge-3D#update-sketchforge-later";
+export const OFFICIAL_UPDATE_GUIDE_URL = "https://github.com/WC3D/SketchForge-3D#update-cadverix-3d-later";
 
 export type AppUpdateStatus = {
   currentVersion: string;

@@ -1,12 +1,12 @@
-# SketchForge project files (`.skf`)
+# Cadverix 3D project files (`.skf`)
 
-`.skf` is SketchForge's native, editable project format. It is an additional backup, transfer, and sharing mechanism; IndexedDB autosave remains the normal local persistence system, and 3MF, STL, OBJ, STEP, and SVG remain geometry exports.
+`.skf` is Cadverix 3D's native, editable project format. It is an additional backup, transfer, and sharing mechanism; IndexedDB autosave remains the normal local persistence system, and 3MF, STL, OBJ, STEP, and SVG remain geometry exports. The established `com.sketchforge.project` schema and media types are retained for compatibility with existing files and readers.
 
 ## Architecture decision
 
-SketchForge uses a packaged container (format option B). A `.skf` file is a ZIP archive containing `project.json` and deduplicated files below `assets/`.
+Cadverix 3D uses a packaged container (format option B). A `.skf` file is a ZIP archive containing `project.json` and deduplicated files below `assets/`.
 
-This was selected over pure JSON because imported STL/STEP data and exact B-Rep can be large, Base64 would add size and parsing overhead, and an archive lets SketchForge validate and hash each asset independently. The editable model is still JSON and can be inspected by opening `project.json` from the package.
+This was selected over pure JSON because imported STL/STEP data and exact B-Rep can be large, Base64 would add size and parsing overhead, and an archive lets Cadverix 3D validate and hash each asset independently. The editable model is still JSON and can be inspected by opening `project.json` from the package.
 
 ## Version 2 layout
 
@@ -35,7 +35,7 @@ project.skf
 - `exactCad`: objects with exact B-Rep or imported STEP sources
 - `editor`: workspace dimensions, units, snap grid, and selected workplane elevation
 
-Object nodes keep stable SketchForge object IDs. Groups refer to child node IDs instead of array positions. Fillet/chamfer history refers to explicit “before” nodes. Feature dependencies are explicit and checked for cycles.
+Object nodes keep stable Cadverix 3D object IDs. Groups refer to child node IDs instead of array positions. Fillet/chamfer history refers to explicit “before” nodes. Feature dependencies are explicit and checked for cycles.
 
 Nodes reference display edges through `cadDisplayEdgesAssetId`; the edge version remains in the shape definition. Each distinct edge array is stored once, including references from groups and reversible edge-treatment history. Mesh coordinate arrays, B-Rep strings, and image data URLs are encoded and hashed once per immutable resource. Weak caches and a bounded text cache reuse this work on subsequent saves. Import restores shared mesh and edge objects across undo states. Long node traversals yield to the event loop between batches.
 
@@ -56,7 +56,7 @@ Native primitives are regenerated from definitions and do not receive mesh asset
 
 ## Opening safely
 
-SketchForge inspects ZIP metadata before expansion and validates the entire project before changing local state. It rejects unsafe paths, encrypted or unsupported compression, excessive expansion, malformed shapes/sketches, duplicate IDs, missing assets, hash mismatches, invalid transforms, unknown shape or operation types, cyclic groups/features, and unsupported versions.
+Cadverix 3D inspects ZIP metadata before expansion and validates the entire project before changing local state. It rejects unsafe paths, encrypted or unsupported compression, excessive expansion, malformed shapes/sketches, duplicate IDs, missing assets, hash mismatches, invalid transforms, unknown shape or operation types, cyclic groups/features, and unsupported versions.
 
 Opening a valid `.skf` creates a new local project. It does not overwrite the project that is currently open. The imported project is then saved through the existing dashboard, thumbnail, IndexedDB, history, and editor lifecycle.
 
@@ -73,8 +73,8 @@ Future schema changes should add a version-to-version migration, run validation 
 ## Current limitations
 
 - Projects created before source-asset tracking cannot recover the exact original STL/SVG file. Their existing normalized editable mesh is preserved as a deduplicated legacy cache and is identified by the absence of a source asset.
-- SketchForge currently bakes the displayed result of booleans and edge treatments. `.skf` preserves the operands, group hierarchy, feature metadata, reversible history, exact B-Rep where available, and a derived-result cache; it does not add a new live parametric feature editor that the application does not yet have.
+- Cadverix 3D currently bakes the displayed result of booleans and edge treatments. `.skf` preserves the operands, group hierarchy, feature metadata, reversible history, exact B-Rep where available, and a derived-result cache; it does not add a new live parametric feature editor that the application does not yet have.
 - The current workplane system stores a base plane plus numeric offset. It does not expose persistent associative face-workplane references, so `.skf` cannot preserve an association that the editor itself does not model.
-- Geometric sketch constraints and dimensions are not yet part of SketchForge's sketch data model. Existing points, segments, curve handles, profiles, and extrusion depth are preserved exactly.
+- Existing sketch points, segments, curve handles, profiles, and extrusion depth are preserved, along with the constraint/dimension data supported by the current project reader.
 - Camera position is intentionally omitted because the current project persistence system does not own it. It can be added as optional editor state in a compatible future version.
 - OBJ is currently an export format, not an import format. An OBJ source-asset record is reserved in the schema for future import support.

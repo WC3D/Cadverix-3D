@@ -1,0 +1,4 @@
+interface:
+  display_name: "Cadverix 3D MCP Skill"
+  short_description: "Control live Cadverix 3D editor tabs"
+  default_prompt: "Use $cadverix-mcp-skill to inspect the live Cadverix 3D scene and modify selected objects."

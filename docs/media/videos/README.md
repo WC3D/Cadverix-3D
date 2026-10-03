@@ -1,4 +1,6 @@
-# SketchForge Demo Video Shot List
+# Cadverix 3D Demo Video Shot List
+
+Existing archived recordings may show the earlier product branding.
 
 Record short clips for the main README. Aim for 10-30 seconds per clip.
 

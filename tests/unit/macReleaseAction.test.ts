@@ -14,7 +14,7 @@ const step = (name: string) => action.runs.steps.find((entry) => entry.name === 
 const bashTest = it.skipIf(process.platform === "win32");
 const directories: string[] = [];
 const temporary = () => {
-  const directory = mkdtempSync(path.join(tmpdir(), "sketchforge-mac-action-"));
+  const directory = mkdtempSync(path.join(tmpdir(), "cadverix-mac-action-"));
   directories.push(directory);
   return directory;
 };
@@ -90,14 +90,14 @@ describe("macOS release action shell safety", () => {
       expect(output.args).toEqual(["run", "desktop:dist", "--", "--publish", "never", "--mac", `--${arch}`, "-c.mac.artifactName=${productName}-${version}-${arch}" + suffix + ".${ext}"]);
       expect(output.certificate).toBe(signed ? "test-certificate" : null);
       if (signed) {
-        expect(output.key).toBe(path.join(directory, `sketchforge-notary-${arch}.p8`));
+        expect(output.key).toBe(path.join(directory, `cadverix-notary-${arch}.p8`));
         expect(readFileSync(output.key, "utf8")).toBe(fakePrivateKey);
         expect(statSync(output.key).mode & 0o777).toBe(0o600);
       } else expect(output.key).toBeNull();
 
       const artifacts = path.join(directory, "dist/desktop");
       mkdirSync(artifacts, { recursive: true });
-      for (const extension of ["dmg", "zip"]) writeFileSync(path.join(artifacts, `SketchForge-1.2.3-${arch}${suffix}.${extension}`), "test artifact");
+      for (const extension of ["dmg", "zip"]) writeFileSync(path.join(artifacts, `Cadverix 3D-1.2.3-${arch}${suffix}.${extension}`), "test artifact");
       writeFileSync(path.join(artifacts, "latest-mac.yml"), "test manifest");
       const verify = run("Verify macOS artifacts", directory, env);
       expect(verify.status, verify.stderr).toBe(0);
@@ -118,7 +118,7 @@ describe("macOS release action shell safety", () => {
     expect(JSON.parse(build.stdout).args.at(-1)).toContain(payload);
     const artifacts = path.join(directory, "dist/desktop");
     mkdirSync(artifacts, { recursive: true });
-    for (const extension of ["dmg", "zip"]) writeFileSync(path.join(artifacts, `SketchForge-${env.VERSION}-arm64${payload}.${extension}`), "test artifact");
+    for (const extension of ["dmg", "zip"]) writeFileSync(path.join(artifacts, `Cadverix 3D-${env.VERSION}-arm64${payload}.${extension}`), "test artifact");
     expect(run("Verify macOS artifacts", directory, env).status).toBe(0);
     expect(existsSync(path.join(directory, "injection-marker"))).toBe(false);
   });

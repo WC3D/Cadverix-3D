@@ -7,5 +7,5 @@ export function projectExportFileName(projectName: string, format: ProjectExport
     .replace(/\s+/g, " ")
     .replace(/[. ]+$/g, "")
     .slice(0, 120);
-  return `${safeProjectName || "SketchForge design"}.${format}`;
+  return `${safeProjectName || "Cadverix 3D design"}.${format}`;
 }

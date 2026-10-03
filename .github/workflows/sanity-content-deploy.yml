@@ -15,7 +15,7 @@ concurrency:
 
 jobs:
   deploy:
-    name: Rebuild and deploy SketchForge
+    name: Rebuild and deploy Cadverix 3D
     runs-on: ubuntu-latest
     timeout-minutes: 20
 

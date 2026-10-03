@@ -60,7 +60,7 @@
 @media (any-pointer: coarse) {
   /* iPads can be wider than the phone breakpoint. Reserve the touch tab height
      at every touch viewport width, and use the visible browser height. */
-  .sketchforge-editor {
+  .cadverix-editor {
     --editor-toolbar-height: calc(100px + env(safe-area-inset-top, 0px));
     --editor-toolbar-tools-height: 60px;
     height: 100dvh;
@@ -100,16 +100,16 @@
   .rotate-handle-icon,
   .rotate-handle-icon svg { width: 13px; height: 13px; }
   .transform-handle.height-lift { translate: 0 -16px; }
-  .sketchforge-editor input:not([type="range"]):not([type="checkbox"]):not([type="color"]),
-  .sketchforge-editor select,
-  .sketchforge-editor textarea { font-size: 16px; }
+  .cadverix-editor input:not([type="range"]):not([type="checkbox"]):not([type="color"]),
+  .cadverix-editor select,
+  .cadverix-editor textarea { font-size: 16px; }
   .toolbar-mode-content.geometry,
   .toolbar-mode-content.sketch,
   .toolbar-mode-content.sculpt { overflow-x: auto; overscroll-behavior-x: contain; }
 }
 
 @media (max-width: 1100px) {
-  .sketchforge-editor { height: 100dvh; }
+  .cadverix-editor { height: 100dvh; }
   .editor-body { height: calc(100dvh - var(--editor-toolbar-height)); bottom: auto; }
   .workplane-stage,
   .sketch-workspace-stage { height: 100%; }
@@ -117,7 +117,7 @@
 }
 
 @media (max-width: 760px) {
-  .sketchforge-editor { --editor-toolbar-height: calc(100px + env(safe-area-inset-top, 0px)); --editor-toolbar-tools-height: 60px; }
+  .cadverix-editor { --editor-toolbar-height: calc(100px + env(safe-area-inset-top, 0px)); --editor-toolbar-tools-height: 60px; }
   .toolbar-title-row { top: env(safe-area-inset-top, 0px); height: 40px; left: max(6px, env(safe-area-inset-left)); right: max(6px, env(safe-area-inset-right)); gap: 6px; }
   .toolbar-workspace-tabs { flex-shrink: 0; }
   .toolbar-workspace-tabs { height: 40px; }

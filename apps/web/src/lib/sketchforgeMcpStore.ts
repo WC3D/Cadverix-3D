@@ -81,7 +81,7 @@ function prune(current = Date.now()) {
       pending.resolve({
         commandId,
         ok: false,
-        error: `SketchForge editor ${editor.editorNumber} is no longer open`,
+        error: `Cadverix 3D editor ${editor.editorNumber} is no longer open`,
         completedAt: current,
       });
     }
@@ -172,7 +172,7 @@ export function dispatchSketchForgeMcpCommand({
     return Promise.resolve({
       commandId: "",
       ok: false,
-      error: typeof editorNumber === "number" ? `No open SketchForge editor ${editorNumber}` : "No matching open SketchForge editor",
+      error: typeof editorNumber === "number" ? `No open Cadverix 3D editor ${editorNumber}` : "No matching open Cadverix 3D editor",
       completedAt: Date.now(),
     } satisfies SketchForgeMcpCommandResult);
   }
@@ -199,7 +199,7 @@ export function dispatchSketchForgeMcpCommand({
       resolve({
         commandId: command.id,
         ok: false,
-        error: `Timed out waiting for SketchForge editor ${editor.editorNumber}`,
+        error: `Timed out waiting for Cadverix 3D editor ${editor.editorNumber}`,
         completedAt: Date.now(),
       });
     }, boundedTimeoutMs);

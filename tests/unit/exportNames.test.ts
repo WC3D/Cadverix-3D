@@ -16,6 +16,6 @@ describe("project export filenames", () => {
   });
 
   it("falls back to a useful name when the project name cannot be used", () => {
-    expect(projectExportFileName("...", "obj")).toBe("SketchForge design.obj");
+    expect(projectExportFileName("...", "obj")).toBe("Cadverix 3D design.obj");
   });
 });

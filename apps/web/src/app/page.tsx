@@ -2,7 +2,7 @@
 
 import { Clock3, EllipsisVertical, FileUp, FolderKanban, Grid3X3, HomeIcon, List, Palette, Pencil, Plus, RefreshCw, Search, Settings, SlidersHorizontal, Trash2, X } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { SketchForgeEditor, importedShapeFromObj, importedShapeFromStl, importedShapeFromSvg } from "@/components/SketchForgeEditor";
+import { CadverixEditor, importedShapeFromObj, importedShapeFromStl, importedShapeFromSvg } from "@/components/CadverixEditor";
 import ChallengesDashboard from "@/components/official/ChallengesDashboard";
 import { applyAppTheme, readStoredAppTheme, resolveAppTheme, storeAppTheme, type AppThemePreference, type ResolvedAppTheme } from "@/lib/appTheme";
 import type { AppUpdateStatus } from "@/lib/appUpdates";
@@ -118,7 +118,7 @@ const ACTIVE_CHALLENGE_TUTORIAL_STORAGE_KEY = "sketchForge.activeChallengeTutori
 const DISMISSED_UPDATE_VERSION_STORAGE_KEY = "sketchForge.dismissedUpdateVersion";
 const PROJECT_ACCENTS: DashboardProject["accent"][] = ["cyan", "green", "gold", "red"];
 const STATIC_EXPORT_BUILD = process.env.NEXT_PUBLIC_STATIC_EXPORT === "true";
-const SOURCE_CODE_URL = process.env.NEXT_PUBLIC_SOURCE_CODE_URL?.trim() || "https://github.com/Formsmith746/SketchForge-3D";
+const SOURCE_CODE_URL = process.env.NEXT_PUBLIC_SOURCE_CODE_URL?.trim() || "https://github.com/WC3D/SketchForge-3D";
 const EDITOR_SKELETON_MIN_DURATION_MS = 320;
 const knownProjectResourceKeys = new Map<string, Set<string>>();
 
@@ -1013,7 +1013,7 @@ export default function Home() {
       openEditor(project.id, { allowMissingFromStorage: true });
       return { ok: true, message: sharedProject ? `Opened shared project ${sharedProject.name}` : `Opened ${file.name} as a new editable local project` };
     } catch (error) {
-      const message = error instanceof Error ? error.message : "Could not open SketchForge project";
+      const message = error instanceof Error ? error.message : "Could not open Cadverix 3D project";
       setDashboardNotice(message);
       return { ok: false, message };
     }
@@ -1314,7 +1314,7 @@ export default function Home() {
       ) : null}
       {editorStarted && canRenderEditor ? (
         <div className={view === "editor" ? "editor-stage active" : "editor-stage"} aria-hidden={view !== "editor"}>
-          <SketchForgeEditor
+          <CadverixEditor
             initialAssets={activeProjectShapeEntry?.assets ?? []}
             initialShapes={activeProjectShapeEntry?.shapes ?? []}
             initialHistory={activeProjectShapeEntry?.history}
@@ -1515,7 +1515,7 @@ function Dashboard({
   const projectPendingRename = projects.find((project) => project.id === projectPendingRenameId) ?? null;
 
   useEffect(() => {
-    const desktop = window.sketchforgeDesktop;
+    const desktop = window.cadverixDesktop ?? window.sketchforgeDesktop;
     if (!desktop) return;
     setDesktopUpdaterConnected(true);
     void desktop.getVersion().then(setDesktopAppVersion).catch(() => undefined);
@@ -1567,7 +1567,7 @@ function Dashboard({
     setUpdateChecking(true);
     setUpdateMessage("");
     try {
-      const desktop = window.sketchforgeDesktop;
+      const desktop = window.cadverixDesktop ?? window.sketchforgeDesktop;
       if (desktop) {
         setDesktopUpdaterConnected(true);
         const result = await desktop.checkForUpdates();
@@ -1587,11 +1587,11 @@ function Dashboard({
         if (result.updateAvailable && result.latestVersion) {
           setUpdateMessage(
             result.downloaded
-              ? `SketchForge ${result.latestVersion} is ready to install.`
-              : `SketchForge ${result.latestVersion} is available. Press Update to download, install, and restart.`,
+              ? `Cadverix 3D ${result.latestVersion} is ready to install.`
+              : `Cadverix 3D ${result.latestVersion} is available. Press Update to download, install, and restart.`,
           );
         } else if (alwaysPrompt) {
-          setUpdateMessage("SketchForge is up to date.");
+          setUpdateMessage("Cadverix 3D is up to date.");
         }
         return;
       }
@@ -1607,7 +1607,7 @@ function Dashboard({
           setUpdatePromptOpen(true);
         }
       } else if (alwaysPrompt && !payload.checkError) {
-        setUpdateMessage("SketchForge is up to date.");
+        setUpdateMessage("Cadverix 3D is up to date.");
       }
     } catch (error) {
       setUpdateMessage(error instanceof Error ? error.message : "Could not check for updates");
@@ -1634,10 +1634,10 @@ function Dashboard({
   const requestUpdate = async () => {
     if (!updateStatus?.updateAvailable) return;
 
-    const desktop = window.sketchforgeDesktop;
+    const desktop = window.cadverixDesktop ?? window.sketchforgeDesktop;
     if (desktop) {
       setUpdateStarting(true);
-      setUpdateMessage(`Downloading SketchForge ${updateStatus.latestVersion ?? "update"}…`);
+      setUpdateMessage(`Downloading Cadverix 3D ${updateStatus.latestVersion ?? "update"}…`);
       try {
         const result = await desktop.installUpdate();
         if (result.error) throw new Error(result.error);
@@ -1652,9 +1652,9 @@ function Dashboard({
             requiresUpdateKey: false,
             updateMode: "desktop",
           });
-          setUpdateMessage("SketchForge is already up to date.");
+          setUpdateMessage("Cadverix 3D is already up to date.");
         } else {
-          setUpdateMessage("Update downloaded. SketchForge is restarting to install it…");
+          setUpdateMessage("Update downloaded. Cadverix 3D is restarting to install it…");
         }
       } catch (error) {
         setUpdateMessage(error instanceof Error ? error.message : "Could not install the update");
@@ -1679,7 +1679,7 @@ function Dashboard({
     try {
       const response = await fetch("/api/app-update", {
         method: "POST",
-        headers: { "x-sketchforge-update-key": updateKey.trim() },
+        headers: { "x-cadverix-update-key": updateKey.trim() },
       });
       const payload = await response.json() as { accepted?: boolean; error?: string; updateUrl?: string; updateMode?: "local" | "server"; restartRequired?: boolean };
       if (!response.ok || !payload.accepted) throw new Error(payload.error || "Could not start the update");
@@ -1689,7 +1689,7 @@ function Dashboard({
       setUpdateKey("");
       if (payload.updateMode === "local" || updateStatus.updateMode === "local") {
         const expectedVersion = updateStatus.latestVersion;
-        setUpdateMessage("Update installed. Restarting local SketchForge…");
+        setUpdateMessage("Update installed. Restarting local Cadverix 3D…");
         await new Promise((resolve) => window.setTimeout(resolve, 1800));
         for (let attempt = 0; attempt < 60; attempt += 1) {
           try {
@@ -1706,7 +1706,7 @@ function Dashboard({
           }
           await new Promise((resolve) => window.setTimeout(resolve, 500));
         }
-        setUpdateMessage("Update installed. Reload this page once local SketchForge finishes restarting.");
+        setUpdateMessage("Update installed. Reload this page once local Cadverix 3D finishes restarting.");
       } else {
         setUpdateMessage("Update started. The server may briefly go offline; reopen this page after it restarts.");
       }
@@ -1720,9 +1720,9 @@ function Dashboard({
   return (
     <main className="dashboard-shell">
       <header className="dashboard-topbar">
-        <a className="dashboard-brand" href="./" aria-label="SketchForge home">
-          <img src="/assets/sketchforge/sketchforge-logo-white.png" alt="" />
-          <span>SketchForge</span>
+        <a className="dashboard-brand" href="./" aria-label="Cadverix 3D home">
+          <img src="/assets/cadverix/cadverix-logo.svg" alt="" />
+          <span>Cadverix 3D</span>
         </a>
         <div className="dashboard-search">
           <Search size={18} strokeWidth={2.4} />
@@ -2032,7 +2032,7 @@ function Dashboard({
         <section className="dashboard-confirm-overlay" role="dialog" aria-modal="true" aria-labelledby="app-update-title">
           <div className="dashboard-confirm-dialog dashboard-update-dialog">
             <header>
-              <strong id="app-update-title">SketchForge {updateStatus.latestVersion} is available</strong>
+              <strong id="app-update-title">Cadverix 3D {updateStatus.latestVersion} is available</strong>
               <button type="button" aria-label="Dismiss update" onClick={dismissUpdate} disabled={updateStarting}>
                 <X size={18} />
               </button>
@@ -2041,7 +2041,7 @@ function Dashboard({
               <p>Do you want to update from version {updateStatus.currentVersion}?</p>
               <div className="dashboard-update-safety">
                 {updateStatus.updateMode === "local" ? (
-                  <>Your browser projects are kept. The updater only replaces the local SketchForge application files.</>
+                  <>Your browser projects are kept. The updater only replaces the local Cadverix 3D application files.</>
                 ) : (
                   <>Your projects are kept. Private projects stay in this browser, and Docker shared projects remain in the persistent <code>/data/projects</code> volume.</>
                 )}
@@ -2103,7 +2103,7 @@ function Dashboard({
             />
           </label>
           <div className="dashboard-version-row">
-            <span>SketchForge version</span>
+            <span>Cadverix 3D version</span>
             <strong>{desktopAppVersion ?? updateStatus?.currentVersion ?? SKF_CREATED_WITH_VERSION}</strong>
           </div>
           <section className="dashboard-update-settings" aria-label="Software updates">

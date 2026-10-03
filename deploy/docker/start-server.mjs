@@ -13,7 +13,7 @@ const parsePort = (value, fallback, name) => {
 };
 
 const appPort = parsePort(process.env.PORT, 3000, "PORT");
-const legacyPort = parsePort(process.env.SKETCHFORGE_LEGACY_PORT, 80, "SKETCHFORGE_LEGACY_PORT");
+const legacyPort = parsePort(process.env.CADVERIX_LEGACY_PORT ?? process.env.SKETCHFORGE_LEGACY_PORT, 80, "CADVERIX_LEGACY_PORT");
 const app = spawn(process.execPath, ["apps/web/server.js"], {
   env: {
     ...process.env,
@@ -45,7 +45,7 @@ if (legacyPort !== appPort) {
   });
 
   proxy.listen(legacyPort, "0.0.0.0", () => {
-    console.log(`Legacy Docker port ${legacyPort} forwards to SketchForge on port ${appPort}.`);
+    console.log(`Legacy Docker port ${legacyPort} forwards to Cadverix 3D on port ${appPort}.`);
   });
 }
 
@@ -73,13 +73,13 @@ for (const signal of ["SIGINT", "SIGTERM"]) {
 }
 
 app.on("error", (error) => {
-  console.error("Unable to start SketchForge:", error);
+  console.error("Unable to start Cadverix 3D:", error);
   finish(1);
 });
 
 app.on("exit", (code, signal) => {
   if (!shuttingDown && signal) {
-    console.error(`SketchForge exited from ${signal}.`);
+    console.error(`Cadverix 3D exited from ${signal}.`);
   }
   finish(shuttingDown ? 0 : code ?? 1);
 });

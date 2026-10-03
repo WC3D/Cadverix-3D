@@ -7,7 +7,7 @@ import { NextResponse } from "next/server";
 export const revalidate = false;
 
 const LOCAL_HOSTS = new Set(["localhost", "127.0.0.1", "::1"]);
-const LOCAL_DOWNLOAD_ROOT_ENV = "SKETCHFORGE_LOCAL_DOWNLOAD_ROOT";
+const LOCAL_DOWNLOAD_ROOT_ENV = "CADVERIX_LOCAL_DOWNLOAD_ROOT";
 const MAX_TEXT_DOWNLOAD_BYTES = 25 * 1024 * 1024;
 const MAX_BINARY_DOWNLOAD_BYTES = 512 * 1024 * 1024;
 
@@ -22,7 +22,7 @@ function isPathInside(root: string, candidate: string) {
 }
 
 async function localDownloadDirectory(requestedFolder: string) {
-  const configuredRoot = process.env[LOCAL_DOWNLOAD_ROOT_ENV]?.trim();
+  const configuredRoot = (process.env[LOCAL_DOWNLOAD_ROOT_ENV] ?? process.env.SKETCHFORGE_LOCAL_DOWNLOAD_ROOT)?.trim();
   const allowedRoot = path.resolve(configuredRoot || path.join(homedir(), "Downloads"));
   const requestedDirectory = path.resolve(path.isAbsolute(requestedFolder) ? requestedFolder : path.join(allowedRoot, requestedFolder));
   if (!isPathInside(allowedRoot, requestedDirectory)) return null;

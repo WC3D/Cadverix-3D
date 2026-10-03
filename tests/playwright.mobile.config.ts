@@ -1,7 +1,8 @@
 import { defineConfig } from "@playwright/test";
 import path from "node:path";
 
-const baseURL = process.env.SKETCHFORGE_TEST_URL ?? "http://localhost:3000";
+const configuredURL = process.env.CADVERIX_TEST_URL ?? process.env.SKETCHFORGE_TEST_URL;
+const baseURL = configuredURL ?? "http://localhost:3000";
 
 export default defineConfig({
   testDir: "./browser",
@@ -20,7 +21,7 @@ export default defineConfig({
     { name: "chromium", use: { browserName: "chromium" } },
     { name: "webkit", use: { browserName: "webkit" } },
   ],
-  webServer: process.env.SKETCHFORGE_TEST_URL ? undefined : {
+  webServer: configuredURL ? undefined : {
     command: "npm run dev -- --hostname 127.0.0.1 --port 3000",
     cwd: path.resolve(__dirname, ".."),
     url: baseURL,

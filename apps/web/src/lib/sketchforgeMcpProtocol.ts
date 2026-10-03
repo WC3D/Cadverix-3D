@@ -1,6 +1,6 @@
 import type { GridSize, ShapeKind, WorkplaneWorkspaceSettings } from "@/types/sketchforge";
 
-export const SKETCHFORGE_MCP_ROUTE = "/api/sketchforge-mcp";
+export const SKETCHFORGE_MCP_ROUTE = "/api/cadverix-mcp";
 export const SKETCHFORGE_MCP_STALE_MS = 15_000;
 export const SKETCHFORGE_MCP_HEARTBEAT_MS = 5_000;
 export const SKETCHFORGE_MCP_LONG_POLL_TIMEOUT_MS = 25_000;

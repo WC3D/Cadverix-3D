@@ -37,10 +37,10 @@ function isLocalRequest(request: Request) {
 
 function localOnly(request: Request) {
   if (process.env.NODE_ENV === "production") {
-    return NextResponse.json({ error: "SketchForge MCP is only available in local development." }, { status: 404 });
+    return NextResponse.json({ error: "Cadverix 3D MCP is only available in local development." }, { status: 404 });
   }
   if (!isLocalRequest(request)) {
-    return NextResponse.json({ error: "SketchForge MCP only accepts localhost requests." }, { status: 403 });
+    return NextResponse.json({ error: "Cadverix 3D MCP only accepts localhost requests." }, { status: 403 });
   }
   return null;
 }
@@ -63,11 +63,11 @@ export async function POST(request: Request) {
   try {
     body = (await request.json()) as SketchForgeMcpApiPayload;
   } catch {
-    return NextResponse.json({ error: "Invalid SketchForge MCP request." }, { status: 400 });
+    return NextResponse.json({ error: "Invalid Cadverix 3D MCP request." }, { status: 400 });
   }
 
   if (!isObject(body) || typeof body.type !== "string") {
-    return NextResponse.json({ error: "Invalid SketchForge MCP request." }, { status: 400 });
+    return NextResponse.json({ error: "Invalid Cadverix 3D MCP request." }, { status: 400 });
   }
 
   if (body.type === "heartbeat") {
@@ -110,5 +110,5 @@ export async function POST(request: Request) {
     return NextResponse.json(result, { status: result.ok ? 200 : 504 });
   }
 
-  return NextResponse.json({ error: "Unknown SketchForge MCP request." }, { status: 400 });
+  return NextResponse.json({ error: "Unknown Cadverix 3D MCP request." }, { status: 400 });
 }
