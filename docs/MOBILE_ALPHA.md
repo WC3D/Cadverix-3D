@@ -31,6 +31,7 @@ For the local printing workflow: design in Cadverix 3D, export STL or 3MF to the
 | Tap highlighted edges in Fillet/Chamfer | Select edges using the tool's **Select tangent chains** setting |
 | Edit in Sculpt | Drag to brush or tap for one dab |
 | Draw in Sketch | Use the active drawing/selection tool with one finger |
+| Drawing sheet | Tap to place geometry/dimension points; drag items, pinch to zoom, and pan with two fingers |
 | Top toolbar undo/redo | Undo/redo the current geometry or sketch history |
 | ? button | Show gesture help |
 
@@ -53,6 +54,7 @@ Wheel/trackpad zoom over object handles uses a non-passive event listener. Works
 - Phone shape properties use a narrower, scrollable lower panel, capped at 26% of the viewport height or 220 CSS pixels, with a compact header and visible collapse control. Wide landscape phones also get a narrower inspector.
 - Touch controls remain available in geometry, sketch, and sculpt views. Undo/redo are in the top toolbar rather than duplicated in the floating touch panel.
 - Dynamic viewport height, safe-area spacing, and readable input sizes accommodate mobile browsers without disabling page zoom outside the drawing surfaces.
+- The Drawing tab has its own horizontally scrolling toolbar and a compact, collapsible properties panel on phones. The sheet can be zoomed independently of its printed scale. See [Drawing workspace](DRAWING_WORKSPACE.md).
 
 ## Validation
 

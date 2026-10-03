@@ -7,6 +7,7 @@ import { canonicalizeShape } from "@/lib/workplaneShapes";
 import { importedShapeFromStl } from "@/lib/stlImport";
 import { importedShapeFromSvg } from "@/lib/svgImport";
 import { normalizeSnapGrid, normalizeWorkspaceSettings } from "@/lib/workplaneSettings";
+import { parseDrawingSheet } from "@/lib/drawingSheet";
 import type { CadDisplayEdge, GridSize, ProjectAsset, ProjectAssetSourceFormat, SketchOperation, SketchRevolveSettings, WorkplaneShape, WorkplaneWorkspaceSettings } from "@/types/sketchforge";
 
 export const SKF_SCHEMA_ID = "com.sketchforge.project";
@@ -14,6 +15,9 @@ export const LYL_SCHEMA_ID = "com.layerling.project";
 // Version 2 stores display edges as deduplicated archive assets instead of repeating
 // them inside every undo state. Version 1 packages are still read and migrated.
 export const SKF_FORMAT_VERSION = 2;
+// Only projects with drawings require the extended reader. Plain modeling
+// projects remain format 2 so existing readers can still exchange them.
+export const SKF_DRAWING_FORMAT_VERSION = 3;
 export const SKF_MINIMUM_READER_VERSION = 2;
 export const SKF_OLDEST_READABLE_FORMAT_VERSION = 1;
 export const SKF_CREATED_WITH_VERSION = "1.0.12";
@@ -108,7 +112,7 @@ export type SkfFeatureV1 = {
 // from inline definitions to assets; keep the exported type name for callers.
 export type SkfProjectDocumentV1 = {
   schema: typeof SKF_SCHEMA_ID | typeof LYL_SCHEMA_ID;
-  formatVersion: 1 | 2;
+  formatVersion: 1 | 2 | 3;
   minimumReaderVersion: number;
   createdWithVersion: string;
   metadata: {
@@ -891,10 +895,12 @@ export async function exportSkfProject(input: SkfProjectExportInput) {
   const placementWorkplane = normalizePlacementWorkplane(input.placementWorkplane, placementElevation);
   const sketchPlacementWorkplane = normalizePlacementWorkplane(input.sketchPlacementWorkplane);
   const selectedWorkplaneId = placementWorkplaneIsBase(placementWorkplane) ? "workplane-base" : "workplane-active";
+  const workspace = normalizeWorkspaceSettings(input.workspace);
+  if (input.workspace.drawing !== undefined) workspace.drawing = parseDrawingSheet(input.workspace.drawing);
   const document: SkfProjectDocumentV1 = {
     schema: SKF_SCHEMA_ID,
-    formatVersion: SKF_FORMAT_VERSION,
-    minimumReaderVersion: SKF_MINIMUM_READER_VERSION,
+    formatVersion: workspace.drawing ? SKF_DRAWING_FORMAT_VERSION : SKF_FORMAT_VERSION,
+    minimumReaderVersion: workspace.drawing ? SKF_DRAWING_FORMAT_VERSION : SKF_MINIMUM_READER_VERSION,
     createdWithVersion: SKF_CREATED_WITH_VERSION,
     metadata: {
       ...(input.projectId ? { projectId: input.projectId } : {}),
@@ -916,7 +922,7 @@ export async function exportSkfProject(input: SkfProjectExportInput) {
     ],
     exactCad: indexes.exactCad,
     editor: {
-      workspace: normalizeWorkspaceSettings(input.workspace),
+      workspace,
       snapGrid: normalizeSnapGrid(input.snapGrid),
       selectedWorkplaneId,
       placementElevation,
@@ -1283,13 +1289,13 @@ async function validateDocumentAndAssets(raw: unknown, files: ArchiveFiles) {
   if (document.schema !== SKF_SCHEMA_ID && document.schema !== LYL_SCHEMA_ID) throw new Error("This file is not a supported Cadverix 3D (.skf) or Layerling project");
   const layerlingProject = document.schema === LYL_SCHEMA_ID;
   if (!Number.isInteger(document.formatVersion)) throw new Error("Cadverix 3D project formatVersion is missing");
-  if (document.formatVersion > SKF_FORMAT_VERSION) {
+  if (document.formatVersion > SKF_DRAWING_FORMAT_VERSION) {
     throw new Error(`This project uses .skf format ${document.formatVersion}, which requires a newer Cadverix 3D version`);
   }
   if (document.formatVersion < SKF_OLDEST_READABLE_FORMAT_VERSION) {
     throw new Error(`Packaged .skf format ${document.formatVersion} requires migration support that is not available`);
   }
-  if (!Number.isInteger(document.minimumReaderVersion) || document.minimumReaderVersion > SKF_FORMAT_VERSION) {
+  if (!Number.isInteger(document.minimumReaderVersion) || document.minimumReaderVersion > SKF_DRAWING_FORMAT_VERSION) {
     throw new Error("This project requires a newer Cadverix 3D reader and was not opened");
   }
   const metadata = objectRecord(document.metadata, "metadata");
@@ -1403,6 +1409,11 @@ async function validateDocumentAndAssets(raw: unknown, files: ArchiveFiles) {
   if (document.history.entries[document.history.index]?.stateId !== document.sceneStateId) throw new Error("Active scene and undo history index do not match");
   validateFeatureGraph(document.features, activeObjectIds);
   const editor = objectRecord(document.editor, "editor");
+  const drawing = (editor.workspace as Partial<WorkplaneWorkspaceSettings> | undefined)?.drawing;
+  if (drawing !== undefined) {
+    if (document.formatVersion < SKF_DRAWING_FORMAT_VERSION || document.minimumReaderVersion < SKF_DRAWING_FORMAT_VERSION) throw new Error("Drawing sheets require SKF format and reader version 3");
+    parseDrawingSheet(drawing);
+  }
   finiteNumber(editor.placementElevation, "editor.placementElevation");
   for (const fieldName of ["placementWorkplane", "sketchPlacementWorkplane"] as const) {
     if (editor[fieldName] === undefined) continue;
@@ -1740,7 +1751,7 @@ export async function importSkfProject(input: ArrayBuffer | Uint8Array, options:
     const document = objectRecord(raw, "Legacy .skf project");
     if (document.schema !== SKF_SCHEMA_ID && document.schema !== LYL_SCHEMA_ID) throw new Error("This file is not a supported Cadverix 3D (.skf) or Layerling project");
     if (document.formatVersion === 0) return migrateV0(document);
-    if (typeof document.formatVersion === "number" && document.formatVersion > SKF_FORMAT_VERSION) {
+    if (typeof document.formatVersion === "number" && document.formatVersion > SKF_DRAWING_FORMAT_VERSION) {
       throw new Error(`This project uses .skf format ${document.formatVersion}, which requires a newer Cadverix 3D version`);
     }
     throw new Error("This legacy .skf version is not supported");

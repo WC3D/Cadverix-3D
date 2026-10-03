@@ -48,12 +48,19 @@ No login. Private projects autosave locally in your browser, with optional share
 - **Faceted mesh rim treatments** - dedicated chamfer and rounded Fillet paths for supported complete, convex, horizontal outer rims on imported meshes, with CAD validation and retained B-Rep geometry.
 - **Rotated solid edge treatment** - chamfer and fillet preserve analytic box topology after one-, two-, or three-axis rotations.
 - **Mesh sculpting** - Add, Subtract, and Smooth brushes with adjustable radius and strength, local remeshing, and undoable strokes processed in a background worker.
+- **2D CAD drawings** - a Drawing tab beside Sculpt, with ISO A0–A4 and ANSI A–E sheets, movable orthographic/isometric model views, custom rotations and scales, dimensions, paper geometry, notes, SVG export, and Print/PDF.
 - **Scene overview** - search shapes and features, inspect groups, control visibility, locking, and hole state, and toggle or remove supported features.
 - **Placement and navigation tools** - align, mirror, center selections on the workplane, focus the camera on a selection, and move objects using the snap grid.
 - **3MF, STL, STEP, and SVG import** - bring outside models and vector profiles into the same workspace as primitives.
 - **3MF, STL, OBJ, STEP, and SVG workflows** - export selected objects or the whole scene, including print-ready 3MF packages and exact STEP/B-Rep geometry where available.
 - **Mobile support (alpha)** - touch-first geometry, sketch, and sculpt controls with compact phone/tablet layouts and pen input support.
 - **Fast browser stack** - Next.js, React, TypeScript, Three.js, and Manifold/CSG geometry tooling.
+
+### 2D CAD drawing sheets
+
+Open **Drawing** beside **Sculpt**, choose an ISO or ANSI paper template, and add views of individual objects, a selection, or the visible assembly. Use **3 views** for a first-/third-angle layout, or place and rotate views individually. Add horizontal, vertical, aligned, angular, radius, and diameter measurements, plus lines, rectangles, circles, and notes.
+
+Sheets autosave with the project and can be exported as SVG or printed to PDF at physical paper size. See the [Drawing workspace guide](docs/DRAWING_WORKSPACE.md) for measurement behavior, source-model updates, and file compatibility.
 
 ### Color-coded tools and the Shapes palette
 
@@ -90,7 +97,7 @@ The **Scene** sidebar provides a searchable object/group overview. Selected obje
 
 Private projects autosave in IndexedDB for the browser and site address you use. Export a **`.skf`** package to back up an editable project or move it between browsers, computers, and mobile devices. Opening a package creates a new local project. Geometry exports such as STL and 3MF are separate from editable project backups.
 
-Current saves use **SKF format 2**, with deduplicated mesh/B-Rep/image assets and compact binary CAD display edges shared across history states. This reduces repeated autosave work and project storage. The reader still accepts format 1 packages, legacy JSON projects, and earlier JSON display-edge assets; new binary-edge saves require an updated reader.
+Modeling-only saves use **SKF format 2**, with deduplicated mesh/B-Rep/image assets and compact binary CAD display edges shared across history states. Projects containing a drawing sheet use **format 3 / minimum reader 3**, preserving sheet templates, view definitions, and measurements. The reader accepts formats 1, 2, and 3, legacy JSON projects, and earlier JSON display-edge assets; drawing projects require a drawing-capable reader.
 
 See the [SKF project format documentation](docs/SKF_PROJECT_FORMAT.md) for package structure, history options, and compatibility details.
 
@@ -486,6 +493,7 @@ npm run desktop:dist
 
 ## Documentation
 
+- [Drawing workspace](docs/DRAWING_WORKSPACE.md) — ISO/ANSI sheets, model views, measurements, and SVG/PDF output.
 - [User manual](docs/CADVERIX_USER_MANUAL.md) — modeling, sketch tools, import/export, and shortcuts.
 - [Rename and compatibility guide](docs/CADVERIX_REBRAND.md) — existing projects, installation identities, configuration aliases, and upstream attribution.
 - [Mobile Alpha](docs/MOBILE_ALPHA.md) — touch/pen controls, LAN setup, and validation status.

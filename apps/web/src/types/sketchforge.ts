@@ -1,4 +1,5 @@
 import type { AppTheme } from "@/lib/themes";
+import type { DrawingSheet } from "@/lib/drawingSheet";
 import type { ConstructionPlaneAttachment, ConstructionPlanePose, PrincipalPlane, Vector3Tuple } from "@/lib/constructionPlanes";
 
 export type ShapeKind =
@@ -152,6 +153,7 @@ export type WorkplaneWorkspaceSettings = {
   accuracy: MeasurementAccuracy;
   historyLimit: HistoryRetentionLimit;
   shapeCustomizations: ShapeCustomizationMap;
+  drawing?: DrawingSheet;
 };
 
 export type AlignAxis = "x" | "y" | "z";

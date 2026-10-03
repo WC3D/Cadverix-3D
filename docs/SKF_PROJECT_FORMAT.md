@@ -8,7 +8,7 @@ Cadverix 3D uses a packaged container (format option B). A `.skf` file is a ZIP 
 
 This was selected over pure JSON because imported STL/STEP data and exact B-Rep can be large, Base64 would add size and parsing overhead, and an archive lets Cadverix 3D validate and hash each asset independently. The editable model is still JSON and can be inspected by opening `project.json` from the package.
 
-## Version 2 layout
+## Version 2 / 3 layout
 
 ```text
 project.skf
@@ -34,6 +34,7 @@ project.skf
 - `workplanes`: base and selected offset workplanes
 - `exactCad`: objects with exact B-Rep or imported STEP sources
 - `editor`: workspace dimensions, units, snap grid, and selected workplane elevation
+- `editor.workspace.drawing` (format 3): paper template/orientation, title-block fields, projection convention, source-linked model views, paper entities, and dimensions with geometry fingerprints
 
 Object nodes keep stable Cadverix 3D object IDs. Groups refer to child node IDs instead of array positions. Fillet/chamfer history refers to explicit “before” nodes. Feature dependencies are explicit and checked for cycles.
 
@@ -64,7 +65,9 @@ Current safety limits are 512 MB compressed, 1 GB expanded, 256 MB per asset, 64
 
 ## Compatibility and migrations
 
-New saves use format version 2 and minimum reader version 2. Older applications reject these files rather than dropping shared display edges. The current reader accepts version 1 packages with inline display edges, interns those resources on import, and writes version 2 on the next save. The importer also contains an explicit migration for the documented version 0 pure-JSON prototype and preserves its object IDs and valid history.
+Modeling-only saves use format version 2 and minimum reader version 2. Projects containing `editor.workspace.drawing` use format version 3 and minimum reader version 3, so older readers reject them instead of dropping the drawing. The current reader accepts packaged versions 1, 2, and 3, including version 1 inline display edges. The importer also migrates the documented version 0 pure-JSON prototype and preserves its object IDs and valid history.
+
+Drawing-sheet data has its own version (currently 1). It stores view source IDs and orientation/scale/position, not duplicate meshes. Projected linework is regenerated from the model. Dimension anchors, paper entities, and title-block text are validated before import, including element limits and internal references. Model-space dimensions carry a geometry fingerprint so edits to a source cannot silently reuse stale values. Drawing undo/redo history is session-local; the saved package contains the current sheet state.
 
 The upstream binary edge encoding requires an updated reader even on forks that previously implemented format 2 using JSON edges. Use copies of projects when testing this build against such an older installation.
 

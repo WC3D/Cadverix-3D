@@ -1,0 +1,64 @@
+.toolbar-mode-content.drawing { overflow-x: auto; overflow-y: hidden; scrollbar-width: none; }
+.toolbar-mode-content.drawing::-webkit-scrollbar { display: none; }
+.drawing-toolbar-host { min-width: max-content; height: 100%; }
+.drawing-toolbar { display: flex; height: 100%; min-width: max-content; }
+.drawing-toolbar .toolbar-section-tools { gap: 4px; }
+.drawing-toolbar button,
+.drawing-toolbar select { min-height: 32px; padding: 3px 8px; border: 1px solid var(--border); border-radius: 5px; background: var(--tile); color: var(--foreground); font-size: 12px; white-space: nowrap; }
+.drawing-toolbar button { display: inline-flex; align-items: center; justify-content: center; gap: 4px; cursor: pointer; }
+.drawing-toolbar button:disabled { opacity: .45; cursor: default; }
+.drawing-toolbar button:hover:not(:disabled) { background: var(--panel); }
+.drawing-workspace { display: flex; flex: 1; min-width: 0; min-height: 0; height: 100%; background: var(--background); color: var(--foreground); }
+.drawing-properties { width: 270px; flex: 0 0 270px; padding: 14px; overflow-y: auto; border-right: 1px solid var(--border); background: var(--panel); }
+.drawing-properties h2 { margin: 0 0 14px; font-size: 17px; }
+.drawing-properties h3 { margin: 18px 0 8px; font-size: 14px; text-transform: capitalize; }
+.drawing-field { display: flex; flex-direction: column; gap: 4px; margin-bottom: 10px; font-size: 12px; font-weight: 700; }
+.drawing-field input, .drawing-field select, .drawing-field textarea { width: 100%; min-width: 0; min-height: 34px; padding: 6px 8px; border: 1px solid var(--border); border-radius: 5px; background: var(--tile); color: var(--foreground); font: inherit; }
+.drawing-field textarea { min-height: 64px; resize: vertical; }
+.drawing-checkbox { display: flex; gap: 8px; align-items: center; font-size: 12px; margin: 10px 0; }
+.drawing-help { font-size: 11px; line-height: 1.5; opacity: .8; }
+.drawing-view-list { display: grid; gap: 5px; }
+.drawing-view-list button, .drawing-delete, .drawing-warning button { padding: 8px; border: 1px solid var(--border); border-radius: 5px; color: var(--foreground); background: var(--tile); text-align: left; font-size: 12px; cursor: pointer; }
+.drawing-view-list button[aria-pressed="true"] { border-color: #1684ca; box-shadow: inset 0 0 0 1px #1684ca; }
+.drawing-delete { width: 100%; margin-top: 14px; }
+.drawing-delete:disabled { opacity: .45; }
+.drawing-warning { padding: 8px; margin: 10px 0; border: 1px solid #d79b22; border-radius: 6px; font-size: 12px; line-height: 1.4; }
+.drawing-warning button { margin-top: 6px; }
+.drawing-paper-area { display: flex; flex-direction: column; flex: 1; min-width: 0; min-height: 0; }
+.drawing-zoom { display: flex; align-items: center; gap: 6px; min-height: 42px; padding: 5px 10px; background: var(--panel); border-bottom: 1px solid var(--border); font-size: 12px; }
+.drawing-zoom button { display: grid; place-items: center; min-width: 32px; min-height: 30px; padding: 4px 8px; border-radius: 4px; color: var(--foreground); background: var(--tile); cursor: pointer; }
+.drawing-zoom span { margin-left: auto; }
+.drawing-paper-viewport { flex: 1; min-width: 0; min-height: 0; overflow: auto; overscroll-behavior: contain; background: #75808c; }
+.drawing-paper-canvas { display: flex; justify-content: center; align-items: center; width: max-content; min-width: 100%; min-height: 100%; padding: 24px; }
+.drawing-paper-svg { display: block; flex-shrink: 0; background: white; box-shadow: 0 4px 20px #0004; user-select: none; }
+.drawing-paper-svg [data-drawing-id] { cursor: pointer; }
+.drawing-paper-svg [data-drawing-kind="entity"] { pointer-events: all; }
+.drawing-paper-svg [data-dimension-label] { cursor: move; }
+.drawing-status { min-height: 40px; padding: 8px 12px; font-size: 12px; line-height: 1.4; background: var(--panel); border-top: 1px solid var(--border); }
+.drawing-status button { margin-left: 12px; padding: 3px 8px; border-radius: 4px; color: var(--foreground); background: var(--tile); }
+.drawing-properties-toggle { display: none; }
+
+@media (any-pointer: coarse) {
+  .drawing-toolbar select { font-size: 16px; }
+  .drawing-toolbar button { min-height: 36px; }
+}
+@media (max-width: 760px) {
+  .drawing-workspace { position: relative; flex-direction: column; }
+  .drawing-properties-toggle { display: block; min-height: 36px; padding: 5px 12px; border-bottom: 1px solid var(--border); color: var(--foreground); background: var(--panel); text-align: left; }
+  .drawing-properties { display: none; position: absolute; bottom: 40px; right: 8px; z-index: 25; width: min(320px, calc(100% - 16px)); max-height: 32dvh; box-shadow: 3px 4px 12px #0003; border: 1px solid var(--border); border-radius: 8px; }
+  .drawing-properties.open { display: block; }
+  .drawing-zoom { min-height: 38px; }
+  .drawing-zoom span { font-size: 10px; }
+  .drawing-status { font-size: 11px; }
+}
+
+@media print {
+  body:has(.drawing-workspace), body:has(.drawing-workspace) .cadverix-editor { height: auto !important; min-height: 0 !important; overflow: visible !important; }
+  body:has(.drawing-workspace) * { visibility: hidden; }
+  body:has(.drawing-workspace) :is(.secondary-toolbar, .drawing-properties, .drawing-properties-toggle, .drawing-zoom, .drawing-status) { display: none !important; }
+  body:has(.drawing-workspace) :is(.editor-body, .drawing-workspace, .drawing-paper-area, .drawing-paper-viewport, .drawing-paper-canvas) { position: static !important; display: block !important; height: auto !important; min-height: 0 !important; width: auto !important; min-width: 0 !important; padding: 0 !important; margin: 0 !important; overflow: visible !important; }
+  body:has(.drawing-workspace) .drawing-paper-svg,
+  body:has(.drawing-workspace) .drawing-paper-svg * { visibility: visible; }
+  body:has(.drawing-workspace) .drawing-paper-svg { position: relative; left: 0; top: 0; box-shadow: none; print-color-adjust: exact; -webkit-print-color-adjust: exact; }
+  body:has(.drawing-workspace) [data-drawing-ui] { display: none !important; }
+}

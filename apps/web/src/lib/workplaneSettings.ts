@@ -2,6 +2,7 @@ import type { GridSize, HistoryRetentionLimit, MeasurementAccuracy, ShapeCustomi
 import { normalizeScaleForUnits } from "@/lib/measurementUnits";
 import { defaultThemes, type AppTheme } from "@/lib/themes";
 import { DEFAULT_WORKPLANE_GRID_COLOR } from "@/lib/workplaneGrid";
+import { normalizeDrawingSheet } from "@/lib/drawingSheet";
 
 export const DEFAULT_SNAP_GRID: GridSize = "1.0 mm";
 export const BRICK_SNAP_STEP = 8;
@@ -263,6 +264,7 @@ export function normalizeWorkspaceSettings(value: unknown, fallback: WorkplaneWo
   const fallbackThemeId = VALID_THEME_IDS.has(fallback.themeId ?? "") ? fallback.themeId : "light";
   const themeId = VALID_THEME_IDS.has(candidate.themeId ?? "") ? candidate.themeId : fallbackThemeId;
   const customTheme = themeOrDefault(candidate.customTheme, fallback.customTheme);
+  const drawing = normalizeDrawingSheet(candidate.drawing ?? fallback.drawing);
   return {
     width: numberOrDefault(candidate.width, fallback.width),
     depth: numberOrDefault(candidate.depth, fallback.depth),
@@ -283,6 +285,7 @@ export function normalizeWorkspaceSettings(value: unknown, fallback: WorkplaneWo
     accuracy: accuracyOrDefault(candidate.accuracy, fallback.accuracy),
     historyLimit: historyLimitOrDefault(candidate.historyLimit, fallback.historyLimit),
     shapeCustomizations: normalizeShapeCustomizations(candidate.shapeCustomizations, fallback.shapeCustomizations),
+    ...(drawing ? { drawing } : {}),
   };
 }
 

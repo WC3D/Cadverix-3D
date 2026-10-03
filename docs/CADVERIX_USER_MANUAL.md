@@ -2,6 +2,8 @@
 
 ## Editor reference
 
+For ISO/ANSI technical sheets, model views, and drawing dimensions, open the **Drawing** tab beside Sculpt and see the [Drawing workspace guide](DRAWING_WORKSPACE.md).
+
 Browser-based 3D modeling, 2D sketching, and fabrication export
 
 See the [changelog](CHANGELOG.md) for release-specific additions and fixes.

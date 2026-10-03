@@ -2893,7 +2893,7 @@ export function WorkplaneViewport({
       try {
         window.localStorage.setItem(
           `${WORKSPACE_DEFAULTS_STORAGE_PREFIX}${key}`,
-          JSON.stringify({ workspace: normalizedWorkspace, snap: normalizedSnap }),
+          JSON.stringify({ workspace: { ...normalizedWorkspace, drawing: undefined }, snap: normalizedSnap }),
         );
       } catch {
         // Project persistence below is still attempted if browser storage is unavailable.

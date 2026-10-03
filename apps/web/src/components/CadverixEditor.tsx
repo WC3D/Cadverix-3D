@@ -63,6 +63,7 @@ import {
   ToolbarWorkplaneIcon,
 } from "./icons";
 import { WorkplaneViewport } from "./WorkplaneViewport";
+import { DrawingWorkspace } from "./DrawingWorkspace";
 import { SketchWorkspace, type SketchCircleDraft, type SketchMeasurement, type SketchPolygonDraft, type SketchPrimitive, type SketchRectDraft, type SketchSelection, type SketchTextDraft, type SketchTool } from "./SketchWorkspace";
 import { EdgeModifierPanel } from "./workplane/EdgeModifierPanel";
 import { SceneOverviewSidebar } from "./workplane/SceneOverviewSidebar";
@@ -194,7 +195,7 @@ type ExportFormat = "stl" | "3mf" | "obj" | "step" | "svg" | "skf";
 type DirectExportFormat = Exclude<ExportFormat, "step" | "skf">;
 type SkfHistoryLimit = EditorHistoryExportLimit;
 type SkfExportTarget = "download" | "shared";
-type ToolbarMode = "geometry" | "sketch" | "sculpt";
+type ToolbarMode = "geometry" | "sketch" | "sculpt" | "drawing";
 type SketchCommandKind = "sweep" | "project" | "offset" | "mirror" | "rectangular-pattern" | "circular-pattern";
 type SketchOffsetCommandOptions = { distance: number; includeConnected: boolean };
 type SketchProjectCommandOptions = { sourceShapeId: string; linked: boolean };
@@ -6281,6 +6282,8 @@ export function CadverixEditor({
   const interactionHistoryTimerRef = useRef<number | null>(null);
   const [projectInteractionActive, setProjectInteractionActive] = useState(false);
   const [toolbarMode, setToolbarMode] = useState<ToolbarMode>("geometry");
+  const [drawingOpened, setDrawingOpened] = useState(false);
+  const [drawingToolbarHost, setDrawingToolbarHost] = useState<HTMLDivElement | null>(null);
   const [sketchActive, setSketchActive] = useState(false);
   const [activeSketchWorkplane, setActiveSketchWorkplane] = useState<PlacementWorkplane>(
     () => normalizePlacementWorkplane(initialPlacementWorkplane, initialPlacementElevation),
@@ -10817,6 +10820,7 @@ export function CadverixEditor({
     };
 
     const handleKeyDown = (event: KeyboardEvent) => {
+      if (toolbarMode === "drawing") return;
       if (isTypingTarget(event.target)) {
         keyboardMovement.finish();
         return;
@@ -11016,10 +11020,16 @@ export function CadverixEditor({
     <div className="cadverix-editor" style={themeStyles}>
       <SecondaryToolbar
         toolbarMode={toolbarMode}
+        drawingToolbarRef={setDrawingToolbarHost}
         projectName={projectName}
         onProjectNameChange={onProjectNameChange}
         showProjectNameInToolbar={showProjectNameInToolbar}
         onToolbarModeChange={(mode) => {
+          if (mode === "drawing") {
+            if (sketchActive) { setNotice("Finish or cancel the current sketch before opening Drawing"); return; }
+            if (edgeModifier) cancelEdgeModifier();
+            setDrawingOpened(true);
+          }
           if (splitSession) cancelSplit();
           if (mode !== "sculpt") setSculptSession(null);
           setToolbarMode(mode);
@@ -11116,7 +11126,7 @@ export function CadverixEditor({
         }}
       />
       <div className="editor-body">
-        <SceneOverviewSidebar
+        {toolbarMode !== "drawing" ? <SceneOverviewSidebar
           shapes={shapes}
           selectedIds={selectedIds}
           actionsDisabled={Boolean(splitSession || edgeModifier || projectInteractionActive || sketchActive)}
@@ -11131,8 +11141,32 @@ export function CadverixEditor({
           shapeInspectorCollapsed={shapeInspectorCollapsed && selectedShapes.length === 1}
           shapeInspectorName={selectedShapes.length === 1 ? selectedShape?.name ?? null : null}
           onShapeInspectorExpand={() => setShapeInspectorCollapsed(false)}
-        />
-        {toolbarMode === "sketch" && sketchActive ? (
+        /> : null}
+        {drawingOpened ? <DrawingWorkspace
+          key={projectId ?? "local-drawing"}
+          active={toolbarMode === "drawing"}
+          value={workspaceSettings.drawing}
+          projectName={projectName}
+          shapes={shapes}
+          selectedIds={selectedIds}
+          getMesh={meshForShape}
+          toolbarHost={drawingToolbarHost}
+          onHome={onHome}
+          onChange={(drawing) => {
+            updateProjectWorkspaceSettings({ workspace: { ...workspaceSettingsRef.current, drawing }, snap: snapGridRef.current });
+            syncProjectShapes(shapesRef.current, true);
+          }}
+          onExportSvg={async (svg) => {
+            const result = await downloadTextFile(projectExportFileName(`${projectName} Drawing`, "svg"), svg, "image/svg+xml;charset=utf-8");
+            setNotice(result.mode === "folder" ? `Drawing saved to ${result.path}` : "Drawing SVG exported");
+          }}
+          onSaveProject={(drawing) => {
+            updateProjectWorkspaceSettings({ workspace: { ...workspaceSettingsRef.current, drawing }, snap: snapGridRef.current });
+            syncProjectShapes(shapesRef.current, true);
+            void exportSkfDesign(projectName, "unlimited");
+          }}
+        /> : null}
+        {toolbarMode === "drawing" ? null : toolbarMode === "sketch" && sketchActive ? (
           <>
             <SketchWorkspace
             profile={sketchProfile}
@@ -11757,6 +11791,7 @@ const sketchShapeMenuItems = [
 
 function SecondaryToolbar({
   toolbarMode,
+  drawingToolbarRef,
   projectName,
   onProjectNameChange,
   showProjectNameInToolbar,
@@ -11837,6 +11872,7 @@ function SecondaryToolbar({
   onAddShape,
 }: {
   toolbarMode: ToolbarMode;
+  drawingToolbarRef: (element: HTMLDivElement | null) => void;
   projectName: string;
   onProjectNameChange?: (name: string) => void;
   showProjectNameInToolbar: boolean;
@@ -12166,7 +12202,7 @@ function SecondaryToolbar({
   return (
     <div className="secondary-toolbar">
       <div className={`toolbar-mode-content ${toolbarMode}`}>
-        {toolbarMode === "geometry" ? (
+        {toolbarMode === "drawing" ? <div className="drawing-toolbar-host" ref={drawingToolbarRef} /> : toolbarMode === "geometry" ? (
           <>
       {onHome ? (
         <div className="tool-group editor-nav-group">
@@ -12618,6 +12654,17 @@ function SecondaryToolbar({
             onClick={() => selectToolbarMode("sculpt")}
           >
             Sculpt
+          </button>
+          <button
+            className={toolbarMode === "drawing" ? "active" : ""}
+            type="button"
+            role="tab"
+            aria-selected={toolbarMode === "drawing"}
+            disabled={sketchActive}
+            title={sketchActive ? "Finish or cancel the sketch before opening Drawing" : "Create a 2D CAD drawing sheet"}
+            onClick={() => selectToolbarMode("drawing")}
+          >
+            Drawing
           </button>
         </div>
         {showProjectNameInToolbar ? (

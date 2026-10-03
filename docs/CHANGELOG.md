@@ -2,6 +2,9 @@
 
 ## Unreleased
 
+- Added a **Drawing** tab beside Sculpt for 2D CAD sheets: ISO A0–A4 and ANSI A–E paper templates, title blocks, first-/third-angle layouts, draggable model views, custom rotations, scale, hidden edges, and independent drawing history.
+- Added paper lines, rectangles, circles and notes, plus horizontal, vertical, aligned, angular, radius and diameter dimensions. Source-geometry changes flag model measurements for review instead of silently retaining outdated values.
+- Added physical-size SVG and Print/PDF output and project autosave for drawings. Drawing projects use SKF format/minimum reader 3; modeling-only projects remain format 2 and older files remain readable.
 - Added color-coded toolbar group outlines and wide Shapes and Generators palettes, with generator entries appearing only in Generators. Palettes adapt between three, two, and one column, stay inside the viewport, and keep their title/close control visible while scrolling. Bent Tube now has a dedicated curved-tube menu icon.
 - Fixed Honeycomb and Bent Tube previews retaining stale geometry after parameter edits. The viewport's shared geometry cache now includes the complete parametric input set, with rendered-image regressions for immediate updates, undo/redo, autosave, and reload in Chromium and WebKit.
 - Redesigned the Cadverix 3D logo with a C3D monogram, isometric cube, drafting pencil, sketch curve, and measurement/grid details; added dedicated Apple touch and PNG favicon assets.
