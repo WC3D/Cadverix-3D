@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- Removed vulnerable transitive `braces` and `http-cache-semantics` dependencies by replacing `patch-package` with a dependency-free compatibility installer and using `@electron/get` 5.1.0 for electron-builder on Node 24.
 - Added a **Drawing** tab beside Sculpt for 2D CAD sheets: ISO A0–A4 and ANSI A–E paper templates, title blocks, first-/third-angle layouts, draggable model views, custom rotations, scale, hidden edges, and independent drawing history.
 - Added paper lines, rectangles, circles and notes, plus horizontal, vertical, aligned, angular, radius and diameter dimensions. Source-geometry changes flag model measurements for review instead of silently retaining outdated values.
 - Added physical-size SVG and Print/PDF output and project autosave for drawings. Drawing projects use SKF format/minimum reader 3; modeling-only projects remain format 2 and older files remain readable.
