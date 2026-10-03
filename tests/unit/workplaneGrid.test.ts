@@ -34,12 +34,12 @@ describe("workplane grid geometry", () => {
     expect(palette.minor.color).not.toBe(palette.major.color);
   });
 
-  it("uses a complete dark viewport palette without changing the configured project background", () => {
+  it("honors the configured background in both dark and light viewport palettes", () => {
     const configuredBackground = "#f8fbfc";
     const dark = workplaneThemePalette("dark", configuredBackground);
     const light = workplaneThemePalette("light", configuredBackground);
 
-    expect(dark.sceneBackground).not.toBe(configuredBackground);
+    expect(dark.sceneBackground).toBe(configuredBackground);
     expect(dark.surface.color).not.toBe(light.surface.color);
     expect(dark.grid.minor.color).not.toBe(light.grid.minor.color);
     expect(light.sceneBackground).toBe(configuredBackground);

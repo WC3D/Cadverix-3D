@@ -63,8 +63,11 @@ describe("workplane settings helpers", () => {
     expect(normalizeWorkspaceSettings({ historyLimit: "invalid" }).historyLimit).toBe(100);
     expect(normalizeWorkspaceSettings({ gridColor: "not-a-color" }).gridColor).toBe(DEFAULT_WORKPLANE_WORKSPACE.gridColor);
     expect(normalizeWorkspaceSettings({ themeId: "sketchforge" }).themeId).toBe("sketchforge");
-    expect(normalizeWorkspaceSettings({ themeId: "dark" }).themeId).toBe("light");
-    expect(normalizeWorkspaceSettings({ themeId: "dark" }, { ...fallback, themeId: "dark" }).themeId).toBe("light");
+    expect(normalizeWorkspaceSettings({}).themeId).toBe("sketchforge");
+    expect(normalizeWorkspaceSettings({}).background).toBe("#101820");
+    expect(normalizeWorkspaceSettings({ themeId: "light", background: "#abcdef" })).toMatchObject({ themeId: "light", background: "#abcdef" });
+    expect(normalizeWorkspaceSettings({ themeId: "dark" }).themeId).toBe("sketchforge");
+    expect(normalizeWorkspaceSettings({ themeId: "dark" }, { ...fallback, themeId: "dark" }).themeId).toBe("sketchforge");
     expect(normalizeWorkspaceSettings({ themeId: "unknown" }).themeId).toBe(DEFAULT_WORKPLANE_WORKSPACE.themeId);
   });
 

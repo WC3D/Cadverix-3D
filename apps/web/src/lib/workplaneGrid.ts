@@ -119,7 +119,7 @@ export function workplaneThemePalette(
 ): WorkplaneThemePalette {
   return theme === "dark"
     ? {
-        sceneBackground: "#101820",
+        sceneBackground: configuredBackground,
         surface: { color: "#183640", opacity: 0.9 },
         grid: workplaneGridPalette("dark", configuredGridColor),
       }

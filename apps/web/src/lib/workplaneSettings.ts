@@ -21,8 +21,8 @@ export const DEFAULT_WORKPLANE_WORKSPACE: WorkplaneWorkspaceSettings = {
   gridBlockSize: 5,
   gridBlockPreset: "5 mm",
   gridColor: DEFAULT_WORKPLANE_GRID_COLOR,
-  background: "#f8fbfc",
-  themeId: "light",
+  background: defaultThemes.sketchforge.viewport.background,
+  themeId: "sketchforge",
   showShadows: true,
   showGrid: true,
   cruiseShapes: true,
@@ -261,7 +261,7 @@ export function keyboardNudgeStep(size: GridSize, coarse: boolean) {
 export function normalizeWorkspaceSettings(value: unknown, fallback: WorkplaneWorkspaceSettings = DEFAULT_WORKPLANE_WORKSPACE): WorkplaneWorkspaceSettings {
   const candidate = value && typeof value === "object" ? (value as Partial<WorkplaneWorkspaceSettings>) : {};
   const units = stringOrDefault(candidate.units, fallback.units);
-  const fallbackThemeId = VALID_THEME_IDS.has(fallback.themeId ?? "") ? fallback.themeId : "light";
+  const fallbackThemeId = VALID_THEME_IDS.has(fallback.themeId ?? "") ? fallback.themeId : "sketchforge";
   const themeId = VALID_THEME_IDS.has(candidate.themeId ?? "") ? candidate.themeId : fallbackThemeId;
   const customTheme = themeOrDefault(candidate.customTheme, fallback.customTheme);
   const drawing = normalizeDrawingSheet(candidate.drawing ?? fallback.drawing);

@@ -6228,7 +6228,7 @@ export function CadverixEditor({
     if (workspaceSettings.themeId === "custom" && workspaceSettings.customTheme) {
       return customThemeWithDefaults(workspaceSettings.customTheme);
     }
-    return defaultThemes[workspaceSettings.themeId || "light"] || defaultThemes.light;
+    return defaultThemes[workspaceSettings.themeId || "sketchforge"] || defaultThemes.sketchforge;
   }, [workspaceSettings.themeId, workspaceSettings.customTheme]);
 
   useEffect(() => {
@@ -6251,7 +6251,7 @@ export function CadverixEditor({
       window.localStorage.setItem(
         "sketchForge.defaultTheme",
         JSON.stringify({
-          themeId: workspaceSettings.themeId || "light",
+          themeId: workspaceSettings.themeId || "sketchforge",
           customTheme: workspaceSettings.customTheme || null,
         })
       );
@@ -12958,7 +12958,7 @@ function TopActionPanel({
             <label htmlFor="theme-select" style={{ fontSize: "14px", fontWeight: 600 }}>Theme preset:</label>
             <select
               id="theme-select"
-              value={workspace.themeId || "light"}
+              value={workspace.themeId || "sketchforge"}
               onChange={(event) => {
                 const themeId = event.currentTarget.value;
                 onWorkspaceChange({ ...workspace, themeId });

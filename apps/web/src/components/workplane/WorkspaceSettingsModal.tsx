@@ -359,7 +359,7 @@ export function WorkspaceSettingsModal({
                   <div className="workspace-row">
                     <span>Theme preset</span>
                     <select
-                      value={workspace.themeId || "light"}
+                      value={workspace.themeId || "sketchforge"}
                       onChange={(event) => {
                         const themeId = event.currentTarget.value;
                         patchWorkspace({ themeId });
