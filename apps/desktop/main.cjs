@@ -81,7 +81,7 @@ async function startPackagedWebServer() {
       PORT: String(port),
       CADVERIX_DESKTOP: "1",
       CADVERIX_DESKTOP_VERSION: app.getVersion(),
-      CADVERIX_SHARED_PROJECTS_DIR: "",
+      CADVERIX_SHARED_PROJECTS_DIR: process.env.CADVERIX_DESKTOP_PROJECTS_DIR || path.join(app.getPath("userData"), "projects"),
       NEXT_TELEMETRY_DISABLED: "1",
     },
   });

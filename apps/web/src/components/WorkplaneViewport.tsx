@@ -42,7 +42,7 @@ import { createSpringGeometry } from "@/lib/springGeometry";
 import { createHoneycombGeometry } from "@/lib/honeycombGeometry";
 import { createBentTubeGeometry } from "@/lib/bentTubeGeometry";
 import { parametricShapeGeometryFields } from "@/lib/parametricShapeGeometry";
-import { parseMeasurementInput } from "@/lib/measurementUnits";
+import { parseMeasurementInput, formatLengthForWorkspace, displayToMillimeters } from "@/lib/measurementUnits";
 import type { ModelSplitPlane } from "@/lib/modelSplit";
 import type { SculptBrushSettings, SculptPoint } from "@/lib/sculptBrush";
 import { SculptStroke } from "@/lib/sculptStroke";
@@ -237,6 +237,8 @@ type WorkplaneViewportProps = {
   splitPlane: ModelSplitPlane | null;
   placementWorkplane: PlacementWorkplane;
   workplaneMode: boolean;
+  faceTool?: "flat" | "pivot" | null;
+  facePivot?: THREE.Vector3 | null;
   theme?: AppTheme;
   externalWorkspace?: WorkplaneWorkspaceSettings;
   initialSnap?: GridSize;
@@ -255,6 +257,7 @@ type WorkplaneViewportProps = {
   onSelectShape: (id: string | string[] | null, mode?: "replace" | "toggle") => void;
   onCreateFaceConstructionPlane: (input: { sourceShapeId: string; origin: [number, number, number]; normal: [number, number, number]; preferredXAxis: [number, number, number] }) => void;
   onSetPlacementWorkplane: (workplane: PlacementWorkplane, source: "shape" | "base") => void;
+  onPickWorkplanePoint?: (point: { x: number; y: number; z: number }) => void;
   onToggleWorkplaneTool: () => void;
   onInteractionActiveChange?: (active: boolean) => void;
   onEditSketch?: () => void;
@@ -326,6 +329,7 @@ type ShapeRenderRecord = {
 };
 
 type ThreeState = {
+  measurementWorkspace?: WorkplaneWorkspaceSettings;
   renderer: THREE.WebGLRenderer;
   scene: THREE.Scene;
   camera: THREE.PerspectiveCamera | THREE.OrthographicCamera;
@@ -816,6 +820,7 @@ function syncMoveDimensionOverlay(
       })
     : null;
   const next = projected && session ? { ...projected, active: session.active } : null;
+  if (next && state.measurementWorkspace) next.lines = next.lines.map((line) => ({ ...line, label: formatLengthForWorkspace(line.value, state.measurementWorkspace!) }));
   if (JSON.stringify(overlayRef.current) === JSON.stringify(next)) {
     return;
   }
@@ -1586,7 +1591,7 @@ function syncRulerOverlay(
         screenPoints: segment.edge && worldPoints.length >= 2 ? rulerScreenPointList(worldPoints, state) : undefined,
         labelX: labelScreen.x,
         labelY: labelScreen.y - 18,
-        label: formatMeasure(rulerPolylineLength(worldPoints), accuracy),
+        label: formatMeasure(rulerPolylineLength(worldPoints), accuracy, state.measurementWorkspace),
       },
     ];
   });
@@ -2544,6 +2549,8 @@ export function WorkplaneViewport({
   splitPlane,
   placementWorkplane,
   workplaneMode,
+  faceTool,
+  facePivot,
   theme = defaultThemes.light,
   externalWorkspace,
   initialSnap,
@@ -2562,6 +2569,7 @@ export function WorkplaneViewport({
   onSelectShape,
   onCreateFaceConstructionPlane,
   onSetPlacementWorkplane,
+  onPickWorkplanePoint,
   onToggleWorkplaneTool,
   onInteractionActiveChange,
   onEditSketch,
@@ -2599,6 +2607,7 @@ export function WorkplaneViewport({
   const [rotationWheelAxis, setRotationWheelAxis] = useState<RotationAxis>("y");
   const [pinnedRotationWheelView, setPinnedRotationWheelView] = useState<PinnedRotationWheelView | null>(null);
   const [editingDimension, setEditingDimension] = useState<EditingDimension>(null);
+  const dimensionInitialTextRef = useRef("");
   const [editingRotation, setEditingRotation] = useState<EditingRotation>(null);
   const [rulerMode, setRulerMode] = useState(false);
   const [rulerDeleteMode, setRulerDeleteMode] = useState(false);
@@ -2675,6 +2684,9 @@ export function WorkplaneViewport({
   const selectedIdsKeyRef = useRef(interactiveSelectedIds.join("|"));
   const placementWorkplaneRef = useRef(placementWorkplane);
   const workplaneModeRef = useRef(workplaneMode);
+  const faceToolRef = useRef(faceTool); faceToolRef.current = faceTool;
+  const facePivotRef = useRef(facePivot); facePivotRef.current = facePivot;
+  const onPickWorkplanePointRef = useRef(onPickWorkplanePoint); onPickWorkplanePointRef.current = onPickWorkplanePoint;
   placementWorkplaneRef.current = placementWorkplane;
   workplaneModeRef.current = workplaneMode;
   splitActiveRef.current = splitActive;
@@ -2771,7 +2783,7 @@ export function WorkplaneViewport({
   const commitMoveDimension = useCallback(
     (axis: MoveDimensionAxis, rawValue: string) => {
       const session = moveDimensionSessionRef.current;
-      const value = parseMeasurementInput(rawValue);
+      const value = displayToMillimeters(parseMeasurementInput(rawValue), workspaceRef.current);
       if (!session || !Number.isFinite(value)) {
         return;
       }
@@ -3763,7 +3775,7 @@ export function WorkplaneViewport({
       const localClientX = rect ? event.clientX - rect.left : event.clientX;
       const localClientY = rect ? event.clientY - rect.top : event.clientY;
       const axisVector = rotationAxisVectorForFrame(handleKey, frame);
-      const pivot = frame.center.clone();
+      const pivot = facePivotRef.current?.clone() ?? frame.center.clone();
       const rotationCenter = kind === "rotate" ? wheel ?? (state ? projectToScreen(pivot, state) : { x: localClientX, y: localClientY }) : undefined;
       const rotationStartPoint = kind === "rotate" && state ? rayPointOnRotationPlane(state, event.clientX, event.clientY, rotationPlaneCenter, axisVector) : null;
       const rotationStartVector = rotationStartPoint ? rotationStartPoint.sub(rotationPlaneCenter) : undefined;
@@ -3867,7 +3879,7 @@ export function WorkplaneViewport({
         setRotationReadout({
           x: event.clientX - renderRect.left + 22,
           y: event.clientY - renderRect.top - 34,
-          text: formatMeasure(liftStartValue ?? 0, workspaceRef.current.accuracy),
+          text: formatLengthForWorkspace(liftStartValue ?? 0, workspaceRef.current),
         });
       } else {
         setRotationReadout(null);
@@ -4017,7 +4029,7 @@ export function WorkplaneViewport({
           setRotationReadout({
             x: readoutPoint.x + 28,
             y: readoutPoint.y - 30,
-            text: formatMeasure((transform.liftStartValue ?? 0) + delta, workspaceRef.current.accuracy),
+            text: formatLengthForWorkspace((transform.liftStartValue ?? 0) + delta, workspaceRef.current),
           });
         }
         return true;
@@ -4119,11 +4131,11 @@ export function WorkplaneViewport({
       transform.items.forEach((item) => {
         const nextQuaternion = rotationDelta.clone().multiply(item.startQuaternion);
         const patch: Partial<WorkplaneShape> = rotationPatchFromQuaternion(nextQuaternion);
-        if (transform.items.length > 1) {
+        if (transform.items.length > 1 || facePivotRef.current) {
           const nextCenter = pivot.clone().add(item.startCenter.clone().sub(pivot).applyQuaternion(rotationDelta));
-          patch.x = snapPositionValue(nextCenter.x, step, -workspaceRef.current.width / 2 + 6, workspaceRef.current.width / 2 - 6);
-          patch.z = snapPositionValue(nextCenter.z, step, -workspaceRef.current.depth / 2 + 6, workspaceRef.current.depth / 2 - 6);
-          patch.elevation = snapPositionValue(nextCenter.y - item.startShape.height / 2, step, MIN_ELEVATION, MAX_ELEVATION);
+          patch.x = facePivotRef.current ? nextCenter.x : snapPositionValue(nextCenter.x, step, -workspaceRef.current.width / 2 + 6, workspaceRef.current.width / 2 - 6);
+          patch.z = facePivotRef.current ? nextCenter.z : snapPositionValue(nextCenter.z, step, -workspaceRef.current.depth / 2 + 6, workspaceRef.current.depth / 2 - 6);
+          patch.elevation = facePivotRef.current ? nextCenter.y - item.startShape.height / 2 : snapPositionValue(nextCenter.y - item.startShape.height / 2, step, MIN_ELEVATION, MAX_ELEVATION);
         }
         onUpdateShape(item.id, patch);
       });
@@ -4181,6 +4193,7 @@ export function WorkplaneViewport({
       rememberResizeAnchor(id, mark.axis === "height" ? "height" : "scale", mark.handleKey);
     }
     setPinnedMeasureKey(mark.handleKey);
+    dimensionInitialTextRef.current = mark.label;
     setEditingDimension({ key: mark.key, axis: mark.axis, x: mark.labelX, y: mark.labelY, value: mark.label });
   }, [rememberResizeAnchor]);
 
@@ -4203,12 +4216,13 @@ export function WorkplaneViewport({
     setPinnedMeasureKey(elevationMark?.handleKey ?? handleKey);
     setActiveRotationWheel(false);
     setRotationReadout(null);
+    dimensionInitialTextRef.current = formatLengthForWorkspace(elevation, workspaceRef.current);
     setEditingDimension({
       key: "elevation",
       axis: "elevation",
       x: clamp(editX, 44, Math.max(44, (transformOverlayRef.current?.width ?? 900) - 44)),
       y: clamp(editY, 34, Math.max(34, (transformOverlayRef.current?.height ?? 600) - 34)),
-      value: formatMeasure(elevation, workspaceRef.current.accuracy),
+      value: formatLengthForWorkspace(elevation, workspaceRef.current),
     });
   }, []);
 
@@ -4220,7 +4234,8 @@ export function WorkplaneViewport({
       setEditingDimension(null);
       return;
     }
-    const value = parseMeasurementInput(edit.value);
+    if (edit.value === dimensionInitialTextRef.current) { setEditingDimension(null); return; }
+    const value = displayToMillimeters(parseMeasurementInput(edit.value), workspaceRef.current);
     if (edit.axis === "elevation") {
       if (Number.isFinite(value)) {
         const activeWorkplane = placementWorkplaneRef.current;
@@ -4550,7 +4565,7 @@ export function WorkplaneViewport({
         const shape = typeof shapeId === "string"
           ? shapesRef.current.find((candidate) => candidate.id === shapeId)
           : null;
-        return Boolean(entry.object instanceof THREE.Mesh && entry.face && shape && shape.kind !== "constructionPlane");
+        return Boolean(entry.object instanceof THREE.Mesh && entry.face && shape && shape.kind !== "constructionPlane" && (!faceToolRef.current || selectedIdsRef.current.includes(shape.id)));
       });
     if (!hit?.face) return null;
 
@@ -4589,8 +4604,22 @@ export function WorkplaneViewport({
       tangent.negate();
     }
 
+    const pickedOrigin = hit.point.clone();
+    if (faceToolRef.current === "pivot") {
+      const geometryIndex = surface.geometry.index;
+      const count = geometryIndex?.count ?? position.count;
+      const sum = new THREE.Vector3(); let totalArea = 0; let coplanarCount = 0;
+      for (let i = 0; i + 2 < count; i += 3) {
+        const vertices = [0, 1, 2].map((offset) => new THREE.Vector3().fromBufferAttribute(position, geometryIndex?.getX(i + offset) ?? i + offset).applyMatrix4(surface.matrixWorld));
+        const cross = vertices[1].clone().sub(vertices[0]).cross(vertices[2].clone().sub(vertices[0]));
+        const area = cross.length();
+        if (area < 1e-12 || cross.normalize().dot(normal) < 0.999999 || Math.abs(vertices[0].clone().sub(hit.point).dot(normal)) > 1e-5) continue;
+        sum.add(vertices[0].add(vertices[1]).add(vertices[2]).multiplyScalar(area / 3)); totalArea += area; coplanarCount++;
+      }
+      if (totalArea > 0 && coplanarCount > 1) pickedOrigin.copy(sum.divideScalar(totalArea));
+    }
     const workplane = placementWorkplaneFromSurface(
-      { x: hit.point.x, y: hit.point.y, z: hit.point.z },
+      { x: pickedOrigin.x, y: pickedOrigin.y, z: pickedOrigin.z },
       { x: normal.x, y: normal.y, z: normal.z },
       { x: tangent.x, y: tangent.y, z: tangent.z },
       reverse,
@@ -4598,7 +4627,7 @@ export function WorkplaneViewport({
 
     return {
       shapeId,
-      workplane: snapPlacementWorkplaneOrigin(workplane, snapStep(snapRef.current)),
+      workplane: faceToolRef.current ? workplane : snapPlacementWorkplaneOrigin(workplane, snapStep(snapRef.current)),
       constructionPlane: {
         sourceShapeId: shapeId,
         origin: [hit.point.x, hit.point.y, hit.point.z] as [number, number, number],
@@ -4712,6 +4741,11 @@ export function WorkplaneViewport({
       if (workplaneModeRef.current) {
         event.preventDefault();
         syncWorkplaneHoverPreview(state, null, workspaceRef.current, resolvedThemeRef.current);
+        if (onPickWorkplanePointRef.current) {
+          const point = toPlacementWorkplanePoint(event.clientX, event.clientY);
+          if (point) { onPickWorkplanePointRef.current(point); onWorkplaneModeChange(false); }
+          return;
+        }
         const surface = pickPlacementSurface(event.clientX, event.clientY, event.shiftKey);
         if (surface) {
           onSetPlacementWorkplane(surface.workplane, "shape");
@@ -4753,7 +4787,7 @@ export function WorkplaneViewport({
         const localClientX = event.clientX - rect.left;
         const localClientY = event.clientY - rect.top;
         const axisVector = rotationAxisVectorForFrame(handle.handleKey, frame);
-        const pivot = frame.center.clone();
+        const pivot = facePivotRef.current?.clone() ?? frame.center.clone();
         const rotationCenter = handle.kind === "rotate" ? wheel ?? projectToScreen(pivot, state) : undefined;
         const rotationStartPoint = handle.kind === "rotate" ? rayPointOnRotationPlane(state, event.clientX, event.clientY, rotationPlaneCenter, axisVector) : null;
         const rotationStartVector = rotationStartPoint ? rotationStartPoint.sub(rotationPlaneCenter) : undefined;
@@ -4844,7 +4878,7 @@ export function WorkplaneViewport({
           setRotationReadout({
             x: event.clientX - rect.left + 22,
             y: event.clientY - rect.top - 34,
-            text: formatMeasure(liftStartValue ?? 0, workspaceRef.current.accuracy),
+            text: formatLengthForWorkspace(liftStartValue ?? 0, workspaceRef.current),
           });
         } else {
           setRotationReadout(null);
@@ -5015,6 +5049,10 @@ export function WorkplaneViewport({
         return;
       }
       if (workplaneModeRef.current) {
+        if (onPickWorkplanePointRef.current) {
+          syncWorkplaneHoverPreview(threeRef.current, null, workspaceRef.current, resolvedThemeRef.current);
+          return;
+        }
         const surface = pickPlacementSurface(event.clientX, event.clientY, event.shiftKey);
         let preview = surface?.workplane ?? null;
         if (!preview) {
@@ -6314,6 +6352,7 @@ function rebuildWorkplane(
   }
 
   const palette = workplaneThemePalette(theme, workspace.background, workspace.gridColor);
+  state.measurementWorkspace = workspace;
   disposeChildren(state.workplaneLayer);
   state.scene.background = new THREE.Color(palette.sceneBackground);
   state.renderer.shadowMap.enabled = workspace.showShadows;
@@ -7100,7 +7139,8 @@ function setSelectionHelpersVisible(state: ThreeState | null, visible: boolean) 
   state.needsRender = true;
 }
 
-function formatMeasure(value: number, accuracy: MeasurementAccuracy = DEFAULT_WORKSPACE.accuracy) {
+function formatMeasure(value: number, accuracy: MeasurementAccuracy = DEFAULT_WORKSPACE.accuracy, workspace?: WorkplaneWorkspaceSettings) {
+  if (workspace) return formatLengthForWorkspace(value, workspace);
   const zeroThreshold = 0.5 * 10 ** -accuracy;
   return cleanNearZero(value, zeroThreshold).toFixed(accuracy);
 }
@@ -7328,9 +7368,9 @@ function syncTransformOverlay(
   );
   const liftHandleAngle = liftTargetAngle - (showLowerHandles ? 90 : -90);
   const centerPoint = project(frame.center);
-  const widthLabel = formatMeasure(frame.width, accuracy);
-  const depthLabel = formatMeasure(frame.depth, accuracy);
-  const heightLabel = formatMeasure(frame.height, accuracy);
+  const widthLabel = formatMeasure(frame.width, accuracy, state.measurementWorkspace);
+  const depthLabel = formatMeasure(frame.depth, accuracy, state.measurementWorkspace);
+  const heightLabel = formatMeasure(frame.height, accuracy, state.measurementWorkspace);
   const nearOut = zFootAxis;
   const farOut = zFootAxis.clone().multiplyScalar(-1);
   const rightOut = xFootAxis;
@@ -7338,7 +7378,7 @@ function syncTransformOverlay(
   const heightHandleKey = showLowerHandles ? "bottom-height" : "top-height";
   const liftHandleKey = showLowerHandles ? "lower-shape" : "lift-shape";
   const workplaneAnchor = framePoint(frame, 0, workplaneY, 0);
-  const liftLabel = formatMeasure(footprintY - workplaneY, accuracy);
+  const liftLabel = formatMeasure(footprintY - workplaneY, accuracy, state.measurementWorkspace);
   const makeFootprintDimensionMark = (handleKey: string, axis: "width" | "depth") => {
     if (axis === "width") {
       const useFarSide = handleKey.includes("far") || handleKey.includes("left");

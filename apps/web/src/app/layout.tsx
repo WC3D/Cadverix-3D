@@ -3,6 +3,7 @@ import "./globals.css";
 import "./mobile.css";
 import "./toolbar.css";
 import "./drawing.css";
+import "./modeling.css";
 
 export const viewport: Viewport = { width: "device-width", initialScale: 1, viewportFit: "cover", interactiveWidget: "resizes-content" };
 

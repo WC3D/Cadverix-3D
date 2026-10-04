@@ -6,7 +6,7 @@ import { SnapGridControl } from "@/components/workplane/ShapeInspector";
 import { SketchRevolvePreview } from "@/components/SketchRevolvePreview";
 import { TouchControls } from "@/components/TouchControls";
 import { useTouchNavigation } from "@/components/useTouchNavigation";
-import { parseMeasurementInput } from "@/lib/measurementUnits";
+import { parseMeasurementInput, formatLengthForWorkspace, displayToMillimeters } from "@/lib/measurementUnits";
 import { WORKPLANE_MAJOR_GRID_INTERVAL } from "@/lib/workplaneGrid";
 import { closestPointOnSketchSegment, type SketchSegmentPlacement } from "@/lib/sketchPointRefinement";
 import { isSketchPanGesture } from "@/lib/sketchPointerControls";
@@ -52,6 +52,7 @@ export type SketchSelection =
 export type SketchMeasurement = { start: SketchPoint; end: SketchPoint } | null;
 
 type SketchWorkspaceProps = {
+  onCorner: (id: string, kind: "fillet" | "chamfer", amount: number) => void;
   profile: SketchProfile;
   operation?: SketchOperation;
   selectedRegionIds: readonly string[];
@@ -513,6 +514,7 @@ function importedMeshFootprint(shape: WorkplaneShape): SketchReferenceFootprint 
 }
 
 export function SketchWorkspace({
+  onCorner,
   profile,
   operation = "extrude",
   selectedRegionIds,
@@ -561,6 +563,8 @@ export function SketchWorkspace({
   onTextSubmit,
   onTextCancel,
 }: SketchWorkspaceProps) {
+  const [cornerAmount, setCornerAmount] = useState(2);
+  const formatDimension = (value: number, _accuracy: number) => formatLengthForWorkspace(value, workspace);
   const workspace = useMemo(() => normalizeWorkspaceSettings(initialWorkspace, DEFAULT_WORKPLANE_WORKSPACE), [initialWorkspace]);
   const [snap, setSnap] = useState<GridSize>(() => normalizeSnapGrid(initialSnap, DEFAULT_SNAP_GRID));
   const [snapOpen, setSnapOpen] = useState(false);
@@ -1928,6 +1932,7 @@ export function SketchWorkspace({
         <SketchSegmentInspector
           key={selectedSegment.id}
           segment={selectedSegment}
+          workspace={workspace}
           length={segmentDimension(selectedSegment, pointById)?.length ?? 0}
           accuracy={workspace.accuracy}
           horizontal={horizontalSegmentIds.has(selectedSegment.id)}
@@ -1944,6 +1949,8 @@ export function SketchWorkspace({
           <button type="button" title="Make corner" onClick={() => onSetPointMode(selectedPoint.id, "corner")}><CornerDownRight /><span>Corner</span></button>
           <button type="button" title="Make smooth" onClick={() => onSetPointMode(selectedPoint.id, "smooth")}><Waves /><span>Smooth</span></button>
           <button type="button" title="Split handles" onClick={() => onSetPointMode(selectedPoint.id, "split")}><Split /><span>Split</span></button>
+          <label>Corner mm<input type="number" aria-label="Sketch corner amount" value={cornerAmount} min="0.01" step="0.1" onChange={(event) => setCornerAmount(Number(event.currentTarget.value))} /></label>
+          <button type="button" onClick={() => onCorner(selectedPoint.id, "fillet", cornerAmount)}>Fillet corner</button><button type="button" onClick={() => onCorner(selectedPoint.id, "chamfer", cornerAmount)}>Chamfer corner</button>
           <button className={fixedPointIds.has(selectedPoint.id) ? "active" : ""} type="button" title={fixedPointIds.has(selectedPoint.id) ? "Release point" : "Fix point"} aria-pressed={fixedPointIds.has(selectedPoint.id)} onClick={() => onTogglePointFixed(selectedPoint.id)}>
             {fixedPointIds.has(selectedPoint.id) ? <LockKeyhole /> : <LockKeyholeOpen />}
             <span>{fixedPointIds.has(selectedPoint.id) ? "Fixed" : "Fix"}</span>
@@ -1962,6 +1969,7 @@ export function SketchWorkspace({
 }
 
 function SketchSegmentInspector({
+  workspace,
   segment,
   length,
   accuracy,
@@ -1974,6 +1982,7 @@ function SketchSegmentInspector({
   onSetLength,
 }: {
   segment: SketchSegment;
+  workspace: WorkplaneWorkspaceSettings;
   length: number;
   accuracy: 1 | 2 | 3;
   horizontal: boolean;
@@ -1985,10 +1994,11 @@ function SketchSegmentInspector({
   onSetLength: (value: number | null) => void;
 }) {
   const editable = !segment.kind || segment.kind === "line";
+  const formatDimension = (value: number, _accuracy: number) => formatLengthForWorkspace(value, workspace);
   const [draft, setDraft] = useState(formatDimension(dimensionValue ?? length, accuracy));
-  useEffect(() => setDraft(formatDimension(dimensionValue ?? length, accuracy)), [accuracy, dimensionValue, length]);
+  useEffect(() => setDraft(formatDimension(dimensionValue ?? length, accuracy)), [accuracy, dimensionValue, length, workspace.units, workspace.scale, workspace.inchDisplay]);
   const commitLength = () => {
-    const value = parseMeasurementInput(draft);
+    const value = draft === formatDimension(dimensionValue ?? length, accuracy) ? dimensionValue ?? length : displayToMillimeters(parseMeasurementInput(draft), workspace);
     if (Number.isFinite(value) && value > 0) onSetLength(value);
     else setDraft(formatDimension(dimensionValue ?? length, accuracy));
   };

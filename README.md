@@ -56,6 +56,19 @@ No login. Private projects autosave locally in your browser, with optional share
 - **Mobile support (alpha)** - touch-first geometry, sketch, and sculpt controls with compact phone/tablet layouts and pen input support.
 - **Fast browser stack** - Next.js, React, TypeScript, Three.js, and Manifold/CSG geometry tooling.
 
+### Browser modeling and project storage
+
+Cadverix includes cross-file 3MF assembly import, fractional viewport/sketch
+measurements, printer build-volume presets, XYZ/circular patterns, lay-flat,
+face pivots, browser-worker shelling, and sketch clipboard/corner tools. Open
+**Geometry → Modify → Modeling tools** for patterns, face tools, and shelling.
+
+**Storage & backups** on the dashboard provides local recovery snapshots and
+downloadable SKF backups in every deployment. Configured Node/Docker instances
+and the desktop app also offer filesystem folders and retained file versions.
+See [Modeling and storage](docs/MODELING_AND_STORAGE.md) for controls, supported
+geometry, retention limits, and deployment-specific capabilities.
+
 ### 2D CAD drawing sheets
 
 Open **Drawing** beside **Sculpt**, choose an ISO or ANSI paper template, and add views of individual objects, a selection, or the visible assembly. Use **3 views** for a first-/third-angle layout, or place and rotate views individually. Add horizontal, vertical, aligned, angular, radius, and diameter measurements, plus lines, rectangles, circles, and notes.

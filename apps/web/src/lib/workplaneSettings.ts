@@ -286,6 +286,9 @@ export function normalizeWorkspaceSettings(value: unknown, fallback: WorkplaneWo
     historyLimit: historyLimitOrDefault(candidate.historyLimit, fallback.historyLimit),
     shapeCustomizations: normalizeShapeCustomizations(candidate.shapeCustomizations, fallback.shapeCustomizations),
     ...(drawing ? { drawing } : {}),
+    ...(candidate.inchDisplay === "decimal" || candidate.inchDisplay === "fractions" ? { inchDisplay: candidate.inchDisplay } : fallback.inchDisplay ? { inchDisplay: fallback.inchDisplay } : {}),
+    ...(typeof candidate.printerId === "string" ? { printerId: candidate.printerId.slice(0, 100) } : {}),
+    ...(typeof candidate.buildHeight === "number" && Number.isFinite(candidate.buildHeight) && candidate.buildHeight > 0 ? { buildHeight: Math.min(2000, candidate.buildHeight) } : {}),
   };
 }
 

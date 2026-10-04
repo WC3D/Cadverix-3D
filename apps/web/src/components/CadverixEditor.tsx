@@ -64,6 +64,11 @@ import {
 } from "./icons";
 import { WorkplaneViewport } from "./WorkplaneViewport";
 import { DrawingWorkspace } from "./DrawingWorkspace";
+import { ModelingTools } from "./ModelingTools";
+import { modelingPatternSteps, type PatternOptions } from "@/lib/modelingPatterns";
+import { PRINTER_PRESETS } from "@/lib/printerPresets";
+import { copySketchSelection, pasteSketchSelection } from "@/lib/sketchClipboard";
+import { treatSketchCorner } from "@/lib/sketchCorners";
 import { SketchWorkspace, type SketchCircleDraft, type SketchMeasurement, type SketchPolygonDraft, type SketchPrimitive, type SketchRectDraft, type SketchSelection, type SketchTextDraft, type SketchTool } from "./SketchWorkspace";
 import { EdgeModifierPanel } from "./workplane/EdgeModifierPanel";
 import { SceneOverviewSidebar } from "./workplane/SceneOverviewSidebar";
@@ -6189,6 +6194,7 @@ export function CadverixEditor({
   const [projectAssets, setProjectAssets] = useState<ProjectAsset[]>(() => dedupeProjectAssets(initialAssets));
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [clipboard, setClipboard] = useState<WorkplaneShape[]>([]);
+  const sketchClipboardRef = useRef<SketchProfile | null>(null);
   const [systemClipboardSupported, setSystemClipboardSupported] = useState(false);
   const [history, setHistory] = useState<EditorHistoryEntry[]>(() => (initialHistoryStateRef.current as EditorHistoryState).entries);
   const [historyIndex, setHistoryIndex] = useState(() => (initialHistoryStateRef.current as EditorHistoryState).index);
@@ -6201,6 +6207,18 @@ export function CadverixEditor({
   const [workspaceSettings, setWorkspaceSettings] = useState<WorkplaneWorkspaceSettings>(() => normalizeWorkspaceSettings(initialWorkspace));
   const [snapGrid, setSnapGrid] = useState<GridSize>(() => normalizeSnapGrid(initialSnap));
   const [workplaneMode, setWorkplaneMode] = useState(false);
+  const [modelingToolsOpen, setModelingToolsOpen] = useState(false);
+  const [patternPreview, setPatternPreview] = useState<WorkplaneShape[]>([]);
+  const [faceAction, setFaceAction] = useState<"flat" | "pivot" | null>(null);
+  const [facePivot, setFacePivot] = useState<THREE.Vector3 | null>(null);
+  const [patternCenter, setPatternCenter] = useState<THREE.Vector3 | null>(null);
+  const [pickingPatternCenter, setPickingPatternCenter] = useState(false);
+  useEffect(() => { setPatternCenter(null); setPickingPatternCenter(false); setWorkplaneMode(false); }, [projectId]);
+  const [shellBusy, setShellBusy] = useState(false);
+  const shellWorkerRef = useRef<Worker | null>(null);
+  const cancelShellRef = useRef<(() => void) | null>(null);
+  useEffect(() => { setFacePivot(null); setPatternPreview([]); }, [selectedIds.join("|")]);
+  useEffect(() => () => { cancelShellRef.current?.(); shellWorkerRef.current?.terminate(); }, []);
   const [menuOpen, setMenuOpen] = useState(false);
   const [topPanel, setTopPanel] = useState<TopPanel>(null);
   const [stepExporting, setStepExporting] = useState(false);
@@ -6815,6 +6833,10 @@ export function CadverixEditor({
       }),
     [notice, selectedIds, shapes],
   );
+  const printerOutsideCount = useMemo(() => {
+    if (!workspaceSettings.buildHeight) return 0;
+    return shapes.filter((shape) => !shape.hidden && !shape.hole && shape.kind !== "constructionPlane" && meshForShape(shape).vertices.some(([x, y, z]) => Math.abs(x) > workspaceSettings.width / 2 + 0.001 || Math.abs(z) > workspaceSettings.depth / 2 + 0.001 || y < -0.001 || y > workspaceSettings.buildHeight! + 0.001)).length;
+  }, [shapes, workspaceSettings.width, workspaceSettings.depth, workspaceSettings.buildHeight]);
   const compactDebugState = useMemo(
     () => `notice=${notice};selected=${selectedIds.length};count=${shapes.length};${shapes.map(compactShapeSummary).join(";")}`,
     [notice, selectedIds, shapes],
@@ -8203,6 +8225,25 @@ export function CadverixEditor({
     selectGeneratedSketchEntities({ pointIds: result.pointIds, segmentIds: result.segmentIds, imageIds: [], textIds: [] });
     setSketchCommand(null);
   }, [commitSketchProfile, selectGeneratedSketchEntities, sketchProfile, sketchSelection]);
+
+  const sketchClipboardAction = useCallback((action: "copy" | "cut" | "paste" | "duplicate") => {
+    if (action !== "paste") {
+      const copied = copySketchSelection(sketchProfile, sketchTransformSelection(sketchSelection));
+      if (!copied.points.length && !copied.images?.length && !copied.texts?.length) { setNotice("Select sketch geometry to copy"); return; }
+      sketchClipboardRef.current = copied;
+      if (action === "cut") { deleteSelectedSketchEntity(); return; }
+      if (action === "copy") { setNotice("Sketch selection copied"); return; }
+    }
+    if (!sketchClipboardRef.current) { setNotice("Sketch clipboard is empty"); return; }
+    const result = pasteSketchSelection(sketchProfile, sketchClipboardRef.current);
+    commitSketchProfile(result.profile, "Pasted sketch geometry");
+    selectGeneratedSketchEntities(result.selection);
+  }, [sketchProfile, sketchSelection, commitSketchProfile, selectGeneratedSketchEntities, deleteSelectedSketchEntity]);
+
+  const applySketchCorner = (pointId: string, kind: "fillet" | "chamfer", amount: number) => {
+    try { commitSketchProfile(treatSketchCorner(sketchProfile, pointId, kind, amount), `Applied sketch ${kind}`); setSketchSelection(null); }
+    catch (error) { setNotice(error instanceof Error ? error.message : "Could not treat corner"); }
+  };
 
   const applySketchMirror = useCallback((options: SketchMirrorOptions) => {
     let source = sketchTransformSelection(sketchSelection);
@@ -10792,7 +10833,7 @@ export function CadverixEditor({
     }
 
     const rotationDelta = geometryRotationDelta(placementWorkplane, angleDegrees);
-    const pivot = rotatableShapes.length > 1 ? selectionCenterOnWorkplane(rotatableShapes, placementWorkplane) : null;
+    const pivot = facePivot ?? (rotatableShapes.length > 1 ? selectionCenterOnWorkplane(rotatableShapes, placementWorkplane) : null);
 
     const nextShapes = shapes.map((shape) => {
       if (!selected.has(shape.id) || shape.locked) {
@@ -10809,7 +10850,90 @@ export function CadverixEditor({
       selectedIds,
       `Rotated ${rotatableShapes.length} shape${rotatableShapes.length === 1 ? "" : "s"} by ${angleLabel}°`,
     );
-  }, [commitShapes, hasSelection, placementWorkplane, selectedIds, selectedShapes, shapes]);
+  }, [commitShapes, hasSelection, placementWorkplane, selectedIds, selectedShapes, shapes, facePivot]);
+
+  const createModelingPattern = (options: PatternOptions, preview: boolean) => {
+    try {
+      if (selectedShapes.some((shape) => shape.locked || shape.kind === "constructionPlane")) throw new Error("Select unlocked model objects");
+      const steps = modelingPatternSteps(options, selectedShapes.length);
+      if (selectedShapes.reduce((sum, shape) => sum + meshForShape(shape).faces.length, 0) * (steps.length + 1) > 1_000_000) throw new Error("Pattern exceeds one million display triangles. Use fewer copies or simpler objects.");
+      // Pattern controls use CAD axes (Z-up); the renderer uses Y-up.
+      const axis = new THREE.Vector3(options.axis === "x" ? 1 : 0, options.axis === "z" ? 1 : 0, options.axis === "y" ? 1 : 0);
+      const pivot = patternCenter ?? facePivot ?? new THREE.Vector3();
+      const copies = steps.flatMap((step) => selectedShapes.map((source) => {
+        let copy = cloneWorkplaneShapeTreeWithFreshIds(source, "pattern");
+        if (options.kind === "circular") {
+          const rotation = new THREE.Quaternion().setFromAxisAngle(axis, THREE.MathUtils.degToRad(step.degrees));
+          const patch = rotatedGeometryShapePatch(copy, rotation, pivot);
+          if (!options.rotateCopies) { delete patch.rotation; delete patch.rotationX; delete patch.rotationZ; }
+          copy = canonicalizeShape(bakeShapeTransformIntoMesh(canonicalizeShape({ ...copy, ...patch })));
+        } else copy = canonicalizeShape({ ...copy, x: copy.x + step.offset[0], elevation: (copy.elevation ?? 0) + step.offset[2], z: copy.z + step.offset[1] });
+        return preview ? { ...copy, locked: true } : copy;
+      }));
+      if (preview) { setPatternPreview(copies); setNotice(`Previewing ${copies.length} copies; Create pattern to keep them`); }
+      else { setPatternPreview([]); commitShapes([...shapes, ...copies], copies.map((copy) => copy.id), `Created ${copies.length} pattern copies`); }
+    } catch (error) { setPatternPreview([]); setNotice(error instanceof Error ? error.message : "Could not create pattern"); }
+  };
+
+  const applyPickedFace = (plane: PlacementWorkplane, source: "shape" | "base") => {
+    if (!faceAction) { setViewportPlacementWorkplane(plane, source); return; }
+    if (source !== "shape") { setNotice("No face selected"); setFaceAction(null); return; }
+    const pivot = new THREE.Vector3(plane.origin.x, plane.origin.y, plane.origin.z);
+    if (faceAction === "pivot") { setFacePivot(pivot); setNotice("Face pivot set. Use Rotate selection or R / Shift+R."); }
+    else {
+      const normal = new THREE.Vector3(plane.normal.x, plane.normal.y, plane.normal.z).normalize();
+      const targetNormal = new THREE.Vector3(placementWorkplane.normal.x, placementWorkplane.normal.y, placementWorkplane.normal.z).normalize();
+      const rotation = new THREE.Quaternion().setFromUnitVectors(normal, targetNormal.clone().negate());
+      const rotated = selectedShapes.map((shape) => canonicalizeShape(bakeShapeTransformIntoMesh(canonicalizeShape({ ...shape, ...rotatedGeometryShapePatch(shape, rotation, pivot) }))));
+      const origin = new THREE.Vector3(placementWorkplane.origin.x, placementWorkplane.origin.y, placementWorkplane.origin.z);
+      let minimum = Infinity;
+      for (const shape of rotated) for (const vertex of meshForShape(shape).vertices) minimum = Math.min(minimum, new THREE.Vector3(...vertex).sub(origin).dot(targetNormal));
+      if (Number.isFinite(minimum)) {
+        const moved = new Map(rotated.map((shape) => [shape.id, canonicalizeShape({ ...shape, x: shape.x - targetNormal.x * minimum, elevation: (shape.elevation ?? 0) - targetNormal.y * minimum, z: shape.z - targetNormal.z * minimum })]));
+        commitShapes(shapes.map((shape) => moved.get(shape.id) ?? shape), selectedIds, "Laid selection flat on the workplane");
+      }
+    }
+    setFaceAction(null);
+  };
+
+  const applyShell = async (thickness: number, opening: "top" | "bottom" | "both" | "closed") => {
+    if (shellBusy) return;
+    const source = selectedShapes.length === 1 ? selectedShapes[0] : undefined;
+    if (!source || source.locked || source.hole || source.kind === "constructionPlane") { setNotice("Select one unlocked solid to shell"); return; }
+    const fingerprint = projectShapesFingerprint([source]);
+    setShellBusy(true); setPatternPreview([]); setNotice("Shelling in the browser CAD worker…");
+    try {
+      const primitive = !shapeHasTaper(source) ? cadModifierPrimitiveForShape(source) : null;
+      const stepTransform = cadImportedStepTransformForShape(source);
+      const input: CadModifierPartInput = primitive ? { shape: source, primitive } : source.cadBrep && !shapeHasTaper(source)
+        ? { shape: source, mesh: meshForShape(source), brep: source.cadBrep, brepTransform: cadBrepTransformForShape(source) }
+        : source.importedMesh?.brepStep && stepTransform && !shapeHasTaper(source)
+          ? { shape: source, mesh: meshForShape(source), step: source.importedMesh.brepStep, brepTransform: stepTransform }
+          : { shape: source, mesh: meshForShape(source) };
+      const transfer = cadModifierTransferParts([input]);
+      if (transfer.requiredMeshTriangleCount > 4000) throw new Error("Shelling this mesh is too expensive. Use an exact STEP solid or a mesh below 4,000 triangles.");
+      const worker = new Worker(new URL("../workers/cadModifier.worker.ts", import.meta.url), { type: "module" });
+      shellWorkerRef.current = worker;
+      const response = await new Promise<Extract<CadModifierWorkerResponse, { type: "preview" }>>((resolve, reject) => {
+        const timer = window.setTimeout(() => { worker.terminate(); reject(new Error("Shell calculation timed out. Try a simpler solid or smaller thickness.")); }, 60000);
+        cancelShellRef.current = () => { window.clearTimeout(timer); worker.terminate(); reject(new Error("Shell cancelled; original retained")); };
+        worker.onerror = () => { window.clearTimeout(timer); reject(new Error("Shell worker failed; the original is unchanged")); };
+        worker.onmessage = (event: MessageEvent<CadModifierWorkerResponse>) => {
+          window.clearTimeout(timer);
+          if (event.data.type === "preview") resolve(event.data);
+          else reject(new Error(event.data.type === "error" ? event.data.message : "Unexpected shell response"));
+        };
+        worker.postMessage({ type: "shell", requestId: 1, parts: transfer.parts, thickness, opening });
+      });
+      const current = shapesRef.current.find((shape) => shape.id === source.id);
+      if (!current || projectShapesFingerprint([current]) !== fingerprint) throw new Error("The source changed during shelling. Run the tool again.");
+      const result = shapeFromCadMesh(source, response.positions, response.normals, response.indices, response.brep);
+      if (!result) throw new Error("Shell produced no usable geometry");
+      const clean = { ...result, groupedShapes: undefined, sketchProfile: undefined, edgeTreatments: undefined, cadDisplayEdges: undefined };
+      commitShapes(shapesRef.current.map((shape) => shape.id === source.id ? clean : shape), [source.id], `Shelled ${source.name} with ${thickness} mm walls`);
+    } catch (error) { setNotice(error instanceof Error ? error.message : "Shelling failed"); }
+    finally { cancelShellRef.current = null; shellWorkerRef.current?.terminate(); shellWorkerRef.current = null; setShellBusy(false); }
+  };
 
   useEffect(() => {
     const isTypingTarget = (target: EventTarget | null) => {
@@ -10821,6 +10945,9 @@ export function CadverixEditor({
 
     const handleKeyDown = (event: KeyboardEvent) => {
       if (toolbarMode === "drawing") return;
+      if (pickingPatternCenter && event.key === "Escape") {
+        event.preventDefault(); setPickingPatternCenter(false); setWorkplaneMode(false); setNotice("Pattern center picking cancelled"); return;
+      }
       if (isTypingTarget(event.target)) {
         keyboardMovement.finish();
         return;
@@ -10857,6 +10984,12 @@ export function CadverixEditor({
         } else if (shortcut && key === "y") {
           event.preventDefault();
           sketchRedo();
+        } else if (shortcut && key === "a") {
+          event.preventDefault();
+          selectGeneratedSketchEntities({ pointIds: sketchProfile.points.map((point) => point.id), segmentIds: sketchProfile.segments.map((segment) => segment.id), imageIds: (sketchProfile.images ?? []).map((image) => image.id), textIds: (sketchProfile.texts ?? []).map((text) => text.id) });
+        } else if (shortcut && ["c", "x", "v", "d"].includes(key)) {
+          event.preventDefault();
+          sketchClipboardAction(({ c: "copy", x: "cut", v: "paste", d: "duplicate" } as const)[key as "c" | "x" | "v" | "d"]);
         } else if (!shortcut && !event.altKey && (event.code === "KeyR" || key === "r")) {
           event.preventDefault();
           rotateSelectedClosedSketch45();
@@ -10989,6 +11122,8 @@ export function CadverixEditor({
     cutSelected,
     deleteSelected,
     deleteSelectedSketchEntity,
+    sketchClipboardAction,
+    pickingPatternCenter,
     duplicateSelected,
     dropSelectedToWorkplane,
     groupSelected,
@@ -11025,6 +11160,7 @@ export function CadverixEditor({
         onProjectNameChange={onProjectNameChange}
         showProjectNameInToolbar={showProjectNameInToolbar}
         onToolbarModeChange={(mode) => {
+          if (mode !== "geometry" && pickingPatternCenter) { setPickingPatternCenter(false); setWorkplaneMode(false); }
           if (mode === "drawing") {
             if (sketchActive) { setNotice("Finish or cancel the current sketch before opening Drawing"); return; }
             if (edgeModifier) cancelEdgeModifier();
@@ -11102,6 +11238,8 @@ export function CadverixEditor({
         onIntersect={intersectSelected}
         onFillet={() => edgeModifier?.kind === "fillet" ? cancelEdgeModifier() : startEdgeModifier("fillet")}
         onMirror={toggleMirrorMode}
+        onModelingTools={() => { setPatternPreview([]); if (pickingPatternCenter) { setPickingPatternCenter(false); setWorkplaneMode(false); } setModelingToolsOpen((open) => !open); }}
+        onSketchClipboard={sketchClipboardAction}
         onSculptBrushChange={(brush) => setSculptSession((current) => current ? { ...current, brush } : null)}
         onSculptRadiusChange={(radius) => setSculptSession((current) => current ? { ...current, radius } : null)}
         onSculptStrengthChange={(strength) => setSculptSession((current) => current ? { ...current, strength } : null)}
@@ -11252,6 +11390,7 @@ export function CadverixEditor({
             onMoveDimension={moveSketchDimension}
             onInsertPoint={insertSketchPoint}
             onSetPointMode={setSketchPointMode}
+            onCorner={applySketchCorner}
             onTogglePointFixed={toggleSketchPointFixed}
             onToggleSegmentConstraint={toggleSketchSegmentConstraint}
             onSetSegmentLength={updateSketchSegmentLength}
@@ -11302,7 +11441,7 @@ export function CadverixEditor({
           <WorkplaneViewport
             theme={activeTheme}
             externalWorkspace={workspaceSettings}
-          shapes={viewportShapes}
+          shapes={patternPreview.length ? [...viewportShapes, ...patternPreview] : viewportShapes}
           selectedIds={selectedIds}
           alignMode={alignMode}
           alignAnchorId={effectiveAlignAnchorId}
@@ -11314,6 +11453,8 @@ export function CadverixEditor({
           splitPlane={splitPlane}
           placementWorkplane={placementWorkplane}
           workplaneMode={workplaneMode}
+          faceTool={faceAction}
+          facePivot={facePivot}
           initialSnap={snapGrid}
           initialWorkspace={workspaceSettings}
           workspaceSettingsKey={projectId ?? "local-workplane"}
@@ -11328,8 +11469,12 @@ export function CadverixEditor({
           onMirrorPreviewClear={clearMirrorPreview}
           onMirrorSelection={mirrorSelectionAcross}
           onSelectShape={selectShape}
-          onCreateFaceConstructionPlane={createFaceConstructionPlane}
-          onSetPlacementWorkplane={setViewportPlacementWorkplane}
+          onCreateFaceConstructionPlane={faceAction ? () => {} : createFaceConstructionPlane}
+          onSetPlacementWorkplane={applyPickedFace}
+          onPickWorkplanePoint={pickingPatternCenter ? (point) => {
+            setPatternCenter(new THREE.Vector3(point.x, point.y, point.z));
+            setPickingPatternCenter(false); setPatternPreview([]); setNotice("Circular pattern center set on the workplane");
+          } : undefined}
           onToggleWorkplaneTool={activateWorkplaneTool}
           onInteractionActiveChange={updateProjectInteractionActive}
           onEditSketch={beginSketchEdit}
@@ -11340,7 +11485,7 @@ export function CadverixEditor({
            shapeInspectorCollapsed={shapeInspectorCollapsed}
            onShapeInspectorCollapsedChange={setShapeInspectorCollapsed}
           onWorkspaceSettingsChange={updateProjectWorkspaceSettings}
-          onWorkplaneModeChange={closeViewportWorkplaneMode}
+          onWorkplaneModeChange={(active) => { closeViewportWorkplaneMode(active); if (!active) { setFaceAction(null); setPickingPatternCenter(false); } }}
           modifierActive={Boolean(edgeModifier)}
           modifierPreviewActive={Boolean(edgeModifier?.preview)}
           modifierEdges={edgeModifier?.edges.filter((edge) => modifierAvailableEdgeIds.includes(edge.id)) ?? []}
@@ -11351,6 +11496,18 @@ export function CadverixEditor({
           resolvedTheme={resolvedTheme}
           />
         )}
+        {toolbarMode === "geometry" && modelingToolsOpen ? <ModelingTools
+          disabled={!selectedShapes.length || selectedShapes.some((shape) => shape.locked) || Boolean(edgeModifier || splitSession) || shellBusy || projectInteractionActive}
+          onClose={() => { cancelShellRef.current?.(); setModelingToolsOpen(false); setPatternPreview([]); }}
+          onPattern={createModelingPattern} hasPivot={Boolean(facePivot)} onClearPivot={() => setFacePivot(null)}
+          patternCenter={patternCenter} pickingCenter={pickingPatternCenter}
+          onPickCenter={() => { setPatternPreview([]); setFaceAction(null); setPickingPatternCenter(true); setWorkplaneMode(true); setNotice("Click the active workplane for the circular pattern center"); }}
+          onClearCenter={() => { setPatternCenter(null); setPatternPreview([]); }}
+          onCancelCenter={() => { setPickingPatternCenter(false); setWorkplaneMode(false); setNotice("Pattern center picking cancelled"); }}
+          onRotate={rotateSelectedBy} onShell={applyShell}
+          onFace={(action) => { setPatternPreview([]); setFaceAction(action); setWorkplaneMode(true); setModelingToolsOpen(false); setNotice(action === "flat" ? "Click the selected object's face to lay on the workplane" : "Click a face to set the rotation pivot"); }}
+        /> : null}
+        {toolbarMode === "geometry" && workspaceSettings.buildHeight ? <div className="printer-status">{PRINTER_PRESETS.find((printer) => printer.id === workspaceSettings.printerId)?.name ?? "Custom printer"} · {workspaceSettings.width} × {workspaceSettings.depth} × {workspaceSettings.buildHeight} mm{printerOutsideCount ? ` · ${printerOutsideCount} outside build volume` : ""}</div> : null}
         {toolbarMode === "geometry" && constructionPlanePanelOpen ? (
           <ConstructionPlanePanel
             planes={constructionPlanes}
@@ -11790,6 +11947,8 @@ const sketchShapeMenuItems = [
 ] satisfies Array<{ primitive: SketchPrimitive; label: string; icon: typeof SquareIcon }>;
 
 function SecondaryToolbar({
+  onModelingTools,
+  onSketchClipboard,
   toolbarMode,
   drawingToolbarRef,
   projectName,
@@ -11872,6 +12031,8 @@ function SecondaryToolbar({
   onAddShape,
 }: {
   toolbarMode: ToolbarMode;
+  onModelingTools: () => void;
+  onSketchClipboard: (action: "copy" | "cut" | "paste" | "duplicate") => void;
   drawingToolbarRef: (element: HTMLDivElement | null) => void;
   projectName: string;
   onProjectNameChange?: (name: string) => void;
@@ -12120,6 +12281,7 @@ function SecondaryToolbar({
   const modifyTools = [
     { label: "Align", icon: ToolbarAlignIcon, action: onAlign, enabled: canAlign && geometryActionsEnabled, active: alignMode },
     { label: "Mirror", icon: ToolbarMirrorIcon, action: onMirror, enabled: hasSelection && geometryActionsEnabled, active: mirrorMode },
+    { label: "Modeling tools", icon: ToolbarDuplicateIcon, action: onModelingTools, enabled: geometryActionsEnabled },
     { label: "Slice / Split", icon: ToolbarSplitIcon, action: onSplit, enabled: splitMode || canSplit, active: splitMode },
     { label: "Snap to grid", icon: ToolbarSnapGridIcon, action: onSnap, enabled: hasSelection && geometryActionsEnabled },
     { label: "Chamfer", icon: ToolbarChamferIcon, action: onChamfer, enabled: canEdgeModify && geometryActionsEnabled, active: edgeModifierKind === "chamfer" },
@@ -12501,6 +12663,15 @@ function SecondaryToolbar({
                       </div>
                     </div>
                   ) : null}
+                </div>
+                <div className="toolbar-section sketch-edit-section" data-tool-group="clipboard">
+                  <div className="toolbar-section-label">Clipboard</div>
+                  <div className="toolbar-section-tools">
+                    <button className="toolbar-icon" type="button" aria-label="Sketch copy" title="Copy sketch selection" disabled={!sketchHasSelection} onClick={() => onSketchClipboard("copy")}><ToolbarCopyIcon /></button>
+                    <button className="toolbar-icon" type="button" aria-label="Sketch cut" title="Cut sketch selection" disabled={!sketchHasSelection} onClick={() => onSketchClipboard("cut")}><ToolbarSplitIcon /></button>
+                    <button className="toolbar-icon" type="button" aria-label="Sketch paste" title="Paste sketch selection" onClick={() => onSketchClipboard("paste")}><ToolbarPasteIcon /></button>
+                    <button className="toolbar-icon" type="button" aria-label="Sketch duplicate" title="Duplicate sketch selection" disabled={!sketchHasSelection} onClick={() => onSketchClipboard("duplicate")}><ToolbarDuplicateIcon /></button>
+                  </div>
                 </div>
                 <div className="toolbar-section sketch-edit-section" data-tool-group="clipboard">
                   <div className="toolbar-section-label">Select</div>

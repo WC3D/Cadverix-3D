@@ -261,11 +261,10 @@ function modelTriangleLoad(document: XMLDocument, label: string) {
 }
 
 function preflight3mfModels(bytes: Uint8Array) {
-  const files = unzipSync(bytes, { filter: (file) => /^3D\/.*\.model$/i.test(file.name) || file.name === "_rels/.rels" });
+  const files = unzipSync(bytes);
   const modelNames = Object.keys(files).filter((name) => /^3D\/.*\.model$/i.test(name));
   const fallbackRootName = modelNames.find((name) => /^3D\/[^/]+\.model$/i.test(name));
   if (!fallbackRootName) throw new Error("3MF package is missing its root model");
-  if (modelNames.length > 1) throw new Error("3MF packages with multiple model parts are not supported");
 
   let rootModelName = fallbackRootName;
   const relationshipsSource = files["_rels/.rels"] ? strFromU8(files["_rels/.rels"]) : "";
@@ -279,7 +278,7 @@ function preflight3mfModels(bytes: Uint8Array) {
   }
 
   let modelElementCount = 0;
-  let loaderTriangles = 0;
+  const documents = new Map<string, XMLDocument>();
   let rootDocument: XMLDocument | undefined;
   for (const modelName of modelNames) {
     const modelSource = strFromU8(files[modelName]);
@@ -291,9 +290,10 @@ function preflight3mfModels(bytes: Uint8Array) {
     const document = parseXml(modelSource, "3MF model");
     if (document.documentElement.localName.toLowerCase() !== "model") throw new Error("3MF model XML is invalid");
     const requiredExtensions = document.documentElement.getAttribute("requiredextensions")?.trim();
-    if (requiredExtensions) throw new Error(`3MF requires unsupported extensions: ${requiredExtensions}`);
-    loaderTriangles += modelTriangleLoad(document, `3MF model '${modelName}'`);
-    if (loaderTriangles > THREE_MF_LIMITS.loaderTriangles) throw new Error("3MF package exceeds the supported triangle limit");
+    for (const prefix of requiredExtensions?.split(/\s+/) ?? []) {
+      if (document.documentElement.lookupNamespaceURI(prefix) !== "http://schemas.microsoft.com/3dmanufacturing/production/2015/06") throw new Error(`3MF requires unsupported extension: ${prefix}`);
+    }
+    documents.set(modelName, document);
     if (modelName === rootModelName) rootDocument = document;
   }
   if (!rootDocument) throw new Error("3MF root model relationship is invalid");
@@ -301,7 +301,76 @@ function preflight3mfModels(bytes: Uint8Array) {
   const unit = (rootDocument.documentElement.getAttribute("unit") || "millimeter").toLowerCase();
   const scale = THREE_MF_UNIT_SCALE[unit];
   if (!scale) throw new Error(`3MF uses unsupported unit '${unit}'`);
-  return scale;
+  // Resource IDs are local to a model part. Flatten into one namespace before
+  // invoking Three's loader, retaining transforms and checking the whole graph.
+  const ids = new Map<string, string>();
+  let nextId = 1;
+  for (const [name, document] of documents) for (const resource of Array.from(document.querySelector("resources")?.children ?? [])) {
+    const id = resource.getAttribute("id");
+    if (!id || ids.has(`${name}#${id}`)) throw new Error("3MF resource IDs are missing or duplicated");
+    ids.set(`${name}#${id}`, String(nextId++));
+  }
+  const resolvePart = (owner: string, target: string | null) => {
+    if (!target) return owner;
+    try { target = decodeURIComponent(target); } catch { throw new Error("3MF component path encoding is invalid"); }
+    if (/[\\\\?#]/.test(target) || /^[a-z]+:/i.test(target)) throw new Error("3MF component path is invalid");
+    const parts = (target.startsWith("/") ? target.slice(1) : `${owner.slice(0, owner.lastIndexOf("/") + 1)}${target}`).split("/");
+    const normalized: string[] = [];
+    for (const part of parts) {
+      if (part === "..") { if (!normalized.length) throw new Error("3MF component path escapes archive"); normalized.pop(); }
+      else if (part && part !== ".") normalized.push(part);
+    }
+    const path = normalized.join("/");
+    if (!documents.has(path)) throw new Error(`3MF component references missing model '${path}'`);
+    return path;
+  };
+  const mappedId = (part: string, id: string) => {
+    const mapped = ids.get(`${part}#${id}`);
+    if (!mapped) throw new Error(`3MF references missing resource '${part}#${id}'`);
+    return mapped;
+  };
+  const resources = rootDocument.querySelector("resources")!;
+  const flattened: Element[] = [];
+  for (const [name, document] of documents) {
+    const partScale = THREE_MF_UNIT_SCALE[(document.documentElement.getAttribute("unit") || "millimeter").toLowerCase()];
+    if (!partScale) throw new Error("3MF component uses unsupported units");
+    const ratio = partScale / scale;
+    const rewrite = (source: Element) => {
+      const clone = rootDocument!.importNode(source, true) as Element;
+      for (const element of [clone, ...Array.from(clone.querySelectorAll("*"))]) {
+        if (element.hasAttribute("id")) element.setAttribute("id", mappedId(name, element.getAttribute("id")!));
+        for (const key of ["pid", "texid"]) if (element.hasAttribute(key)) element.setAttribute(key, mappedId(name, element.getAttribute(key)!));
+        if (element.hasAttribute("objectid")) {
+          const path = Array.from(element.attributes).find((attribute) => attribute.localName === "path");
+          element.setAttribute("objectid", mappedId(resolvePart(name, path?.value ?? null), element.getAttribute("objectid")!));
+          if (path) element.removeAttributeNode(path);
+        }
+        if (element.localName === "vertex") for (const axis of ["x", "y", "z"]) {
+          const value = Number(element.getAttribute(axis));
+          if (!Number.isFinite(value)) throw new Error("3MF vertex is not finite");
+          element.setAttribute(axis, String(value * ratio));
+        }
+        if (element.hasAttribute("transform")) {
+          const transform = element.getAttribute("transform")!.trim().split(/\s+/).map(Number);
+          if (transform.length !== 12 || !transform.every(Number.isFinite)) throw new Error("3MF component transform is invalid");
+          for (let i = 9; i < 12; i++) transform[i] *= ratio;
+          element.setAttribute("transform", transform.join(" "));
+        }
+      }
+      return clone;
+    };
+    for (const resource of Array.from(document.querySelector("resources")?.children ?? [])) flattened.push(rewrite(resource));
+    if (name === rootModelName) {
+      const build = document.querySelector("build");
+      if (build) build.replaceWith(rewrite(build));
+    }
+  }
+  resources.replaceChildren(...flattened);
+  rootDocument.documentElement.removeAttribute("requiredextensions");
+  modelTriangleLoad(rootDocument, "3MF assembly");
+  for (const name of modelNames) delete files[name];
+  files[rootModelName] = strToU8(new XMLSerializer().serializeToString(rootDocument));
+  return { scale, buffer: zipSync(files).buffer as ArrayBuffer };
 }
 
 function materialColor(material: THREE.Material | THREE.Material[]) {
@@ -317,8 +386,9 @@ function materialColor(material: THREE.Material | THREE.Material[]) {
 export function importedShapeFrom3mf(fileName: string, buffer: ArrayBuffer): WorkplaneShape {
   const bytes = new Uint8Array(buffer);
   inspect3mfArchive(bytes);
-  const unitScale = preflight3mfModels(bytes);
-  const root = new ThreeMFLoader().parse(buffer);
+  const normalized = preflight3mfModels(bytes);
+  const unitScale = normalized.scale;
+  const root = new ThreeMFLoader().parse(normalized.buffer);
   root.updateMatrixWorld(true);
   const rawPositions: number[] = [];
   let color: string | undefined;

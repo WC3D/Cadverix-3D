@@ -173,6 +173,7 @@ export function TransformOverlay({
         <button
           key={`${mark.key}-label`}
           className="dimension-label"
+          aria-label={`${mark.axis} dimension`}
           type="button"
           style={{ "--overlay-x": `${mark.labelX}px`, "--overlay-y": `${mark.labelY}px` } as CSSProperties}
           onPointerDown={(event) => event.stopPropagation()}
@@ -184,10 +185,11 @@ export function TransformOverlay({
       {editingDimension ? (
         <input
           className="dimension-input"
+          aria-label={`${editingDimension.axis} dimension`}
           style={{ "--overlay-x": `${editingDimension.x}px`, "--overlay-y": `${editingDimension.y}px` } as CSSProperties}
           value={editingDimension.value}
           autoFocus
-          inputMode="decimal"
+          inputMode="text"
           onPointerDown={(event) => event.stopPropagation()}
           onChange={(event) => onEditingDimensionChange(event.target.value)}
           onBlur={onCommitDimensionEdit}

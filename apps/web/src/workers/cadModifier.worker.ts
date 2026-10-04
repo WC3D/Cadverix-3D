@@ -605,7 +605,7 @@ self.onmessage = async (event: MessageEvent<CadModifierWorkerRequest>) => {
       post({ type: "disposed", requestId: request.requestId });
       return;
     }
-    if (request.type === "prepare") {
+    if (request.type === "prepare" || request.type === "shell") {
       phase = "reconstructing source geometry";
       let activeCad = cad;
       releaseSession(activeCad);
@@ -631,6 +631,30 @@ self.onmessage = async (event: MessageEvent<CadModifierWorkerRequest>) => {
       // OCCT wraps boolean-fused bodies in a compound even when the result is one solid.
       // Use that solid directly so overlapping grouped parts have one closed modifier body.
       baseShape = baseSolids.length === 1 ? baseSolids[0] : reconstructed;
+      if (request.type === "shell") {
+        phase = "shelling solid";
+        if (baseSolids.length !== 1) throw new Error("Shell requires one connected solid");
+        if (!Number.isFinite(request.thickness) || request.thickness < 0.01 || request.thickness > 1000) throw new Error("Invalid wall thickness");
+        const faces = activeCad.getSubShapes(baseShape, "face");
+        const bounds = activeCad.getBoundingBox(baseShape);
+        const remove = faces.filter((face) => {
+          if (request.opening === "closed" || activeCad.surfaceType(face) !== "plane") return false;
+          const center = activeCad.getSurfaceCenterOfMass(face);
+          const normal = orientedFaceNormal(activeCad, face, center);
+          return (request.opening !== "bottom" && normal.y > 0.999 && Math.abs(center.y - bounds.ymax) < 0.001)
+            || (request.opening !== "top" && normal.y < -0.999 && Math.abs(center.y - bounds.ymin) < 0.001);
+        });
+        if (request.opening !== "closed" && !remove.length) throw new Error("No horizontal end face found. Lay the solid flat first or choose a closed cavity.");
+        const result = request.opening === "closed"
+          ? activeCad.cut(baseShape, activeCad.offset(baseShape, -request.thickness, 1e-6))
+          : activeCad.shell(baseShape, remove, -request.thickness, 1e-6);
+        if (!activeCad.isValid(result) || activeCad.getVolume(result) <= 0 || activeCad.getVolume(result) >= activeCad.getVolume(baseShape)) throw new Error("This wall thickness does not produce a valid inward shell. Try a smaller thickness.");
+        const mesh = copyCadMesh(activeCad.tessellate(result, { linearDeflection: 0.035, angularDeflection: 0.15 }));
+        const brep = activeCad.toBREP(result);
+        post({ type: "preview", requestId: request.requestId, ...mesh, brep, appliedAmount: request.thickness, adjustedAmount: false, appliedEdgeIds: [], skippedEdgeIds: [], displayEdges: [] }, [mesh.positions.buffer, mesh.normals.buffer, mesh.indices.buffer]);
+        releaseSession(activeCad);
+        return;
+      }
       phase = "collecting source edges";
       const collected = collectEdges(activeCad, baseShape, request.sharpAngle, Boolean(request.suppressTreatmentDetailEdges), true);
       edgeHandles = collected.handles;

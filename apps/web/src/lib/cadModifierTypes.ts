@@ -17,7 +17,7 @@ export type CadModifierQuality = "draft" | "standard" | "fine";
 
 export type CadModifierFaultDiagnostic = {
   phase: string;
-  operation: CadModifierKind | "prepare" | "dispose";
+  operation: CadModifierKind | "prepare" | "dispose" | "shell";
   strategy: "native-edge" | "planar-rim";
   edgeIds: number[];
   amount?: number;
@@ -58,6 +58,7 @@ export type CadModifierComponentMesh = {
 };
 
 export type CadModifierWorkerRequest =
+  | { type: "shell"; requestId: number; parts: CadModifierMeshPart[]; thickness: number; opening: "top" | "bottom" | "both" | "closed" }
   | { type: "prepare"; requestId: number; parts: CadModifierMeshPart[]; sharpAngle: number; suppressTreatmentDetailEdges?: boolean }
   | {
       type: "preview";

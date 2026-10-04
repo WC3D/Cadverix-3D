@@ -154,6 +154,9 @@ export type WorkplaneWorkspaceSettings = {
   historyLimit: HistoryRetentionLimit;
   shapeCustomizations: ShapeCustomizationMap;
   drawing?: DrawingSheet;
+  inchDisplay?: "fractions" | "decimal";
+  printerId?: string;
+  buildHeight?: number;
 };
 
 export type AlignAxis = "x" | "y" | "z";

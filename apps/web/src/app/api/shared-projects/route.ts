@@ -1,8 +1,9 @@
-import { randomUUID } from "crypto";
+import { randomUUID, createHash } from "crypto";
 import { promises as fs } from "fs";
 import path from "path";
 import { NextResponse } from "next/server";
 import { inspectSkfProjectPackage, SKF_LIMITS, SKF_MEDIA_TYPE } from "@/lib/skfProject";
+import { resolveSharedPath, sharedRelativePath } from "@/lib/sharedStoragePaths";
 
 export const runtime = "nodejs";
 export const revalidate = false;
@@ -28,6 +29,7 @@ function sharedProjectsDirectory() {
 }
 
 function safeProjectFileName(requestedName: string) {
+  if (requestedName.includes("/")) { sharedRelativePath(requestedName); if (!requestedName.endsWith(".skf")) throw new Error("Projects must use .skf"); return requestedName; }
   const withoutExtension = requestedName.replace(/\.skf$/i, "");
   const stem = path.basename(withoutExtension)
     .replace(/[<>:"/\\|?*\u0000-\u001f]/g, "_")
@@ -42,7 +44,19 @@ function revisionForStat(stat: { size: number; mtimeMs: number }) {
 }
 
 function sharedThumbnailPath(root: string, fileName: string, revision: string) {
-  return path.join(root, SHARED_THUMBNAILS_DIR, `${fileName}.${revision}.png`);
+  const thumbnailKey = fileName.includes("/") ? `.nested-${createHash("sha256").update(fileName).digest("hex")}` : fileName;
+  return path.join(root, SHARED_THUMBNAILS_DIR, `${thumbnailKey}.${revision}.png`);
+}
+
+const STORAGE_CAPABILITIES = { folders: true, versions: true };
+function versionDirectory(root: string, fileName: string) { return path.join(root, ".backups", createHash("sha256").update(fileName).digest("hex")); }
+async function backupSharedProject(root: string, fileName: string, filePath: string) {
+  const directory = versionDirectory(root, fileName);
+  await fs.mkdir(directory, { recursive: true });
+  await fs.writeFile(path.join(directory, "project.json"), JSON.stringify({ fileName }));
+  await fs.copyFile(filePath, path.join(directory, `${Date.now()}-${randomUUID()}.skf`), 1);
+  const versions = (await fs.readdir(directory)).filter((file) => file.endsWith(".skf")).sort().reverse();
+  await Promise.all(versions.slice(10).map((file) => fs.unlink(path.join(directory, file))));
 }
 
 function sharedThumbnailUrl(fileName: string, revision: string) {
@@ -54,7 +68,7 @@ function projectRecord(fileName: string, stat: { size: number; mtimeMs: number }
   const revision = revisionForStat(stat);
   return {
     fileName,
-    name: fileName.replace(/\.skf$/i, ""),
+    name: path.basename(fileName).replace(/\.skf$/i, ""),
     updatedAt: stat.mtimeMs,
     size: stat.size,
     revision,
@@ -130,10 +144,31 @@ export async function GET(request: Request) {
     await fs.mkdir(root, { recursive: true });
     const requestUrl = new URL(request.url);
     const requestedFile = requestUrl.searchParams.get("fileName");
+    if (requestUrl.searchParams.has("archives")) {
+      const directories = await fs.readdir(path.join(root, ".backups"), { withFileTypes: true }).catch((error) => { if (error.code === "ENOENT") return []; throw error; });
+      const archives: string[] = [];
+      for (const directory of directories.filter((entry) => entry.isDirectory() && /^[a-f0-9]{64}$/.test(entry.name)).slice(0, 5000)) {
+        const metadata = JSON.parse(await fs.readFile(path.join(root, ".backups", directory.name, "project.json"), "utf8"));
+        if (typeof metadata.fileName === "string") archives.push(sharedRelativePath(metadata.fileName));
+      }
+      return NextResponse.json({ archives: archives.sort() }, { headers: { "Cache-Control": "no-store" } });
+    }
+    if (requestedFile && requestUrl.searchParams.has("versions")) {
+      sharedRelativePath(requestedFile);
+      const versions = await fs.readdir(versionDirectory(root, requestedFile)).catch((error) => { if (error.code === "ENOENT") return []; throw error; });
+      return NextResponse.json({ versions: versions.filter((file) => /^\d+-[\da-f-]+\.skf$/.test(file)).sort().reverse() }, { headers: { "Cache-Control": "no-store" } });
+    }
+    if (requestedFile && requestUrl.searchParams.has("backup")) {
+      sharedRelativePath(requestedFile);
+      const version = requestUrl.searchParams.get("backup")!;
+      if (!/^\d+-[\da-f-]+\.skf$/.test(version)) throw new Error("Invalid backup name");
+      const bytes = await fs.readFile(path.join(versionDirectory(root, requestedFile), version));
+      return new Response(bytes, { headers: { "Content-Type": SKF_MEDIA_TYPE, "Cache-Control": "no-store" } });
+    }
     if (requestedFile) {
       const fileName = safeProjectFileName(requestedFile);
       if (fileName !== requestedFile) return NextResponse.json({ error: "Invalid shared project name" }, { status: 400 });
-      const filePath = path.join(root, fileName);
+      const filePath = await resolveSharedPath(root, fileName, true);
       const stat = await regularFileStat(filePath);
       if (!stat) return NextResponse.json({ error: "Shared project was not found" }, { status: 404 });
       if (requestUrl.searchParams.get("thumbnail") === "1") {
@@ -167,18 +202,21 @@ export async function GET(request: Request) {
       });
     }
 
-    const entries = await fs.readdir(root, { withFileTypes: true });
+    const folder = sharedRelativePath(requestUrl.searchParams.get("folder") ?? "", true);
+    const directory = await resolveSharedPath(root, folder);
+    const entries = await fs.readdir(directory, { withFileTypes: true });
     const projects = await Promise.all(entries
       .filter((entry) => entry.isFile() && /\.skf$/i.test(entry.name))
       .map(async (entry) => {
-        const stat = await regularFileStat(path.join(root, entry.name));
+        const fileName = folder ? `${folder}/${entry.name}` : entry.name;
+        const stat = await regularFileStat(path.join(directory, entry.name));
         if (!stat) return null;
         const revision = revisionForStat(stat);
-        const thumbnailStat = await regularFileStat(sharedThumbnailPath(root, entry.name, revision));
-        return projectRecord(entry.name, stat, Boolean(thumbnailStat));
+        const thumbnailStat = await regularFileStat(sharedThumbnailPath(root, fileName, revision));
+        return projectRecord(fileName, stat, Boolean(thumbnailStat));
       }));
     return NextResponse.json(
-      { enabled: true, projects: projects.filter((entry): entry is SharedProjectFile => Boolean(entry)).sort((a, b) => b.updatedAt - a.updatedAt) },
+       { enabled: true, capabilities: STORAGE_CAPABILITIES, folder, folders: entries.filter((entry) => entry.isDirectory() && !entry.name.startsWith(".")).map((entry) => folder ? `${folder}/${entry.name}` : entry.name), projects: projects.filter((entry): entry is SharedProjectFile => Boolean(entry)).sort((a, b) => b.updatedAt - a.updatedAt) },
       { headers: { "Cache-Control": "no-store" } },
     );
   } catch (error) {
@@ -201,7 +239,7 @@ export async function DELETE(request: Request) {
     if (fileName !== requestedFile) return NextResponse.json({ error: "Invalid shared project name" }, { status: 400 });
 
     await fs.mkdir(root, { recursive: true });
-    const filePath = path.join(root, fileName);
+    const filePath = await resolveSharedPath(root, fileName, true);
     lockPath = `${filePath}.lock`;
 
     try {
@@ -232,6 +270,7 @@ export async function DELETE(request: Request) {
     }
 
     const thumbnailPath = sharedThumbnailPath(root, fileName, currentRevision);
+    await backupSharedProject(root, fileName, filePath);
     await fs.unlink(filePath);
     await fs.unlink(thumbnailPath).catch((error) => {
       if ((error as NodeJS.ErrnoException).code !== "ENOENT") throw error;
@@ -244,7 +283,7 @@ export async function DELETE(request: Request) {
     return NextResponse.json({ error: error instanceof Error ? error.message : "Could not delete shared project" }, { status: 500 });
   } finally {
     if (lockHandle) await lockHandle.close().catch(() => undefined);
-    if (lockPath) await fs.unlink(lockPath).catch(() => undefined);
+    if (lockPath && lockHandle) await fs.unlink(lockPath).catch(() => undefined);
   }
 }
 
@@ -271,9 +310,9 @@ export async function POST(request: Request) {
     const requestUrl = new URL(request.url);
     const fileName = safeProjectFileName(requestUrl.searchParams.get("fileName") ?? summary.projectName);
     await fs.mkdir(root, { recursive: true });
-    const filePath = path.join(root, fileName);
+    const filePath = await resolveSharedPath(root, fileName, true);
     lockPath = `${filePath}.lock`;
-    temporaryPath = path.join(root, `.${fileName}.${randomUUID()}.tmp`);
+    temporaryPath = path.join(path.dirname(filePath), `.${path.basename(fileName)}.${randomUUID()}.tmp`);
 
     try {
       lockHandle = await fs.open(lockPath, "wx");
@@ -312,7 +351,7 @@ export async function POST(request: Request) {
       const thumbnailsRoot = path.join(root, SHARED_THUMBNAILS_DIR);
       await fs.mkdir(thumbnailsRoot, { recursive: true });
       savedThumbnailPath = sharedThumbnailPath(root, fileName, savedRevision);
-      temporaryThumbnailPath = path.join(thumbnailsRoot, `.${fileName}.${randomUUID()}.tmp`);
+      temporaryThumbnailPath = path.join(thumbnailsRoot, `.${encodeURIComponent(fileName)}.${randomUUID()}.tmp`);
       const thumbnailHandle = await fs.open(temporaryThumbnailPath, "wx");
       try {
         await thumbnailHandle.writeFile(thumbnailBytes);
@@ -323,6 +362,7 @@ export async function POST(request: Request) {
       await fs.rename(temporaryThumbnailPath, savedThumbnailPath);
       temporaryThumbnailPath = "";
     }
+    if (currentStat) await backupSharedProject(root, fileName, filePath);
     await fs.rename(temporaryPath, filePath);
     temporaryPath = "";
     const savedStat = await fs.stat(filePath);
@@ -340,6 +380,41 @@ export async function POST(request: Request) {
     if (lockHandle) await lockHandle.close().catch(() => undefined);
     if (temporaryPath) await fs.unlink(temporaryPath).catch(() => undefined);
     if (temporaryThumbnailPath) await fs.unlink(temporaryThumbnailPath).catch(() => undefined);
-    if (lockPath) await fs.unlink(lockPath).catch(() => undefined);
+    if (lockPath && lockHandle) await fs.unlink(lockPath).catch(() => undefined);
+  }
+}
+
+export async function PATCH(request: Request) {
+  const root = sharedProjectsDirectory();
+  if (!root) return NextResponse.json({ error: "Shared storage is disabled" }, { status: 404 });
+  if (!sameOriginRequest(request)) return NextResponse.json({ error: "Same-origin requests required" }, { status: 403 });
+  const locks: Array<{ handle: Awaited<ReturnType<typeof fs.open>>; path: string }> = [];
+  try {
+    const body = await request.json() as { action: string; path: string; destination?: string };
+    const relative = sharedRelativePath(body.path);
+    await fs.mkdir(root, { recursive: true });
+    if (body.action === "mkdir") {
+      const directory = await resolveSharedPath(root, relative, true);
+      await fs.mkdir(directory);
+      return NextResponse.json({ created: true });
+    }
+    if (body.action !== "move" && body.action !== "copy") throw new Error("Unknown storage action");
+    const destination = sharedRelativePath(body.destination ?? "");
+    if (!relative.endsWith(".skf") || !destination.endsWith(".skf") || relative === destination) throw new Error("Choose distinct .skf project paths");
+    const sourcePath = await resolveSharedPath(root, relative);
+    const destinationPath = await resolveSharedPath(root, destination, true);
+    for (const lockPath of [sourcePath, destinationPath].sort().map((file) => `${file}.lock`)) locks.push({ handle: await fs.open(lockPath, "wx"), path: lockPath });
+    const stat = await regularFileStat(sourcePath);
+    if (!stat || unquoteEtag(request.headers.get("if-match")) !== revisionForStat(stat)) return NextResponse.json({ error: "Project changed; refresh before moving or copying" }, { status: 409 });
+    await fs.copyFile(sourcePath, destinationPath, 1);
+    if (body.action === "move") {
+      await backupSharedProject(root, relative, sourcePath);
+      await fs.unlink(sourcePath);
+    }
+    return NextResponse.json({ fileName: destination });
+  } catch (error) {
+    return NextResponse.json({ error: error instanceof Error ? error.message : "Storage operation failed" }, { status: 400 });
+  } finally {
+    for (const lock of locks) { await lock.handle.close(); await fs.unlink(lock.path).catch(() => undefined); }
   }
 }

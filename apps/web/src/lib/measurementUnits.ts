@@ -135,10 +135,10 @@ export function formatFractionalInches(value: number, denominator = 64) {
 
 export function formatLengthForWorkspace(
   valueMm: number,
-  workspace: Pick<WorkplaneWorkspaceSettings, "units" | "scale" | "accuracy">,
+  workspace: Pick<WorkplaneWorkspaceSettings, "units" | "scale" | "accuracy" | "inchDisplay">,
 ) {
   const value = millimetersToDisplay(valueMm, workspace);
-  return lengthDisplayUnit(workspace).label === "in"
+  return lengthDisplayUnit(workspace).label === "in" && workspace.inchDisplay !== "decimal"
     ? formatFractionalInches(value)
     : formatMeasurementNumber(value, workspace.accuracy);
 }

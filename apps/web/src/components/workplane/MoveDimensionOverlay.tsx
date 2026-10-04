@@ -60,14 +60,14 @@ export function MoveDimensionOverlay({
               aria-label={`${line.axis.toUpperCase()} movement`}
               value={editing.value}
               autoFocus
-              inputMode="decimal"
+              inputMode="text"
               spellCheck={false}
               style={styleForLine(line)}
               onChange={(event) => setEditing({ axis: line.axis, value: event.target.value })}
               onBlur={() => {
                 const nextAxis = nextEditingAxisRef.current;
                 nextEditingAxisRef.current = null;
-                if (!cancelEditRef.current) {
+                if (!cancelEditRef.current && editing.value !== line.label) {
                   onCommit(line.axis, editing.value);
                 }
                 cancelEditRef.current = false;

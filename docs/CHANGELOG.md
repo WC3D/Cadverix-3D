@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+- Added browser-side XYZ/circular patterns, face-pivot rotation, lay-flat, and inward shelling with an isolated CAD-worker timeout/cancellation path.
+- Added nested cross-file 3MF component resolution, fractional/decimal viewport and sketch measurements, and bundled printer build-volume presets with out-of-volume indicators.
+- Added an internal sketch clipboard with copy/cut/paste/duplicate shortcuts and undoable straight-segment corner fillet/chamfer tools.
+- Added capability-based Storage & backups: browser recovery snapshots and SKF downloads everywhere, filesystem folders/copy/move/version archives on configured servers and desktop. The static Cloudflare deployment remains browser-storage-only.
 - Removed vulnerable transitive `braces` and `http-cache-semantics` dependencies by replacing `patch-package` with a dependency-free compatibility installer and using `@electron/get` 5.1.0 for electron-builder on Node 24.
 - Added a **Drawing** tab beside Sculpt for 2D CAD sheets: ISO A0–A4 and ANSI A–E paper templates, title blocks, first-/third-angle layouts, draggable model views, custom rotations, scale, hidden edges, and independent drawing history.
 - Added paper lines, rectangles, circles and notes, plus horizontal, vertical, aligned, angular, radius and diameter dimensions. Source-geometry changes flag model measurements for review instead of silently retaining outdated values.

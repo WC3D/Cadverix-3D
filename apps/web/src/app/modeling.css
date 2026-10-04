@@ -1,0 +1,25 @@
+.modeling-tools { position:absolute; z-index:45; right:12px; top:12px; width:300px; max-width:calc(100% - 24px); max-height:calc(100% - 24px); overflow:auto; padding:12px; background:var(--panel); color:var(--foreground); border:1px solid var(--border); border-radius:8px; box-shadow:var(--shadow); }
+.modeling-tools header,.modeling-row { display:flex; gap:8px; justify-content:space-between; }
+.modeling-tools fieldset { margin-top:12px; border:1px solid var(--border); padding:8px; }
+.modeling-tools label { display:block; font-size:12px; margin:6px 0; min-width:0; }
+.modeling-tools input:not([type=checkbox]),.modeling-tools select { width:100%; background:var(--tile); color:var(--foreground); border:1px solid var(--border); padding:6px; border-radius:4px; }
+.modeling-tools button { margin:3px; padding:7px; border:1px solid var(--border); background:var(--tile); color:var(--foreground); border-radius:4px; }
+.modeling-tools p { font-size:12px; margin:6px 0; }
+.pattern-pick-prompt { position:absolute; z-index:45; top:12px; left:50%; transform:translateX(-50%); max-width:80%; padding:8px; border:1px solid var(--border); border-radius:6px; background:var(--panel); color:var(--foreground); font-size:13px; }
+.pattern-pick-prompt button { margin-left:8px; padding:6px; border:1px solid var(--border); border-radius:4px; background:var(--tile); color:var(--foreground); }
+.printer-status { position:absolute; bottom:45px; left:12px; z-index:10; pointer-events:none; background:var(--panel); color:var(--foreground); padding:5px 8px; border-radius:4px; font-size:12px; max-width:60%; }
+.sketch-point-actions { max-width:calc(100% - 24px); overflow-x:auto; align-items:center; }
+.sketch-point-actions label { color:#435d72; font-size:11px; white-space:nowrap; }
+.sketch-point-actions input { width:55px; color:#435d72; border:1px solid #cad9e3; }
+@media(max-width:700px) { .sketch-point-actions { bottom:100px; } }
+@media(max-width:600px) { .modeling-tools { top:auto; bottom:8px; max-height:55%; } }
+.storage-launch { position:fixed; bottom:40px; right:16px; z-index:30; border:1px solid var(--border); border-radius:6px; padding:10px; background:var(--panel); color:var(--foreground); }
+.storage-manager { background:var(--panel); color:var(--foreground); padding:20px; width:850px; max-width:95vw; max-height:90dvh; overflow:auto; border-radius:10px; }
+.storage-manager header { display:flex; justify-content:space-between; align-items:center; }
+.storage-manager fieldset { border:1px solid var(--border); padding:10px; margin:12px 0; }
+.storage-manager p { font-size:13px; margin:8px 0; }
+.storage-row { display:flex; flex-wrap:wrap; gap:6px; align-items:center; border-bottom:1px solid var(--border); padding:8px 0; }
+.storage-row span { flex:1; min-width:140px; overflow-wrap:anywhere; }
+.storage-manager button,.storage-manager input { padding:7px; margin:3px; color:var(--foreground); background:var(--tile); border:1px solid var(--border); border-radius:4px; }
+.storage-manager label { display:block; margin:8px 0; }
+.storage-manager input { max-width:100%; }

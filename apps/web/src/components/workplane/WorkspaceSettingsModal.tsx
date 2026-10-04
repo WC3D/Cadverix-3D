@@ -10,6 +10,7 @@ import { normalizeScaleForUnits, parseMeasurementInput, scaleOptionsForUnits, WO
 import { shapeAssetDefaultDimensions, shapeAssetSpecialDefaults, toolbarShapeAssets } from "@/lib/shapeCatalog";
 import { DEFAULT_WORKPLANE_WORKSPACE, MAX_CUSTOM_SHAPE_DIMENSION, MAX_HIGH_RESOLUTION_SIDES, MIN_CUSTOM_SHAPE_DIMENSION, snapGridForUnits, snapGridOptionsForUnits } from "@/lib/workplaneSettings";
 import type { GearType, GridSize, ShapeCustomization, ShapeKind, WorkplaneWorkspaceSettings } from "@/types/sketchforge";
+import { PRINTER_PRESETS } from "@/lib/printerPresets";
 
 type WorkspaceSettings = WorkplaneWorkspaceSettings;
 type WorkspaceSettingsSection = "appearance" | "measurement" | "workplane" | "shapes" | "history";
@@ -483,6 +484,7 @@ export function WorkspaceSettingsModal({
 
               {activeSection === "measurement" ? (
                 <>
+                  <label className="workspace-row"><span>Show inches as</span><select aria-label="Inch display" value={workspace.inchDisplay ?? "fractions"} onChange={(event) => patchWorkspace({ inchDisplay: event.currentTarget.value as "fractions" | "decimal" })}><option value="fractions">Fractions (1/64 inch)</option><option value="decimal">Decimals</option></select></label>
                   <div className="workspace-section-heading">
                     <strong>Measurement</strong>
                     <span>Choose units, precision, scale, and snapping.</span>
@@ -522,6 +524,11 @@ export function WorkspaceSettingsModal({
 
               {activeSection === "workplane" ? (
                 <>
+                  <label className="workspace-row"><span>Printer build volume</span><select aria-label="Printer preset" value={workspace.printerId ?? ""} onChange={(event) => {
+                    const printer = PRINTER_PRESETS.find((preset) => preset.id === event.currentTarget.value);
+                    patchWorkspace(printer ? { printerId: printer.id, width: printer.width, depth: printer.depth, buildHeight: printer.height, sizePreset: "Custom" } : { printerId: "", buildHeight: undefined });
+                  }}><option value="">Custom / no printer</option>{PRINTER_PRESETS.map((preset) => <option key={preset.id} value={preset.id}>{preset.name} ({preset.width} × {preset.depth} × {preset.height} mm)</option>)}</select></label>
+                  <label className="workspace-row"><span>Maximum print height (mm)</span><input aria-label="Printer build height" type="number" min="1" max="2000" value={workspace.buildHeight ?? ""} onChange={(event) => patchWorkspace({ buildHeight: event.currentTarget.value ? Number(event.currentTarget.value) : undefined })} /></label>
                   <div className="workspace-section-heading">
                     <strong>Workplane</strong>
                     <span>Set the plate dimensions and visible grid spacing.</span>

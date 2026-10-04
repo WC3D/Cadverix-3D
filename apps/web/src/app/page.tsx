@@ -1,4 +1,6 @@
 "use client";
+import { saveProjectBackup } from "@/lib/projectBackups";
+import { ProjectStorageManager } from "@/components/ProjectStorageManager";
 
 import { Clock3, EllipsisVertical, FileUp, FolderKanban, Grid3X3, HomeIcon, List, Palette, Pencil, Plus, RefreshCw, Search, Settings, SlidersHorizontal, Trash2, X } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
@@ -326,6 +328,7 @@ async function saveProjectShapes(projectId: string, entry: ProjectShapeCacheEntr
   });
   const database = await openProjectShapesDb();
   return new Promise<void>((resolve, reject) => {
+    let saved = false;
     const transaction = database.transaction(PROJECT_SHAPES_STORE_NAME, "readwrite");
     const store = transaction.objectStore(PROJECT_SHAPES_STORE_NAME);
     const existingRequest = store.get(projectId);
@@ -343,9 +346,11 @@ async function saveProjectShapes(projectId: string, entry: ProjectShapeCacheEntr
         skfPackage,
         updatedAt: Date.now(),
       } satisfies ProjectShapeRecord);
+      saved = true;
     };
     transaction.oncomplete = () => {
       database.close();
+      if (saved) void saveProjectBackup(projectId, context.projectName, skfPackage).catch((error) => console.warn("Local recovery snapshot unavailable", error));
       resolve();
     };
     transaction.onerror = () => {
@@ -534,6 +539,7 @@ export default function Home() {
   const [showProjectNameInToolbar, setShowProjectNameInToolbar] = useState(true);
   const [dashboardNotice, setDashboardNotice] = useState("");
   const [sharedProjects, setSharedProjects] = useState<SharedProject[]>([]);
+  const [storageManagerOpen, setStorageManagerOpen] = useState(false);
   const [sharedProjectsEnabled, setSharedProjectsEnabled] = useState(false);
   const [sharedProjectsLoading, setSharedProjectsLoading] = useState(false);
   const [activeChallengeTutorial, setActiveChallengeTutorial] = useState<ChallengeTutorialId | null>(null);
@@ -1264,6 +1270,8 @@ export default function Home() {
           event.currentTarget.value = "";
         }}
       />
+      {view === "dashboard" ? <button className="storage-launch" type="button" onClick={() => setStorageManagerOpen(true)}>Storage & backups</button> : null}
+      {storageManagerOpen ? <ProjectStorageManager projects={projects} onClose={() => setStorageManagerOpen(false)} onRestore={openSkfProjectFromFile} onOpenShared={openSharedProject} /> : null}
       {view === "dashboard" ? (
         <Dashboard
           dashboardSection={dashboardSection}
