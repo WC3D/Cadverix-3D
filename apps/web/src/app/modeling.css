@@ -23,3 +23,14 @@
 .storage-manager button,.storage-manager input { padding:7px; margin:3px; color:var(--foreground); background:var(--tile); border:1px solid var(--border); border-radius:4px; }
 .storage-manager label { display:block; margin:8px 0; }
 .storage-manager input { max-width:100%; }
+.workspace-printer-select { grid-template-columns:145px minmax(0, 1fr); }
+.workspace-printer-select select { min-width:0; max-width:100%; }
+.workspace-printer-note { margin:0; font-size:12px; line-height:1.5; color:var(--muted-strong); }
+.workspace-workplane-settings { grid-template-columns:minmax(0, 1fr); }
+@media(max-width:600px) {
+  .workspace-workplane-settings .workspace-select,.workspace-workplane-settings .workspace-row { grid-template-columns:minmax(0, 1fr); }
+  .workspace-workplane-settings .workspace-dimensions { margin-left:0; gap:12px; grid-template-columns:repeat(2, minmax(0, 1fr)); }
+  .workspace-workplane-settings .workspace-dimensions label { min-width:0; }
+  .workspace-workplane-settings input,.workspace-workplane-settings select { min-width:0; max-width:100%; }
+  .workspace-workplane-settings .workspace-dimensions input { width:100%; }
+}

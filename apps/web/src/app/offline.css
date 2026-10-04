@@ -1,0 +1,10 @@
+.offline-app-banner { display:flex; align-items:center; gap:14px; padding:14px 16px; margin-bottom:20px; border:1px solid var(--border-strong, #405665); border-radius:10px; background:var(--panel, #17232d); color:var(--foreground, #d8e6f1); }
+.offline-app-copy { display:flex; flex:1; min-width:0; flex-direction:column; gap:4px; }
+.offline-app-copy strong { font-size:15px; }
+.offline-app-copy span { font-size:12px; line-height:1.5; }
+.offline-app-banner button,.offline-app-chip { display:inline-flex; align-items:center; justify-content:center; gap:7px; padding:9px 12px; border:1px solid var(--border, #304250); border-radius:7px; background:var(--tile, #1b2833); color:var(--foreground, #d8e6f1); cursor:pointer; }
+.offline-app-banner .offline-app-install { background:var(--primary, #0e69f1); color:white; font-weight:700; white-space:nowrap; }
+.offline-app-banner button:disabled { opacity:.5; cursor:wait; }
+.offline-app-chip { margin-bottom:16px; font-size:12px; }
+.offline-app-update { font-weight:600; }
+@media(max-width:600px) { .offline-app-banner { flex-wrap:wrap; gap:10px; padding:12px; } .offline-app-copy { flex-basis:calc(100% - 45px); } .offline-app-banner button { min-height:40px; } }

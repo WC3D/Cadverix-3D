@@ -32,9 +32,31 @@ Angles continue to use degrees. Drawing sheets have their own unit settings.
 ## Printer presets
 
 Open **Workspace settings → Workplane → Printer build volume**. The bundled
-catalog includes ten common Bambu Lab, Prusa, Creality, and Elegoo configurations.
+catalog includes all **190 profiles from Layerling**, plus nine retained/local
+entries, for **199 presets grouped by manufacturer**. It includes Bambu Lab,
+Prusa, Snapmaker, Creality, Elegoo, Anycubic, Qidi, Sovol, Flashforge, Artillery,
+Voron, and the other manufacturers in Layerling's bundled catalog.
 Selecting one sets the plate dimensions and maximum print height. Custom plate
 dimensions and print height are also supported and saved with the project.
+
+Additional presets use these build volumes (X × Y × Z, with Z as height):
+
+| Printer | Build volume (mm) |
+| --- | --- |
+| Tronxy X5SA | 330 × 330 × 400 |
+| Wanhao Duplicator i3 | 200 × 200 × 180 |
+| Creality HALOT-ONE (original) | 127 × 80 × 160 |
+| Elegoo Saturn (original) | 192 × 120 × 200 |
+
+Imported values follow Layerling's OrcaSlicer printable-volume profiles, which
+can differ from manufacturers' nominal dimensions. Existing IDs and saved
+dimensions remain usable; older overlapping presets are labeled **legacy
+preset**. For example, the original `neptune4` preset remains 225 × 225 × 265 mm,
+while the imported `elegoo-neptune-4` profile is 230 × 230 × 265 mm. Selecting a
+different preset explicitly applies its dimensions.
+
+The data is bundled locally and works in every deployment, including offline.
+See [Printer catalog provenance and updates](PRINTER_CATALOG.md).
 
 The viewport reports the configured volume and counts visible solids extending
 outside it, using their transformed mesh vertices. It does not crop geometry or

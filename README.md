@@ -506,6 +506,7 @@ npm run desktop:dist
 
 ## Documentation
 
+- [Installable offline app](docs/OFFLINE_APP.md) — install the static/Cloudflare version, cache the CAD runtime, and update safely.
 - [Drawing workspace](docs/DRAWING_WORKSPACE.md) — ISO/ANSI sheets, model views, measurements, and SVG/PDF output.
 - [User manual](docs/CADVERIX_USER_MANUAL.md) — modeling, sketch tools, import/export, and shortcuts.
 - [Rename and compatibility guide](docs/CADVERIX_REBRAND.md) — existing projects, installation identities, configuration aliases, and upstream attribution.

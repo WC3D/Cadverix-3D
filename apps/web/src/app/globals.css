@@ -1487,7 +1487,7 @@ button {
   }
 
   .dashboard-layout {
-    grid-template-columns: 1fr;
+    grid-template-columns: minmax(0, 1fr);
   }
 
   .dashboard-sidebar {
@@ -1504,6 +1504,7 @@ button {
 
   .dashboard-nav-stack {
     display: flex;
+    min-width: 0;
     flex: 1 1 auto;
     gap: 8px;
   }

@@ -2,6 +2,7 @@ import { readFile, rm, writeFile } from "node:fs/promises";
 import { dirname, join } from "node:path";
 import { spawnSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
+import { generateServiceWorker } from "./generate-service-worker.mjs";
 
 const repositoryRoot = dirname(dirname(fileURLToPath(import.meta.url)));
 const webRoot = join(repositoryRoot, "apps", "web");
@@ -27,3 +28,4 @@ if (build.error) throw build.error;
 if (build.status !== 0) process.exit(build.status ?? 1);
 
 await import("./verify-static-worker-assets.mjs");
+await generateServiceWorker(exportRoot);

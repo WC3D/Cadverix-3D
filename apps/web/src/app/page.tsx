@@ -1,6 +1,7 @@
 "use client";
 import { saveProjectBackup } from "@/lib/projectBackups";
 import { ProjectStorageManager } from "@/components/ProjectStorageManager";
+import { OfflineAppBanner, useOfflineApp } from "@/components/OfflineApp";
 
 import { Clock3, EllipsisVertical, FileUp, FolderKanban, Grid3X3, HomeIcon, List, Palette, Pencil, Plus, RefreshCw, Search, Settings, SlidersHorizontal, Trash2, X } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
@@ -521,6 +522,7 @@ function projectNameFromFileName(fileName: string) {
 }
 
 export default function Home() {
+  const offlineApp = useOfflineApp();
   const [mounted, setMounted] = useState(false);
   const [view, setView] = useState<AppView>("dashboard");
   const [editorStarted, setEditorStarted] = useState(false);
@@ -1274,6 +1276,7 @@ export default function Home() {
       {storageManagerOpen ? <ProjectStorageManager projects={projects} onClose={() => setStorageManagerOpen(false)} onRestore={openSkfProjectFromFile} onOpenShared={openSharedProject} /> : null}
       {view === "dashboard" ? (
         <Dashboard
+          offlineBanner={<OfflineAppBanner app={offlineApp} />}
           dashboardSection={dashboardSection}
           dashboardNotice={dashboardNotice}
           downloadFolder={downloadFolder}
@@ -1433,6 +1436,7 @@ function EditorLoadingSkeleton() {
 }
 
 function Dashboard({
+  offlineBanner,
   dashboardSection,
   dashboardNotice,
   downloadFolder,
@@ -1476,6 +1480,7 @@ function Dashboard({
   query: string;
   settingsOpen: boolean;
   sharedProjects: SharedProject[];
+  offlineBanner: React.ReactNode;
   sharedProjectsEnabled: boolean;
   sharedProjectsLoading: boolean;
   staticExportBuild: boolean;
@@ -1773,6 +1778,7 @@ function Dashboard({
         </aside>
 
         <section className="dashboard-main" aria-label={dashboardSection === "challenges" ? "Challenges" : dashboardSection === "shared" ? "Shared projects" : dashboardSection === "customization" ? "Customization" : "Dashboard"}>
+          {offlineBanner}
           {dashboardSection === "challenges" ? (
             <ChallengesDashboard onStartChallenge={onStartChallenge} />
           ) : dashboardSection === "customization" ? (

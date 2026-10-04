@@ -2,6 +2,9 @@
 
 ## Unreleased
 
+- Imported Layerling's complete 190-profile printer catalog, grouped the resulting 199 presets by manufacturer, and retained existing Cadverix preset IDs and dimensions. The bundled catalog includes source attribution and a pinned update script.
+- Added an installable offline PWA for HTTPS/localhost static deployments, with Cadverix app icons, verified app/CAD-worker precaching, an offline-readiness banner, retry handling, and updates that wait for open editor tabs to close.
+- Added printer build-volume presets for the Tronxy X5SA, Wanhao Duplicator i3, original Creality HALOT-ONE, and original Elegoo Saturn.
 - Added browser-side XYZ/circular patterns, face-pivot rotation, lay-flat, and inward shelling with an isolated CAD-worker timeout/cancellation path.
 - Added nested cross-file 3MF component resolution, fractional/decimal viewport and sketch measurements, and bundled printer build-volume presets with out-of-volume indicators.
 - Added an internal sketch clipboard with copy/cut/paste/duplicate shortcuts and undoable straight-segment corner fillet/chamfer tools.

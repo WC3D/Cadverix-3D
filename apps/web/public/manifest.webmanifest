@@ -1,0 +1,17 @@
+{
+  "id": "/",
+  "name": "Cadverix 3D",
+  "short_name": "Cadverix",
+  "description": "Local-first 3D modeling and technical drawings, with offline browser editing.",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "any",
+  "background_color": "#101820",
+  "theme_color": "#101820",
+  "icons": [
+    { "src": "/assets/cadverix/cadverix-app-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "/assets/cadverix/cadverix-app-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "/assets/cadverix/cadverix-app-maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ]
+}

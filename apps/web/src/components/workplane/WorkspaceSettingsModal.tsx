@@ -10,7 +10,7 @@ import { normalizeScaleForUnits, parseMeasurementInput, scaleOptionsForUnits, WO
 import { shapeAssetDefaultDimensions, shapeAssetSpecialDefaults, toolbarShapeAssets } from "@/lib/shapeCatalog";
 import { DEFAULT_WORKPLANE_WORKSPACE, MAX_CUSTOM_SHAPE_DIMENSION, MAX_HIGH_RESOLUTION_SIDES, MIN_CUSTOM_SHAPE_DIMENSION, snapGridForUnits, snapGridOptionsForUnits } from "@/lib/workplaneSettings";
 import type { GearType, GridSize, ShapeCustomization, ShapeKind, WorkplaneWorkspaceSettings } from "@/types/sketchforge";
-import { PRINTER_PRESETS } from "@/lib/printerPresets";
+import { PRINTER_PRESETS, PRINTER_PRESET_GROUPS } from "@/lib/printerPresets";
 
 type WorkspaceSettings = WorkplaneWorkspaceSettings;
 type WorkspaceSettingsSection = "appearance" | "measurement" | "workplane" | "shapes" | "history";
@@ -350,7 +350,7 @@ export function WorkspaceSettingsModal({
           </nav>
 
           <div className="workspace-modal-content">
-            <div className="workspace-modal-body">
+            <div className={`workspace-modal-body${activeSection === "workplane" ? " workspace-workplane-settings" : ""}`}>
               {activeSection === "appearance" ? (
                 <>
                   <div className="workspace-section-heading">
@@ -524,11 +524,12 @@ export function WorkspaceSettingsModal({
 
               {activeSection === "workplane" ? (
                 <>
-                  <label className="workspace-row"><span>Printer build volume</span><select aria-label="Printer preset" value={workspace.printerId ?? ""} onChange={(event) => {
+                  <label className="workspace-select workspace-printer-select"><span>Printer build volume</span><select aria-label="Printer preset" value={workspace.printerId ?? ""} onChange={(event) => {
                     const printer = PRINTER_PRESETS.find((preset) => preset.id === event.currentTarget.value);
                     patchWorkspace(printer ? { printerId: printer.id, width: printer.width, depth: printer.depth, buildHeight: printer.height, sizePreset: "Custom" } : { printerId: "", buildHeight: undefined });
-                  }}><option value="">Custom / no printer</option>{PRINTER_PRESETS.map((preset) => <option key={preset.id} value={preset.id}>{preset.name} ({preset.width} × {preset.depth} × {preset.height} mm)</option>)}</select></label>
-                  <label className="workspace-row"><span>Maximum print height (mm)</span><input aria-label="Printer build height" type="number" min="1" max="2000" value={workspace.buildHeight ?? ""} onChange={(event) => patchWorkspace({ buildHeight: event.currentTarget.value ? Number(event.currentTarget.value) : undefined })} /></label>
+                  }}><option value="">Custom / no printer</option>{PRINTER_PRESET_GROUPS.map((group) => <optgroup key={group.vendor} label={group.vendor}>{group.printers.map((preset) => <option key={preset.id} value={preset.id}>{preset.name} ({preset.width} × {preset.depth} × {preset.height} mm)</option>)}</optgroup>)}</select></label>
+                  <p className="workspace-printer-note">{PRINTER_PRESETS.length} presets, grouped by manufacturer. Imported dimensions follow Layerling’s OrcaSlicer profiles; legacy presets keep their original dimensions.</p>
+                  <label className="workspace-row"><span>Maximum print height (mm)</span><input aria-label="Printer build height" type="number" min="1" max="2000" step="any" value={workspace.buildHeight ?? ""} onChange={(event) => patchWorkspace({ buildHeight: event.currentTarget.value ? Number(event.currentTarget.value) : undefined })} /></label>
                   <div className="workspace-section-heading">
                     <strong>Workplane</strong>
                     <span>Set the plate dimensions and visible grid spacing.</span>
