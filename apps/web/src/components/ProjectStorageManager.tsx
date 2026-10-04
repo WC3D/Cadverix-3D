@@ -39,9 +39,9 @@ export function ProjectStorageManager({ projects, onClose, onRestore, onOpenShar
     } catch (error) { setNotice(error instanceof Error ? error.message : "Shared storage unavailable"); }
   };
   useEffect(() => { void refresh().catch((error) => setNotice(String(error))); }, [folder]);
-  const run = async (operation: () => Promise<unknown>) => {
+  const run = async (operation: () => Promise<unknown>, successNotice = "") => {
     setBusy(true); setNotice("");
-    try { await operation(); await refresh(); }
+    try { await operation(); await refresh(); if (successNotice) setNotice(successNotice); }
     catch (error) { setNotice(error instanceof Error ? error.message : "Storage operation failed"); }
     finally { setBusy(false); }
   };
@@ -57,7 +57,7 @@ export function ProjectStorageManager({ projects, onClose, onRestore, onOpenShar
       <p>Recovery snapshots: at most five per project, twenty total, 64 MB total. Automatic snapshots are spaced two minutes apart while editing. Download an SKF for an independent backup.</p>
       {projects.map((project) => <div className="storage-row" key={project.id}><span>{project.name}</span>
         <button type="button" onClick={() => void run(async () => download(`${project.name}.skf`, await currentProjectPackage(project.id)))}>Download backup</button>
-        <button type="button" onClick={() => void run(async () => saveProjectBackup(project.id, project.name, await currentProjectPackage(project.id), true))}>Snapshot now</button>
+        <button type="button" onClick={() => void run(async () => saveProjectBackup(project.id, project.name, await currentProjectPackage(project.id), true), `Snapshot saved locally for ${project.name}.`)}>Snapshot now</button>
         {capabilities.sharedProjects ? <button type="button" onClick={() => void run(async () => {
           const name = `${project.name.replace(/[<>:"/\\|?*\u0000-\u001f]/g, "_")}.skf`;
           const response = await fetch(`/api/shared-projects?fileName=${encodeURIComponent(folder ? `${folder}/${name}` : name)}`, { method: "POST", headers: { "If-None-Match": "*" }, body: new Uint8Array(await currentProjectPackage(project.id)) });
@@ -79,7 +79,7 @@ export function ProjectStorageManager({ projects, onClose, onRestore, onOpenShar
         const response = await fetch(`/api/shared-projects?fileName=${encodeURIComponent(file.fileName)}&versions=1`); const payload = await response.json(); if (!response.ok) throw new Error(payload.error); setVersions({ file, names: payload.versions });
       })}>Versions</button> : null}</div>)}
       {versions ? <div><h3>Previous versions of {versions.file.name}</h3>{!versions.names.length ? <p>No earlier saves yet. Up to ten versions are retained before overwriting a file.</p> : versions.names.map((name) => <button type="button" key={name} onClick={() => void run(async () => { const response = await fetch(`/api/shared-projects?fileName=${encodeURIComponent(versions.file.fileName)}&backup=${encodeURIComponent(name)}`); if (!response.ok) throw new Error("Could not read backup"); await restore(versions.file.name, new Uint8Array(await response.arrayBuffer())); })}>Restore copy · {new Date(Number(name.split("-")[0])).toLocaleString()}</button>)}</div> : null}
-    </fieldset> : <p>Filesystem sharing is unavailable here. Local snapshots and downloadable backups remain available; cloud sharing requires a configured storage API.</p>}
+    </fieldset> : <fieldset><legend>Shared project folders</legend><p>Shared folders are not configured for this installation. Local recovery snapshots and downloadable backups above are still available.</p></fieldset>}
     <p role="status">{busy ? "Working…" : notice}</p>
   </section></div>;
 }

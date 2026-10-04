@@ -36,6 +36,7 @@ import { createBentTubeGeometry } from "@/lib/bentTubeGeometry";
 import { regularPolygonFootprintScale } from "@/lib/regularPolygonFootprint";
 import {
   ToolbarAlignIcon,
+  ToolbarBodiesSplitIcon,
   ToolbarCenterOnWorkplaneIcon,
   ToolbarChamferIcon,
   ToolbarCaretDownIcon,
@@ -11176,6 +11177,7 @@ export function CadverixEditor({
         canUndo={!splitSession && !projectInteractionActive && (historyIndex > 0 || Boolean(edgeModifier))}
         canRedo={!splitSession && !projectInteractionActive && historyIndex < history.length - 1}
         canGroup={selectedShapes.length > 1 && selectedShapes.every((shape) => !shape.locked)}
+        canBodiesSplit={canSeparateSelectedParts}
         canIntersect={selectedShapes.some((shape) => !shape.locked && !shape.hole) && selectedShapes.some((shape) => !shape.locked && Boolean(shape.hole))}
         canUngroup={selectedShapes.some((shape) => Boolean(shape.groupedShapes?.length))}
         hasClipboard={clipboard.length > 0 || systemClipboardSupported}
@@ -11235,6 +11237,7 @@ export function CadverixEditor({
         onCenterOnWorkplane={centerSelectionOnWorkplane}
         onDropToWorkplane={dropSelectedToWorkplane}
         onGroup={groupSelected}
+        onBodiesSplit={separateSelectedParts}
         onIntersect={intersectSelected}
         onFillet={() => edgeModifier?.kind === "fillet" ? cancelEdgeModifier() : startEdgeModifier("fillet")}
         onMirror={toggleMirrorMode}
@@ -11964,6 +11967,7 @@ function SecondaryToolbar({
   sculptStrength,
   sculptTargetName,
   edgeModifierKind,
+  canBodiesSplit,
   canGroup,
   canIntersect,
   canSplit,
@@ -12011,6 +12015,7 @@ function SecondaryToolbar({
   onCenterOnWorkplane,
   onDropToWorkplane,
   onGroup,
+  onBodiesSplit,
   onIntersect,
   onFillet,
   onMirror,
@@ -12047,6 +12052,7 @@ function SecondaryToolbar({
   sculptStrength: number;
   sculptTargetName: string | null;
   edgeModifierKind: CadModifierKind | null;
+  canBodiesSplit: boolean;
   canGroup: boolean;
   canIntersect: boolean;
   canSplit: boolean;
@@ -12094,6 +12100,7 @@ function SecondaryToolbar({
   onCenterOnWorkplane: () => void;
   onDropToWorkplane: () => void;
   onGroup: () => void;
+  onBodiesSplit: () => void;
   onIntersect: () => void;
   onFillet: () => void;
   onMirror: () => void;
@@ -12277,6 +12284,7 @@ function SecondaryToolbar({
     { label: "Group", icon: ToolbarGroupIcon, action: onGroup, enabled: canGroup && geometryActionsEnabled },
     { label: "Ungroup", icon: ToolbarUngroupIcon, action: onUngroup, enabled: canUngroup && geometryActionsEnabled },
     { label: "Boolean Intersection", icon: ToolbarIntersectionIcon, action: onIntersect, enabled: canIntersect && geometryActionsEnabled },
+    { label: "Bodies split", icon: ToolbarBodiesSplitIcon, action: onBodiesSplit, enabled: canBodiesSplit && geometryActionsEnabled },
   ];
   const modifyTools = [
     { label: "Align", icon: ToolbarAlignIcon, action: onAlign, enabled: canAlign && geometryActionsEnabled, active: alignMode },

@@ -49,6 +49,28 @@ test("imports nested cross-file 3MF components with local ID collisions", async 
   await expect.poll(async () => (await scene(page)).shapeCount).toBe(1);
   expect((await scene(page)).shapes[0].width).toBeCloseTo(20);
 });
+test("splits disconnected bodies from the Combine toolbar and undoes as one action", async ({ page }) => {
+  const ns = 'xmlns="http://schemas.microsoft.com/3dmanufacturing/core/2015/02"';
+  const vertices = [
+    [0, 0, 0], [10, 0, 0], [0, 10, 0], [0, 0, 10],
+    [30, 0, 0], [40, 0, 0], [30, 10, 0], [30, 0, 10],
+  ].map(([x, y, z]) => `<vertex x="${x}" y="${y}" z="${z}"/>`).join("");
+  const triangles = [[0, 2, 1], [0, 1, 3], [0, 3, 2], [1, 2, 3], [4, 6, 5], [4, 5, 7], [4, 7, 6], [5, 6, 7]]
+    .map(([v1, v2, v3]) => `<triangle v1="${v1}" v2="${v2}" v3="${v3}"/>`).join("");
+  const archive = zipSync({
+    "_rels/.rels": strToU8('<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Target="/3D/3dmodel.model" Id="rel0" Type="http://schemas.microsoft.com/3dmanufacturing/2013/01/3dmodel"/></Relationships>'),
+    "3D/3dmodel.model": strToU8(`<model ${ns} unit="millimeter"><resources><object id="1" type="model"><mesh><vertices>${vertices}</vertices><triangles>${triangles}</triangles></mesh></object></resources><build><item objectid="1"/></build></model>`),
+  });
+  await page.locator('input[type="file"]').filter({ hasNot: page.locator("[accept*=image]") }).first().setInputFiles({ name: "disconnected.3mf", mimeType: "model/3mf", buffer: Buffer.from(archive) });
+  await expect.poll(async () => (await scene(page)).shapeCount).toBe(1);
+  const splitBodies = page.getByRole("button", { name: "Bodies split", exact: true });
+  await expect(splitBodies).toBeEnabled();
+  await splitBodies.click();
+  await expect.poll(async () => (await scene(page)).shapeCount).toBe(2);
+  expect((await scene(page)).selectedIds).toHaveLength(2);
+  await page.getByRole("button", { name: "Undo", exact: true }).click();
+  await expect.poll(async () => (await scene(page)).shapeCount).toBe(1);
+});
 test("printer settings and local recovery snapshots survive reload", async ({ page }) => {
   await page.getByRole("button", { name: "Add shape", exact: true }).click();
   await page.getByRole("button", { name: "Box", exact: true }).click();
@@ -72,6 +94,7 @@ test("printer settings and local recovery snapshots survive reload", async ({ pa
   expect(unzipSync(await readFile((await backupDownload.path())!))["project.json"]).toBeDefined();
   await page.getByRole("button", { name: "Snapshot now", exact: true }).click();
   await expect(page.getByRole("button", { name: "Snapshot now", exact: true })).toBeEnabled();
+  await expect(page.getByRole("status")).toContainText("Snapshot saved locally");
   await expect(page.getByRole("button", { name: "Restore as copy", exact: true }).first()).toBeVisible();
   await page.getByRole("button", { name: "Restore as copy", exact: true }).first().click();
   await expect(page).toHaveURL(/project=/);
