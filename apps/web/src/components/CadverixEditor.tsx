@@ -1,6 +1,6 @@
 "use client";
 
-import { Check, Circle, Circle as CircleIcon, CircleDot, CircleMinus, CirclePlus, CloudUpload, CopyPlus, Download, Eye, FolderOpen, Grid2X2, Hexagon, Hexagon as HexagonIcon, Paintbrush, Pentagon, RotateCw, Route, Ruler, ScanLine, Sparkles, Square, Square as SquareIcon, Triangle as TriangleIcon, Type, X } from "lucide-react";
+import { Check, Circle, Circle as CircleIcon, CircleDot, CircleMinus, CirclePlus, CloudUpload, CopyPlus, Download, Eye, EyeOff, FolderOpen, Grid2X2, Hexagon, Hexagon as HexagonIcon, Paintbrush, Pentagon, RotateCw, Route, Ruler, ScanLine, Sparkles, Square, Square as SquareIcon, Triangle as TriangleIcon, Type, X } from "lucide-react";
 import type manifoldModule from "manifold-3d";
 import type { ManifoldToplevel } from "manifold-3d";
 import { useCallback, useEffect, useMemo, useRef, useState, type FormEvent } from "react";
@@ -51,6 +51,7 @@ import {
   ToolbarIntersectionIcon,
   ToolbarFilletIcon,
   ToolbarMirrorIcon,
+  ToolbarNoteIcon,
   ToolbarPasteIcon,
   ToolbarRedoIcon,
   ToolbarSnapGridIcon,
@@ -110,7 +111,7 @@ import {
   type CadModifierRequestPhase,
 } from "@/lib/cadModifierRuntime";
 import { cloneWorkplaneShapeSnapshot, compactEdgeTreatmentHistory, edgeTreatmentAppliedFrame, restoreShapeBeforeEdgeTreatment } from "@/lib/edgeTreatmentHistory";
-import { appendEditorHistorySnapshot, boundedEditorHistoryState, editorHistoryEntry, editorHistoryForExport, hydrateEditorHistoryState, projectShapesFingerprint, type EditorHistoryEntry, type EditorHistoryExportLimit, type EditorHistoryState } from "@/lib/editorHistory";
+import { appendEditorHistorySnapshot, boundedEditorHistoryState, editorHistoryEntry, editorHistoryForExport, hydrateEditorHistoryState, notesForHistoryIndex, projectSceneFingerprint, projectShapesFingerprint, type EditorHistoryEntry, type EditorHistoryExportLimit, type EditorHistoryState } from "@/lib/editorHistory";
 import { snapShapeFootprintToVisibleGrid, visibleGridStep } from "@/lib/gridSnap";
 import type { SculptBrushKind } from "@/lib/sculptBrush";
 import { removeShapeFeature, shapeWithFeatureToggles, withShapeFeatureEnabled } from "@/lib/shapeFeatureToggles";
@@ -157,7 +158,7 @@ import { cadSketchProfileForRegions, cadSketchRegions, cadSketchSelectableRegion
 import { sketchDimensionAnchorKey, sketchDistanceDimensionValue } from "@/lib/sketchDimensions";
 import { addLineIntersectionPoints, splitSketchSegment } from "@/lib/sketchPointRefinement";
 import { buildSketchRevolveMesh, DEFAULT_SKETCH_REVOLVE_SETTINGS, normalizeSketchRevolveSettings, type SketchRevolveMesh } from "@/lib/sketchRevolve";
-import { exportSkfProject, SKF_MEDIA_TYPE } from "@/lib/skfProject";
+import { exportLylProject, exportSkfProject, LYL_MEDIA_TYPE, SKF_MEDIA_TYPE } from "@/lib/skfProject";
 import { makeShapeFromAsset, sceneShape, toolbarBasicShapeAssets, toolbarGeneratorAssets, type ToolbarShapeAsset } from "@/lib/shapeCatalog";
 import { importExtensionSupported } from "@/lib/importExtensions";
 import { editableProjectFileName } from "@/lib/projectFileTypes";
@@ -168,6 +169,7 @@ import { exportMeshesTo3mf, importedShapeFrom3mf } from "@/lib/threeMf";
 import { importedShapeFromSvg, invalidSvgMeshReason } from "@/lib/svgImport";
 import { toSvgProjection, type SvgProjectionLayer } from "@/lib/svgExport";
 import { normalizeSnapGrid, normalizeWorkspaceSettings, workplaneSettingsFingerprint } from "@/lib/workplaneSettings";
+import { createNoteId, detachNotesFromMissingShapes, normalizeNotes, NOTE_COUNT_LIMIT, NOTE_TEXT_LIMIT } from "@/lib/workplaneNotes";
 import {
   normalizePlacementWorkplane,
   placementPatchForNewShape,
@@ -192,16 +194,18 @@ import {
 import type { CadModifierComponentMesh, CadModifierDisplayEdge, CadModifierEdge, CadModifierKind, CadModifierMeshPart, CadModifierPrimitivePart, CadModifierQuality, CadModifierWorkerRequest, CadModifierWorkerResponse } from "@/lib/cadModifierTypes";
 import type { SketchCadBuildResponse } from "@/lib/sketchCadTypes";
 import { appColorModeForThemePreset, customThemeWithDefaults, defaultThemes, THEME_PRESET_OPTIONS } from "@/lib/themes";
-import type { AlignAxis, AlignHandleStatus, AlignTarget, GridSize, ProjectAsset, ShapeAsset, ShapeFeatureKind, SketchDimensionAnchor, SketchImage, SketchOperation, SketchPoint, SketchProfile, SketchRevolveSettings, SketchSegment, WorkplaneShape, WorkplaneWorkspaceSettings } from "@/types/sketchforge";
+import type { AlignAxis, AlignHandleStatus, AlignTarget, GridSize, ProjectAsset, ShapeAsset, ShapeFeatureKind, SketchDimensionAnchor, SketchImage, SketchOperation, SketchPoint, SketchProfile, SketchRevolveSettings, SketchSegment, WorkplaneNote, WorkplaneShape, WorkplaneWorkspaceSettings } from "@/types/sketchforge";
 
 export { importedShapeFrom3mf, importedShapeFromObj, importedShapeFromStl, importedShapeFromSvg };
 
 type TopPanel = "import" | "export" | "tips" | "profile" | "settings" | null;
-type ExportFormat = "stl" | "3mf" | "obj" | "step" | "svg" | "skf";
-type DirectExportFormat = Exclude<ExportFormat, "step" | "skf">;
+type ExportFormat = "stl" | "3mf" | "obj" | "step" | "svg" | "skf" | "lyl";
+type ProjectPackageExportFormat = Extract<ExportFormat, "skf" | "lyl">;
+type DirectExportFormat = Exclude<ExportFormat, "step" | ProjectPackageExportFormat>;
 type SkfHistoryLimit = EditorHistoryExportLimit;
 type SkfExportTarget = "download" | "shared";
 type ToolbarMode = "geometry" | "sketch" | "sculpt" | "drawing";
+const NOTE_COMMIT_IDLE_MS = 700;
 type SketchCommandKind = "sweep" | "project" | "offset" | "mirror" | "rectangular-pattern" | "circular-pattern";
 type SketchOffsetCommandOptions = { distance: number; includeConnected: boolean };
 type SketchProjectCommandOptions = { sourceShapeId: string; linked: boolean };
@@ -6189,9 +6193,13 @@ export function CadverixEditor({
       initialHistory,
       initialHistoryIndex,
       normalizeWorkspaceSettings(initialWorkspace).historyLimit,
+      notesForHistoryIndex(initialHistory, initialHistoryIndex),
     );
   }
   const [shapes, setShapes] = useState<WorkplaneShape[]>(() => initialSceneRef.current as WorkplaneShape[]);
+  const [notes, setNotes] = useState<WorkplaneNote[]>(() => notesForHistoryIndex(initialHistory, initialHistoryIndex));
+  const [notesVisible, setNotesVisible] = useState(true);
+  const [noteMode, setNoteMode] = useState(false);
   const [projectAssets, setProjectAssets] = useState<ProjectAsset[]>(() => dedupeProjectAssets(initialAssets));
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [clipboard, setClipboard] = useState<WorkplaneShape[]>([]);
@@ -6208,6 +6216,9 @@ export function CadverixEditor({
   const [workspaceSettings, setWorkspaceSettings] = useState<WorkplaneWorkspaceSettings>(() => normalizeWorkspaceSettings(initialWorkspace));
   const [snapGrid, setSnapGrid] = useState<GridSize>(() => normalizeSnapGrid(initialSnap));
   const [workplaneMode, setWorkplaneMode] = useState(false);
+  useEffect(() => {
+    if (workplaneMode) setNoteMode(false);
+  }, [workplaneMode]);
   const [modelingToolsOpen, setModelingToolsOpen] = useState(false);
   const [patternPreview, setPatternPreview] = useState<WorkplaneShape[]>([]);
   const [faceAction, setFaceAction] = useState<"flat" | "pivot" | null>(null);
@@ -6285,6 +6296,8 @@ export function CadverixEditor({
   const projectSnapshotRunRef = useRef(0);
   const lastProjectSnapshotRef = useRef<ProjectThumbnailSceneKey | null>(null);
   const shapesRef = useRef(shapes);
+  const notesRef = useRef(notes);
+  const noteCommitTimerRef = useRef<number | null>(null);
   const projectAssetsRef = useRef(projectAssets);
   const selectedIdsRef = useRef(selectedIds);
   const workspaceSettingsRef = useRef(workspaceSettings);
@@ -6643,6 +6656,10 @@ export function CadverixEditor({
   useEffect(() => {
     shapesRef.current = shapes;
   }, [shapes]);
+
+  useEffect(() => {
+    notesRef.current = notes;
+  }, [notes]);
 
   useEffect(() => {
     projectAssetsRef.current = projectAssets;
@@ -7025,8 +7042,8 @@ export function CadverixEditor({
   }, []);
 
   const appendHistorySnapshot = useCallback(
-    (nextShapes: WorkplaneShape[], nextSelection: string[]) =>
-      appendHistoryEntry(editorHistoryEntry(nextShapes, nextSelection)),
+    (nextShapes: WorkplaneShape[], nextSelection: string[], nextNotes: WorkplaneNote[] = notesRef.current) =>
+      appendHistoryEntry(editorHistoryEntry(nextShapes, nextSelection, nextNotes)),
     [appendHistoryEntry],
   );
 
@@ -7039,7 +7056,7 @@ export function CadverixEditor({
       return;
     }
 
-    const entry = editorHistoryEntry(shapesRef.current, selectedIdsRef.current);
+    const entry = editorHistoryEntry(shapesRef.current, selectedIdsRef.current, notesRef.current);
     if (!startFingerprint || startFingerprint === entry.fingerprint) {
       return;
     }
@@ -7070,7 +7087,7 @@ export function CadverixEditor({
           finalizeInteractionHistory();
         }
         if (!projectInteractionActiveRef.current) {
-          interactionHistoryStartRef.current = projectShapesFingerprint(shapesRef.current);
+          interactionHistoryStartRef.current = projectSceneFingerprint(shapesRef.current, notesRef.current);
           interactionHistoryChangedRef.current = false;
         }
         projectInteractionActiveRef.current = true;
@@ -7187,11 +7204,15 @@ export function CadverixEditor({
       const canonicalNext = refreshConstructionPlaneShapes(next.map(canonicalizeShape), shapesRef.current);
       const requestedSelection = Array.isArray(nextSelection) ? nextSelection : nextSelection ? [nextSelection] : [];
       const validSelection = requestedSelection.filter((id, index) => requestedSelection.indexOf(id) === index && canonicalNext.some((shape) => shape.id === id));
+      const currentNotes = notesRef.current;
+      const nextNotes = detachNotesFromMissingShapes(currentNotes, canonicalNext, shapesRef.current);
       shapesRef.current = canonicalNext;
       selectedIdsRef.current = validSelection;
+      notesRef.current = nextNotes;
       setShapes(canonicalNext);
       setSelectedIds(validSelection);
-      const changed = appendHistorySnapshot(canonicalNext, validSelection);
+      if (nextNotes !== currentNotes) setNotes(nextNotes);
+      const changed = appendHistorySnapshot(canonicalNext, validSelection, nextNotes);
       if (message) {
         setNotice(message);
       }
@@ -7201,6 +7222,105 @@ export function CadverixEditor({
     },
     [appendHistorySnapshot, selectedIds, syncProjectShapes],
   );
+
+  const commitNotes = useCallback((next: WorkplaneNote[], message?: string) => {
+    const normalized = normalizeNotes(next);
+    notesRef.current = normalized;
+    setNotes(normalized);
+    const changed = appendHistoryEntry(editorHistoryEntry(shapesRef.current, selectedIdsRef.current, normalized));
+    if (message) setNotice(message);
+    if (changed) syncProjectShapes(shapesRef.current, true);
+  }, [appendHistoryEntry, syncProjectShapes]);
+
+  const flushPendingNoteCommit = useCallback(() => {
+    if (noteCommitTimerRef.current === null) return;
+    window.clearTimeout(noteCommitTimerRef.current);
+    noteCommitTimerRef.current = null;
+    appendHistoryEntry(editorHistoryEntry(shapesRef.current, selectedIdsRef.current, notesRef.current));
+    syncProjectShapes(shapesRef.current, true, true);
+  }, [appendHistoryEntry, syncProjectShapes]);
+
+  useEffect(() => {
+    const onPageHide = () => flushPendingNoteCommit();
+    const onVisibilityChange = () => {
+      if (document.visibilityState === "hidden") flushPendingNoteCommit();
+    };
+    window.addEventListener("pagehide", onPageHide);
+    document.addEventListener("visibilitychange", onVisibilityChange);
+    return () => {
+      window.removeEventListener("pagehide", onPageHide);
+      document.removeEventListener("visibilitychange", onVisibilityChange);
+    };
+  }, [flushPendingNoteCommit]);
+
+  useEffect(() => {
+    // This cleanup retains the previous project's save callback, so a final
+    // debounced edit is persisted before the next project hydrates.
+    return () => flushPendingNoteCommit();
+    // flushPendingNoteCommit intentionally belongs to the active project.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [projectId]);
+
+  const addNote = useCallback((position: { x: number; y: number; z: number; anchor?: WorkplaneNote["anchor"] }) => {
+    if (notesRef.current.length >= NOTE_COUNT_LIMIT) {
+      setNotice(`A project can contain up to ${NOTE_COUNT_LIMIT} notes`);
+      return null;
+    }
+    const created: WorkplaneNote = { id: createNoteId(), text: "", x: position.x, y: position.y, z: position.z };
+    if (position.anchor) created.anchor = position.anchor;
+    commitNotes([...notesRef.current, created], position.anchor ? "Note pinned to object" : "Note added");
+    return created.id;
+  }, [commitNotes]);
+
+  const updateNote = useCallback((id: string, patch: Partial<WorkplaneNote>, transient = false) => {
+    if (!notesRef.current.some((note) => note.id === id)) return;
+    const next = notesRef.current.map((note) => {
+      if (note.id !== id) return note;
+      const merged: WorkplaneNote = { ...note, ...patch, id: note.id };
+      if (typeof patch.text === "string") merged.text = patch.text.slice(0, NOTE_TEXT_LIMIT);
+      if ("anchor" in patch && !patch.anchor) delete merged.anchor;
+      return merged;
+    });
+    if (noteCommitTimerRef.current !== null) window.clearTimeout(noteCommitTimerRef.current);
+    noteCommitTimerRef.current = null;
+    if (!transient) {
+      commitNotes(next);
+      return;
+    }
+    notesRef.current = next;
+    setNotes(next);
+    noteCommitTimerRef.current = window.setTimeout(() => {
+      noteCommitTimerRef.current = null;
+      commitNotes(notesRef.current);
+    }, NOTE_COMMIT_IDLE_MS);
+  }, [commitNotes]);
+
+  const removeNote = useCallback((id: string) => {
+    if (noteCommitTimerRef.current !== null) window.clearTimeout(noteCommitTimerRef.current);
+    noteCommitTimerRef.current = null;
+    if (!notesRef.current.some((note) => note.id === id)) return;
+    commitNotes(notesRef.current.filter((note) => note.id !== id), "Note deleted");
+  }, [commitNotes]);
+
+  const toggleNoteTool = useCallback(() => {
+    setNoteMode((active) => {
+      const next = !active;
+      if (next) {
+        setWorkplaneMode(false);
+        setNotesVisible(true);
+      }
+      setNotice(next ? "Click an object or the workplane to place a note" : "Note placement cancelled");
+      return next;
+    });
+  }, []);
+
+  const toggleNotesVisible = useCallback(() => {
+    setNotesVisible((visible) => {
+      if (visible) setNoteMode(false);
+      setNotice(visible ? "Notes hidden" : "Notes shown");
+      return !visible;
+    });
+  }, []);
 
   const createPrincipalConstructionPlane = useCallback((principal: PrincipalPlane, offset: number, angle: number = 0, flipped: boolean = false) => {
     const safeOffset = Number.isFinite(offset) ? Math.max(-1000, Math.min(1000, offset)) : 0;
@@ -8510,18 +8630,22 @@ export function CadverixEditor({
     if (!projectChanged && incomingSerialized === projectShapesFingerprint(shapes)) {
       return;
     }
+    const incomingNotes = notesForHistoryIndex(initialHistory, initialHistoryIndex);
     const hydratedHistory = hydrateEditorHistoryState(
       incoming,
       initialHistory,
       initialHistoryIndex,
       normalizeWorkspaceSettings(initialWorkspace).historyLimit,
+      incomingNotes,
     );
     projectHydratingRef.current = true;
     shapesRef.current = incoming;
     selectedIdsRef.current = [];
+    notesRef.current = incomingNotes;
     historyRef.current = hydratedHistory.entries;
     historyIndexRef.current = hydratedHistory.index;
     setShapes(incoming);
+    setNotes(incomingNotes);
     setSelectedIds([]);
     setHistory(hydratedHistory.entries);
     setHistoryIndex(hydratedHistory.index);
@@ -8546,6 +8670,9 @@ export function CadverixEditor({
       }
       if (interactionHistoryTimerRef.current !== null) {
         window.clearTimeout(interactionHistoryTimerRef.current);
+      }
+      if (noteCommitTimerRef.current !== null) {
+        window.clearTimeout(noteCommitTimerRef.current);
       }
       sketchRevolveUpdateTimerRef.current.forEach((timer) => window.clearTimeout(timer));
       sketchRevolveUpdateTimerRef.current.clear();
@@ -8871,13 +8998,16 @@ export function CadverixEditor({
     const entry = currentHistory[nextIndex];
     const nextShapes = (entry?.shapes ?? []).map(canonicalizeShape);
     const nextSelection = (entry?.selectedIds ?? []).filter((id) => nextShapes.some((shape) => shape.id === id));
+    const nextNotes = normalizeNotes(entry?.notes);
     historyIndexRef.current = nextIndex;
     shapesRef.current = nextShapes;
     selectedIdsRef.current = nextSelection;
+    notesRef.current = nextNotes;
     setHistoryIndex(nextIndex);
     setShapes(nextShapes);
+    setNotes(nextNotes);
     setSelectedIds(nextSelection);
-    syncProjectShapes(nextShapes);
+    syncProjectShapes(nextShapes, true);
     setNotice(modifierCancelled ? "Edge modifier cancelled · Undo" : "Undo");
   }, [invalidateCadModifierSession, syncProjectShapes]);
 
@@ -8897,13 +9027,16 @@ export function CadverixEditor({
     const entry = currentHistory[nextIndex];
     const nextShapes = (entry?.shapes ?? []).map(canonicalizeShape);
     const nextSelection = (entry?.selectedIds ?? []).filter((id) => nextShapes.some((shape) => shape.id === id));
+    const nextNotes = normalizeNotes(entry?.notes);
     historyIndexRef.current = nextIndex;
     shapesRef.current = nextShapes;
     selectedIdsRef.current = nextSelection;
+    notesRef.current = nextNotes;
     setHistoryIndex(nextIndex);
     setShapes(nextShapes);
+    setNotes(nextNotes);
     setSelectedIds(nextSelection);
-    syncProjectShapes(nextShapes);
+    syncProjectShapes(nextShapes, true);
     setNotice(modifierCancelled ? "Edge modifier cancelled · Redo" : "Redo");
   }, [invalidateCadModifierSession, syncProjectShapes]);
 
@@ -10239,9 +10372,11 @@ export function CadverixEditor({
   }, [executeMcpCommand]);
 
   useEffect(() => {
-    if (process.env.NODE_ENV === "production" || typeof window === "undefined") {
+    if (typeof window === "undefined") {
       return;
     }
+    const desktopMcp = window.cadverixDesktop?.mcpAvailable === true || window.sketchforgeDesktop?.mcpAvailable === true;
+    if (process.env.NODE_ENV === "production" && !desktopMcp) return;
     if (!["localhost", "127.0.0.1", "::1"].includes(window.location.hostname)) {
       return;
     }
@@ -10582,8 +10717,12 @@ export function CadverixEditor({
     }
   }, [hasSelection, projectName, selectedShapes, shapes, stepExporting]);
 
-  const exportSkfDesign = useCallback(async (exportName: string, historyLimit: SkfHistoryLimit, target: SkfExportTarget = "download") => {
+  const exportProjectDesign = useCallback(async (format: ProjectPackageExportFormat, exportName: string, historyLimit: SkfHistoryLimit, target: SkfExportTarget = "download") => {
     if (skfExporting) return;
+    if (format === "lyl" && target === "shared") {
+      setNotice("Shared project storage accepts SKF files only");
+      return;
+    }
     if (target === "shared" && !onSaveSharedProject) {
       setNotice("Shared project storage is not available in this deployment");
       return;
@@ -10602,12 +10741,14 @@ export function CadverixEditor({
         throw new Error("Could not capture the current project preview");
       }
       const exportedHistory = editorHistoryForExport(historyRef.current, historyIndexRef.current, historyLimit);
-      const bytes = await exportSkfProject({
+      const exportPackage = format === "lyl" ? exportLylProject : exportSkfProject;
+      const bytes = await exportPackage({
         projectId: projectInfoRef.current.projectId,
         projectName,
         createdAt: projectCreatedAt,
         modifiedAt: projectModifiedAt,
         shapes: shapesRef.current,
+        notes: notesRef.current,
         history: exportedHistory.entries,
         historyIndex: exportedHistory.index,
         assets: projectAssetsRef.current,
@@ -10621,8 +10762,9 @@ export function CadverixEditor({
         setNotice(await onSaveSharedProject({ exportName: exportName.trim() || projectName, bytes, thumbnailDataUrl }));
       } else {
         const buffer = bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength) as ArrayBuffer;
-        const result = await downloadBlobFile(projectExportFileName(exportName, "skf"), new Blob([buffer], { type: SKF_MEDIA_TYPE }));
-        setNotice(result.mode === "folder" ? `Saved editable Cadverix 3D project to ${result.path}` : "Saved editable Cadverix 3D project (.skf)");
+        const result = await downloadBlobFile(projectExportFileName(exportName, format), new Blob([buffer], { type: format === "lyl" ? LYL_MEDIA_TYPE : SKF_MEDIA_TYPE }));
+        const label = format === "lyl" ? "Layerling project (.lyl)" : "editable Cadverix 3D project (.skf)";
+        setNotice(result.mode === "folder" ? `Saved ${label} to ${result.path}` : `Saved ${label}`);
       }
     } catch (error) {
       setNotice(error instanceof Error ? error.message : "Could not save Cadverix 3D project");
@@ -11173,6 +11315,7 @@ export function CadverixEditor({
           setWorkplaneMode(false);
           setTopPanel(null);
           setMenuOpen(false);
+          setNoteMode(false);
         }}
         canUndo={!splitSession && !projectInteractionActive && (historyIndex > 0 || Boolean(edgeModifier))}
         canRedo={!splitSession && !projectInteractionActive && historyIndex < history.length - 1}
@@ -11184,6 +11327,9 @@ export function CadverixEditor({
         hasSelection={hasSelection}
         hiddenShapeCount={shapes.filter((shape) => shape.hidden).length}
         selectionHidden={hasSelection && selectedShapes.every((shape) => shape.hidden)}
+        noteMode={noteMode}
+        notesVisible={notesVisible}
+        noteCount={notes.length}
         alignMode={alignMode}
         canAlign={selectedShapes.length > 1}
         canEdgeModify={selectedShapes.length === 1 && Boolean(selectedShape && !selectedShape.locked && !selectedShape.hole)}
@@ -11250,6 +11396,8 @@ export function CadverixEditor({
         onPaste={pasteShape}
         onRedo={redo}
         onSnap={snapSelected}
+        onNoteTool={toggleNoteTool}
+        onToggleNotes={toggleNotesVisible}
         onShowHidden={showHidden}
         onToggleHidden={toggleHidden}
         onUngroup={ungroupSelected}
@@ -11304,7 +11452,7 @@ export function CadverixEditor({
           onSaveProject={(drawing) => {
             updateProjectWorkspaceSettings({ workspace: { ...workspaceSettingsRef.current, drawing }, snap: snapGridRef.current });
             syncProjectShapes(shapesRef.current, true);
-            void exportSkfDesign(projectName, "unlimited");
+            void exportProjectDesign("skf", projectName, "unlimited");
           }}
         /> : null}
         {toolbarMode === "drawing" ? null : toolbarMode === "sketch" && sketchActive ? (
@@ -11484,6 +11632,13 @@ export function CadverixEditor({
           canSeparateParts={canSeparateSelectedParts}
           onSeparateParts={separateSelectedParts}
            onUpdateShape={updateShape}
+           notes={notes}
+           notesVisible={notesVisible}
+           noteMode={noteMode}
+           onNoteAdd={addNote}
+           onNoteUpdate={updateNote}
+           onNoteRemove={removeNote}
+           onNoteModeChange={setNoteMode}
            sculptSettings={sculptSession ? { kind: sculptSession.brush, radius: sculptSession.radius, strength: sculptSession.strength } : null}
            shapeInspectorCollapsed={shapeInspectorCollapsed}
            onShapeInspectorCollapsedChange={setShapeInspectorCollapsed}
@@ -11618,7 +11773,7 @@ export function CadverixEditor({
           scopeLabel={exportScopeLabel}
           onClose={() => setTopPanel(null)}
           onExport={exportDesign}
-          onExportSkf={exportSkfDesign}
+          onExportProject={exportProjectDesign}
           onExportStep={exportStepDesign}
           sharedProjectsEnabled={sharedProjectsEnabled}
           skfExporting={skfExporting}
@@ -11978,6 +12133,9 @@ function SecondaryToolbar({
   hasSelection,
   hiddenShapeCount,
   selectionHidden,
+  noteMode,
+  notesVisible,
+  noteCount,
   mirrorMode,
   splitMode,
   sketchActive,
@@ -12028,6 +12186,8 @@ function SecondaryToolbar({
   onSnap,
   onShowHidden,
   onToggleHidden,
+  onNoteTool,
+  onToggleNotes,
   onUngroup,
   onUndo,
   onWorkplaneTool,
@@ -12063,6 +12223,9 @@ function SecondaryToolbar({
   hasSelection: boolean;
   hiddenShapeCount: number;
   selectionHidden: boolean;
+  noteMode: boolean;
+  notesVisible: boolean;
+  noteCount: number;
   mirrorMode: boolean;
   splitMode: boolean;
   sketchActive: boolean;
@@ -12113,6 +12276,8 @@ function SecondaryToolbar({
   onSnap: () => void;
   onShowHidden: () => void;
   onToggleHidden: () => void;
+  onNoteTool: () => void;
+  onToggleNotes: () => void;
   onUngroup: () => void;
   onUndo: () => void;
   onWorkplaneTool: () => void;
@@ -12494,6 +12659,20 @@ function SecondaryToolbar({
                 <Eye size={20} aria-hidden="true" />
                 <strong>{hiddenShapeCount === 0 ? "Nothing hidden" : `Show all hidden (${hiddenShapeCount})`}</strong>
               </button>
+              <button
+                className="visibility-dropdown-action"
+                type="button"
+                role="menuitemcheckbox"
+                aria-checked={notesVisible}
+                disabled={noteCount === 0}
+                onClick={() => {
+                  setVisibilityOpen(false);
+                  onToggleNotes();
+                }}
+              >
+                {notesVisible ? <Eye size={20} aria-hidden="true" /> : <EyeOff size={20} aria-hidden="true" />}
+                <strong>Notes{noteCount > 0 ? ` (${noteCount})` : ""}</strong>
+              </button>
               <div className="visibility-dropdown-help">
                 <span>Eye again: selected</span>
                 <span aria-hidden="true">·</span>
@@ -12518,6 +12697,9 @@ function SecondaryToolbar({
       <div className="toolbar-section toolbar-actions-section" data-tool-group="manage">
         <div className="toolbar-section-label">Manage</div>
         <div className="action-buttons">
+          <button className={`action-icon-button ${noteMode ? "active" : ""}`} aria-label="Add note" aria-pressed={noteMode} title="Add note" onClick={onNoteTool}>
+            <ToolbarNoteIcon />
+          </button>
           <button className="action-icon-button" aria-label="Import" title="Import" disabled={splitMode} onClick={() => onTopPanel("import")}>
             <ToolbarImportIcon />
           </button>
@@ -12889,7 +13071,7 @@ function TopActionPanel({
   scopeLabel,
   onClose,
   onExport,
-  onExportSkf,
+  onExportProject,
   onExportStep,
   sharedProjectsEnabled,
   skfExporting,
@@ -12905,7 +13087,7 @@ function TopActionPanel({
   scopeLabel: "selected" | "total";
   onClose: () => void;
   onExport: (format: DirectExportFormat, exportName: string) => void;
-  onExportSkf: (exportName: string, historyLimit: SkfHistoryLimit, target?: SkfExportTarget) => void;
+  onExportProject: (format: ProjectPackageExportFormat, exportName: string, historyLimit: SkfHistoryLimit, target?: SkfExportTarget) => void;
   onExportStep: (exportName: string) => void;
   sharedProjectsEnabled: boolean;
   skfExporting: boolean;
@@ -12971,11 +13153,17 @@ function TopActionPanel({
       description: "Editable project",
       note: "Preserves the editable project, undo/redo history, sketches, groups, CAD data, and imported sources.",
     },
+    lyl: {
+      label: "LYL",
+      description: "Layerling project",
+      note: "Exports compatible editable objects and history for Layerling. Unsupported Cadverix features are reported instead of discarded.",
+    },
   };
   const selectedExport = exportDetails[exportFormat];
+  const projectPackageExport = exportFormat === "skf" || exportFormat === "lyl";
   const runSelectedExport = () => {
     if (exportFormat === "step") onExportStep(exportName);
-    else if (exportFormat === "skf") onExportSkf(exportName, skfHistoryLimit);
+    else if (projectPackageExport) onExportProject(exportFormat, exportName, skfHistoryLimit);
     else onExport(exportFormat, exportName);
   };
 
@@ -13037,7 +13225,7 @@ function TopActionPanel({
                 onChange={(event) => setExportName(event.target.value)}
                 onFocus={(event) => event.currentTarget.select()}
                 onKeyDown={(event) => {
-                  if (event.key === "Enter" && (shapeCount > 0 || exportFormat === "skf") && !stepExporting && !skfExporting) runSelectedExport();
+                  if (event.key === "Enter" && (shapeCount > 0 || projectPackageExport) && !stepExporting && !skfExporting) runSelectedExport();
                 }}
               />
               <span>.{exportFormat}</span>
@@ -13049,10 +13237,10 @@ function TopActionPanel({
               <div>
                 <strong>Format</strong>
               </div>
-              <span className="export-scope-badge">{exportFormat === "skf" ? "Full project" : `${shapeCount} ${scopeLabel}`}</span>
+              <span className="export-scope-badge">{projectPackageExport ? "Full project" : `${shapeCount} ${scopeLabel}`}</span>
             </div>
             <div className="export-format-slider" data-format={exportFormat} role="radiogroup" aria-label="Export format">
-              {(["stl", "3mf", "obj", "step", "svg", "skf"] as const).map((format) => (
+              {(["stl", "3mf", "obj", "step", "svg", "skf", "lyl"] as const).map((format) => (
                 <button
                   key={format}
                   type="button"
@@ -13067,7 +13255,7 @@ function TopActionPanel({
             </div>
           </section>
 
-          {exportFormat === "skf" ? (
+          {projectPackageExport ? (
             <section className="export-setting-section skf-history-section">
               <div className="export-section-heading">
                 <div>
@@ -13083,7 +13271,7 @@ function TopActionPanel({
                   max={skfHistoryLimits.length - 1}
                   step={1}
                   value={skfHistoryLimitIndex}
-                  aria-label="Saved SKF action history"
+                  aria-label="Saved project action history"
                   aria-valuetext={skfHistoryLimit === "unlimited" ? "Unlimited" : `${skfHistoryLimit} actions`}
                   onChange={(event) => setSkfHistoryLimit(skfHistoryLimits[Number(event.currentTarget.value)] ?? "unlimited")}
                 />
@@ -13112,17 +13300,17 @@ function TopActionPanel({
                 <button
                   className="export-shared-button"
                   type="button"
-                  onClick={() => onExportSkf(exportName, skfHistoryLimit, "shared")}
+                  onClick={() => onExportProject("skf", exportName, skfHistoryLimit, "shared")}
                   disabled={skfExporting || stepExporting}
                 >
                   <CloudUpload />
                   <span>Save to shared</span>
                 </button>
               ) : null}
-              <button className="export-primary-button" onClick={runSelectedExport} disabled={(shapeCount === 0 && exportFormat !== "skf") || stepExporting || skfExporting}>
+              <button className="export-primary-button" onClick={runSelectedExport} disabled={(shapeCount === 0 && !projectPackageExport) || stepExporting || skfExporting}>
                 <Download />
-                {exportFormat === "skf" ? (skfExporting ? "Saving project…" : "Save Cadverix 3D Project") : null}
-                <span hidden={exportFormat === "skf"}>
+                {projectPackageExport ? (skfExporting ? "Saving project…" : exportFormat === "lyl" ? "Export Layerling Project" : "Save Cadverix 3D Project") : null}
+                <span hidden={projectPackageExport}>
                 {stepExporting && exportFormat === "step" ? "Building STEP…" : `Export ${selectedExport.label}`}
                 </span>
               </button>

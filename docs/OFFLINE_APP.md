@@ -1,17 +1,28 @@
-# Installable offline web app
+# Offline desktop and web apps
 
-The **static export**, including the Cloudflare assets deployment, can be
-installed as a Progressive Web App (PWA). It uses the browser's own app window
-and storage; it does not require Electron or a server running on the device.
+On Windows, macOS, and Linux, the static/Cloudflare dashboard recommends the
+native **Cadverix 3D desktop app** as the primary offline version. It includes
+automatic desktop updates and authenticated local MCP access. The dashboard
+links to the latest matching installers on GitHub Releases.
+
+The **static export** can also be installed as a Progressive Web App (PWA).
+This remains the fallback on desktop and the primary option on mobile. It uses
+the browser's own app window and storage; it does not require Electron or a
+server running on the device.
 
 ## Install and prepare for offline use
 
 1. Open the deployed static site over **HTTPS** while online. Localhost is also
    supported for testing.
-2. The dashboard shows **Cadverix 3D as an app** and offline-download progress.
-3. Wait for **Ready for offline use**. Installation of an icon alone is not
+2. On a supported desktop OS, choose **Download for Windows/macOS/Linux** for
+   the recommended native app. If installers have not been published yet, the
+   dashboard says **Coming soon** and leaves the browser option available.
+3. To use the browser app instead, wait for **Browser fallback: Ready for
+   offline use**. On mobile, wait for **Ready for offline use**.
+   Installation of an icon alone is not
    proof that the CAD runtime has finished downloading.
-4. Click **Install now** when the browser offers its installation prompt.
+4. Click **Install browser app** on desktop or **Install now** on mobile when
+   the browser offers its installation prompt.
    Otherwise use the browser's installation menu. On iPhone/iPad, use Safari's
    **Share → Add to Home Screen**; on supported macOS Safari versions use
    **File → Add to Dock**.
@@ -73,7 +84,7 @@ hide the newly deployed server application.
 | Static export on localhost | Same behavior; useful for testing |
 | Static export served on plain LAN HTTP | No offline-install promise; service workers require a secure context |
 | Normal Node development/production or Docker server build | Existing web app behavior; offline registration is disabled |
-| Electron desktop | Existing native desktop behavior; no PWA registration |
+| Electron desktop | Primary desktop offline app, automatic updates, and authenticated local MCP; no PWA registration |
 
 Serve the static export at the site's root. The manifest, startup URL and
 service-worker scope use `/`, matching the current Cloudflare configuration.

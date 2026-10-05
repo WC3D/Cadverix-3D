@@ -1,11 +1,15 @@
 "use client";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Download, RefreshCw, WifiOff, X } from "lucide-react";
+import { desktopPlatformForUserAgent, desktopPlatformLabel, type DesktopPlatform } from "@/lib/offlineInstall";
 
 type InstallPrompt = Event & { prompt: () => Promise<void>; userChoice: Promise<{ outcome: string }> };
 declare global { interface Window { cadverixInstallPrompt?: InstallPrompt | null } }
 type OfflineStatus = { ready: boolean; progress?: number; total?: number; bytes?: number; error?: string };
+type DesktopRelease = { state: "loading" | "available" | "unavailable" | "unknown"; url?: string; version?: string };
 const DISMISSED = "cadverix.offlineInstallDismissed";
+const RELEASES_URL = "https://github.com/WC3D/SketchForge-3D/releases";
+const LATEST_RELEASE_API = "https://api.github.com/repos/WC3D/SketchForge-3D/releases/latest";
 const installedApp = () => window.matchMedia("(display-mode: standalone)").matches || (navigator as Navigator & { standalone?: boolean }).standalone === true;
 
 export function useOfflineApp() {
@@ -17,10 +21,16 @@ export function useOfflineApp() {
   const [prompt, setPrompt] = useState<InstallPrompt | null>(null);
   const [instructions, setInstructions] = useState("Use your browser’s Install app or Add to Home Screen option, if available.");
   const [attempt, setAttempt] = useState(0);
+  const [desktopPlatform, setDesktopPlatform] = useState<DesktopPlatform | null>(null);
+  const [desktopRelease, setDesktopRelease] = useState<DesktopRelease>({ state: "loading" });
   const registration = useRef<ServiceWorkerRegistration | null>(null);
 
   useEffect(() => {
-    if (process.env.NEXT_PUBLIC_STATIC_EXPORT !== "true" || !window.isSecureContext || !("serviceWorker" in navigator) || "cadverixDesktop" in window) return;
+    if (process.env.NEXT_PUBLIC_STATIC_EXPORT !== "true" || "cadverixDesktop" in window) return;
+    const platform = desktopPlatformForUserAgent(navigator.userAgent, navigator.maxTouchPoints);
+    setDesktopPlatform(platform);
+    if (platform) setEnabled(true);
+    if (!window.isSecureContext || !("serviceWorker" in navigator)) return;
     let alive = true;
     const cleanups: Array<() => void> = [];
     setEnabled(true);
@@ -98,6 +108,28 @@ export function useOfflineApp() {
     };
   }, [attempt]);
 
+  useEffect(() => {
+    if (!desktopPlatform || process.env.NEXT_PUBLIC_STATIC_EXPORT !== "true") return;
+    let alive = true;
+    fetch(LATEST_RELEASE_API, { headers: { Accept: "application/vnd.github+json" } })
+      .then(async (response) => {
+        if (!alive) return;
+        if (response.status === 404) {
+          setDesktopRelease({ state: "unavailable" });
+          return;
+        }
+        if (!response.ok) throw new Error(`GitHub returned HTTP ${response.status}`);
+        const release = await response.json() as { html_url?: unknown; tag_name?: unknown };
+        setDesktopRelease({
+          state: "available",
+          url: typeof release.html_url === "string" ? release.html_url : RELEASES_URL,
+          version: typeof release.tag_name === "string" ? release.tag_name : undefined,
+        });
+      })
+      .catch(() => { if (alive) setDesktopRelease({ state: "unknown", url: RELEASES_URL }); });
+    return () => { alive = false; };
+  }, [desktopPlatform]);
+
   const install = useCallback(async () => {
     if (!prompt || !status.ready) return;
     try {
@@ -107,21 +139,29 @@ export function useOfflineApp() {
     finally { window.cadverixInstallPrompt = null; setPrompt(null); }
   }, [prompt, status.ready]);
   const dismiss = () => { setDismissed(true); try { localStorage.setItem(DISMISSED, "1"); } catch { /* optional preference */ } };
-  return { enabled, status, updateReady, installed, dismissed, prompt, instructions, install, dismiss, retry: () => { setStatus({ ready: false }); setAttempt((value) => value + 1); }, expand: () => setDismissed(false) };
+  return { enabled, status, updateReady, installed, dismissed, prompt, instructions, desktopPlatform, desktopRelease, install, dismiss, retry: () => { setStatus({ ready: false }); setAttempt((value) => value + 1); }, expand: () => setDismissed(false) };
 }
 
 export function OfflineAppBanner({ app }: { app: ReturnType<typeof useOfflineApp> }) {
   if (!app.enabled) return null;
   if (app.dismissed && app.status.ready && !app.updateReady) return <button className="offline-app-chip" type="button" onClick={app.expand}><WifiOff size={15} />Offline ready · App options</button>;
+  const desktopLabel = app.desktopPlatform ? desktopPlatformLabel(app.desktopPlatform) : null;
+  const desktopAvailable = app.desktopRelease.state === "available" || app.desktopRelease.state === "unknown";
   return <aside className="offline-app-banner" aria-label="Install Cadverix for offline use">
     <WifiOff size={25} aria-hidden="true" />
     <div className="offline-app-copy">
-      <strong>{app.installed ? "Cadverix 3D offline app" : "Cadverix 3D as an app"}</strong>
-      <span role="status" aria-label="Offline app status">{app.status.ready ? "Ready for offline use" : app.status.error ?? `Preparing offline files${app.status.total ? ` · ${app.status.progress ?? 0}/${app.status.total}` : "…"}${app.status.bytes ? ` (${Math.ceil(app.status.bytes / 1024 / 1024)} MB)` : ""}`}</span>
-      {app.updateReady ? <span className="offline-app-update">Update ready. Finish your work, close all Cadverix tabs and app windows, then reopen to apply it.</span> : app.status.ready && !app.installed ? <span>{app.prompt ? "Install with its own icon and window, then launch without internet." : app.instructions}</span> : null}
+      <strong>{desktopLabel ? `Cadverix 3D desktop app for ${desktopLabel}` : app.installed ? "Cadverix 3D offline app" : "Cadverix 3D as an app"}</strong>
+      {desktopLabel ? <span>The recommended offline version includes local MCP access and automatic desktop updates.</span> : null}
+      {desktopLabel && app.desktopRelease.state === "unavailable" ? <span role="status">Desktop installers are not published yet. The browser app remains available below.</span> : null}
+      {desktopLabel && app.desktopRelease.state === "loading" ? <span role="status">Checking for the latest desktop release…</span> : null}
+      {desktopLabel && desktopAvailable ? <span role="status">{app.desktopRelease.version ? `${app.desktopRelease.version} is available.` : "Open the releases page for the latest installer."}</span> : null}
+      <span role={desktopLabel ? undefined : "status"} aria-label="Offline app status">{desktopLabel ? "Browser fallback: " : ""}{app.status.ready ? "Ready for offline use" : app.status.error ?? `Preparing offline files${app.status.total ? ` · ${app.status.progress ?? 0}/${app.status.total}` : "…"}${app.status.bytes ? ` (${Math.ceil(app.status.bytes / 1024 / 1024)} MB)` : ""}`}</span>
+      {app.updateReady ? <span className="offline-app-update">Update ready. Finish your work, close all Cadverix tabs and app windows, then reopen to apply it.</span> : app.status.ready && !app.installed ? <span>{app.prompt ? `${desktopLabel ? "Alternatively, install the browser app" : "Install with its own icon and window"}, then launch without internet.` : app.instructions}</span> : null}
       {!app.status.ready && !app.status.error ? <span>Keep this page open until the offline files finish downloading.</span> : null}
     </div>
-    {app.prompt && !app.installed ? <button type="button" className="offline-app-install" disabled={!app.status.ready} onClick={() => void app.install()}><Download size={17} />Install now</button> : null}
+    {desktopLabel && desktopAvailable ? <a className="offline-app-install" href={app.desktopRelease.url ?? RELEASES_URL} target="_blank" rel="noreferrer"><Download size={17} />Download for {desktopLabel}</a> : null}
+    {desktopLabel && (app.desktopRelease.state === "loading" || app.desktopRelease.state === "unavailable") ? <button type="button" className="offline-app-install" disabled><Download size={17} />{app.desktopRelease.state === "loading" ? "Checking release" : "Coming soon"}</button> : null}
+    {app.prompt && !app.installed ? <button type="button" className={desktopLabel ? undefined : "offline-app-install"} disabled={!app.status.ready} onClick={() => void app.install()}><Download size={17} />{desktopLabel ? "Install browser app" : "Install now"}</button> : null}
     {!app.status.ready && (app.status.error || app.status.total) ? <button type="button" onClick={app.retry}><RefreshCw size={16} />Retry offline setup</button> : null}
     {app.status.ready && !app.updateReady ? <button type="button" aria-label="Dismiss install suggestion" onClick={app.dismiss}><X size={18} /></button> : null}
   </aside>;

@@ -1,8 +1,18 @@
-const { app, BrowserWindow, Menu, Tray, dialog, ipcMain, nativeImage, shell } = require("electron");
+const path = require("node:path");
+const { pathToFileURL } = require("node:url");
+
+if (process.argv?.includes("--mcp-server")) {
+  const mcpServerPath = path.join(__dirname, "..", "..", "scripts", "cadverix-mcp-server.mjs");
+  void import(pathToFileURL(mcpServerPath).href).catch((error) => {
+    process.stderr.write(`Could not start Cadverix 3D MCP: ${error instanceof Error ? error.stack || error.message : String(error)}\n`);
+    process.exitCode = 1;
+  });
+} else {
+const { app, BrowserWindow, Menu, Tray, dialog, ipcMain, nativeImage, session, shell } = require("electron");
 const { autoUpdater } = require("electron-updater");
 const { spawn } = require("node:child_process");
+const crypto = require("node:crypto");
 const fs = require("node:fs");
-const path = require("node:path");
 
 app.setName("Cadverix 3D");
 // Retain the installed application's profile across the product-name change.
@@ -28,6 +38,8 @@ let downloadedUpdateReady = false;
 let updateInstallRequested = false;
 let lastUpdateCheckResult = null;
 let lastUpdateCheckError = "";
+let mcpDiscoveryPath = "";
+const mcpToken = app.isPackaged ? crypto.randomBytes(32).toString("base64url") : "";
 
 function appendServerOutput(chunk) {
   webServerOutput += String(chunk);
@@ -81,6 +93,7 @@ async function startPackagedWebServer() {
       PORT: String(port),
       CADVERIX_DESKTOP: "1",
       CADVERIX_DESKTOP_VERSION: app.getVersion(),
+      CADVERIX_MCP_TOKEN: mcpToken,
       CADVERIX_SHARED_PROJECTS_DIR: process.env.CADVERIX_DESKTOP_PROJECTS_DIR || path.join(app.getPath("userData"), "projects"),
       NEXT_TELEMETRY_DISABLED: "1",
     },
@@ -92,6 +105,51 @@ async function startPackagedWebServer() {
   const url = `http://127.0.0.1:${port}`;
   await waitForServer(url);
   return url;
+}
+
+function removeMcpDiscovery() {
+  if (!mcpDiscoveryPath) return;
+  try {
+    const current = JSON.parse(fs.readFileSync(mcpDiscoveryPath, "utf8"));
+    if (current?.pid === process.pid) fs.unlinkSync(mcpDiscoveryPath);
+  } catch {
+    // A missing or replaced discovery file does not need cleanup.
+  }
+  mcpDiscoveryPath = "";
+}
+
+function publishMcpDiscovery(url) {
+  if (!app.isPackaged || !mcpToken) return;
+  const userDataPath = app.getPath("userData");
+  fs.mkdirSync(userDataPath, { recursive: true, mode: 0o700 });
+  mcpDiscoveryPath = path.join(userDataPath, "cadverix-mcp.json");
+  const temporaryPath = `${mcpDiscoveryPath}.${process.pid}.${crypto.randomBytes(6).toString("hex")}.tmp`;
+  const payload = `${JSON.stringify({
+    url,
+    token: mcpToken,
+    pid: process.pid,
+    version: app.getVersion(),
+    updatedAt: new Date().toISOString(),
+  }, null, 2)}\n`;
+  fs.writeFileSync(temporaryPath, payload, { encoding: "utf8", mode: 0o600 });
+  fs.renameSync(temporaryPath, mcpDiscoveryPath);
+  try {
+    fs.chmodSync(mcpDiscoveryPath, 0o600);
+  } catch {
+    // Windows ACLs govern access when POSIX modes are unavailable.
+  }
+}
+
+async function installMcpRendererCookie(url) {
+  if (!app.isPackaged || !mcpToken) return;
+  await session.defaultSession.cookies.set({
+    url,
+    name: "cadverix_mcp",
+    value: mcpToken,
+    httpOnly: true,
+    sameSite: "strict",
+    secure: false,
+  });
 }
 
 function stopPackagedWebServer() {
@@ -359,6 +417,8 @@ async function startDesktop() {
 
   try {
     const url = devUrl || await startPackagedWebServer();
+    await installMcpRendererCookie(url);
+    publishMcpDiscovery(url);
     setupDesktopIpc();
     createTray();
     createMainWindow(url);
@@ -397,6 +457,7 @@ if (!hasSingleInstanceLock) {
 
 app.on("before-quit", () => {
   isQuitting = true;
+  removeMcpDiscovery();
   stopPackagedWebServer();
 });
 
@@ -404,3 +465,4 @@ app.on("window-all-closed", () => {
   // Keep Cadverix 3D available from the system tray. Use Quit Cadverix 3D
   // from the tray menu when the user wants to fully stop the application.
 });
+}

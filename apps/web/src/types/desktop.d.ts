@@ -12,6 +12,7 @@ type CadverixDesktopUpdateResult = {
 declare global {
   interface Window {
     cadverixDesktop?: {
+      mcpAvailable: boolean;
       getVersion: () => Promise<string>;
       checkForUpdates: () => Promise<CadverixDesktopUpdateResult>;
       installUpdate: () => Promise<CadverixDesktopUpdateResult>;

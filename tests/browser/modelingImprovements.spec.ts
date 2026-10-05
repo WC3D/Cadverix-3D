@@ -26,6 +26,24 @@ test("XYZ patterns preview without committing, apply once, and undo", async ({ p
   await page.getByRole("button", { name: "Undo", exact: true }).click();
   await expect.poll(async () => (await scene(page)).shapeCount).toBe(1);
 });
+test("exports a compatible editable Layerling project", async ({ page }) => {
+  await page.getByRole("button", { name: "Add shape", exact: true }).click();
+  await page.getByRole("button", { name: "Box", exact: true }).click();
+  await page.getByRole("button", { name: "Add note", exact: true }).click();
+  await page.locator(".three-workplane-host").click({ position: { x: 80, y: 80 } });
+  await page.getByPlaceholder("Write a note...").fill("Check this face");
+  await page.getByRole("button", { name: "Export", exact: true }).click();
+  await page.getByRole("radio", { name: "LYL: Layerling project", exact: true }).click();
+  await expect(page.getByLabel("Saved project action history", { exact: true })).toBeVisible();
+  const downloaded = page.waitForEvent("download");
+  await page.getByRole("button", { name: "Export Layerling Project", exact: true }).click();
+  const projectDownload = await downloaded;
+  expect(projectDownload.suggestedFilename()).toMatch(/\.lyl$/);
+  const files = unzipSync(await readFile((await projectDownload.path())!));
+  const document = JSON.parse(Buffer.from(files["project.json"]).toString());
+  expect(document.schema).toBe("com.layerling.project");
+  expect(document.states.some((state: { notes?: Array<{ text: string }> }) => state.notes?.some((note) => note.text === "Check this face"))).toBe(true);
+});
 test("shells a box in the browser worker and preserves exact CAD geometry", async ({ page }) => {
   test.setTimeout(90000);
   await page.getByRole("button", { name: "Add shape", exact: true }).click();

@@ -450,3 +450,18 @@ export type WorkplaneShape = {
   locked?: boolean;
   hidden?: boolean;
 };
+
+export type WorkplaneNoteAnchor = {
+  shapeId: string;
+  normalized: [number, number, number];
+};
+
+export type WorkplaneNote = {
+  id: string;
+  text: string;
+  x: number;
+  y: number;
+  z: number;
+  anchor?: WorkplaneNoteAnchor;
+  collapsed?: boolean;
+};

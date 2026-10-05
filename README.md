@@ -19,7 +19,7 @@
     <a href="https://github.com/WC3D/SketchForge-3D/stargazers"><img alt="Star Cadverix 3D on GitHub" src="https://img.shields.io/github/stars/WC3D/SketchForge-3D?style=flat&logo=github"></a>
     <a href="https://github.com/sponsors/Formsmith746"><img alt="Sponsor upstream contributors on GitHub" src="https://img.shields.io/badge/GitHub-Sponsor-ea4aaa?logo=githubsponsors&logoColor=white"></a>
     <img alt="Local first" src="https://img.shields.io/badge/local--first-no%20account-0ea5e9">
-    <img alt="Version v1.0.12" src="https://img.shields.io/badge/version-v1.0.12-2563eb">
+    <img alt="Version v1.0.13" src="https://img.shields.io/badge/version-v1.0.13-2563eb">
     <a href="docs/MOBILE_ALPHA.md"><img alt="Mobile support: alpha" src="https://img.shields.io/badge/mobile-alpha-f59e0b"></a>
   </p>
 </div>
@@ -38,8 +38,9 @@ No login. Private projects autosave locally in your browser, with optional share
 
 - **2D Sketching & Parametric Profiles** - draw parametric lines, Bézier curves, three-point arcs (start, end, then bulge), circles, rectangles, polygons, and text with constraints, distance dimensions, region selections, and revolve/extrude/sweep operations.
 - **Local-first projects** - designs live in browser storage with generated project thumbnails.
-- **Editable SKF project packages** - back up and transfer projects with their editable objects, imported assets, and available undo/redo history; optionally save to a shared Docker library. Compatible Layerling `.lyl` files can also be opened and are converted to SKF when saved.
+- **Editable SKF and Layerling projects** - back up and transfer projects with editable objects, imported assets, and available undo/redo history. Compatible `.lyl` files can be opened, and compatible projects can be exported back to Layerling; SKF remains the lossless native and shared-storage format.
 - **Real 3D workplane** - grid, camera controls, snap settings, transform handles, outlines, and inspector controls.
+- **Workplane notes** - place editable notes freely on the workplane or pin them to bodies so they follow model transforms; notes participate in undo/redo and SKF/LYL project saves.
 - **Associative construction planes** - create offset, angled, flipped, face-attached, and midplanes for sketches away from the base workplane.
 - **Primitive shape library** - boxes, cylinders, spheres, cones, pyramids, wedges, text, roofs, half spheres, torus shapes, tubes, and more.
 - **Solid and hole workflow** - turn shapes into cutters and group them into final geometry.
@@ -513,7 +514,7 @@ npm run desktop:dist
 - [Mobile Alpha](docs/MOBILE_ALPHA.md) — touch/pen controls, LAN setup, and validation status.
 - [CAD edge tools](docs/CAD_EDGE_TOOLS.md) — imported rim fillets/chamfers, supported geometry, diagnostics, and tests.
 - [SKF project format](docs/SKF_PROJECT_FORMAT.md) — editable project packages and reader compatibility.
-- [Changelog](docs/CHANGELOG.md) — release notes, including CAD stability and editor fixes in 1.0.12.
+- [Changelog](docs/CHANGELOG.md) — release notes for current and previous versions.
 
 ## Contributing
 
@@ -561,10 +562,21 @@ Open an editor tab:
 http://127.0.0.1:3000/?editor=1
 ```
 
-The AI client starts the MCP server with:
+For repository development, the AI client starts the MCP server with:
 
 ```bash
 node scripts/cadverix-mcp-server.mjs
+```
+
+The installed desktop app hosts the same bridge offline. Keep Cadverix 3D open
+and configure the MCP client to launch the installed executable with
+`--mcp-server`; the helper securely discovers the running app and its
+per-launch credential. Typical executable paths are:
+
+```text
+Windows: C:\Program Files\Cadverix 3D\Cadverix 3D.exe
+macOS:   /Applications/Cadverix 3D.app/Contents/MacOS/Cadverix 3D
+Linux:   /path/to/Cadverix 3D-1.0.13-x86_64.AppImage
 ```
 
 ### Codex
@@ -591,7 +603,7 @@ mkdir -p ~/.codex/skills
 cp -R docs/skills/cadverix-mcp-skill ~/.codex/skills/
 ```
 
-Then add an MCP server entry to your Codex config. Use [`docs/mcp/codex-config.example.toml`](docs/mcp/codex-config.example.toml) as the template and replace the script path with the absolute path on your machine. Restart Codex after changing the config.
+Then add an MCP server entry to your Codex config. Use [`docs/mcp/codex-config.example.toml`](docs/mcp/codex-config.example.toml) as the development template, or set `command` to the installed executable and `args = ["--mcp-server"]`. Restart Codex after changing the config.
 
 Once installed, ask Codex:
 
@@ -601,7 +613,7 @@ Use $cadverix-mcp-skill to list my open Cadverix 3D editors and inspect the curr
 
 ### Claude
 
-Claude does not use Codex `SKILL.md` files, but it can use the same Cadverix 3D MCP server. Add the server to Claude Desktop's MCP config using [`docs/mcp/claude-desktop-config.example.json`](docs/mcp/claude-desktop-config.example.json) as the template, replacing the script path with the absolute path on your machine.
+Claude does not use Codex `SKILL.md` files, but it can use the same Cadverix 3D MCP server. Add the server to Claude Desktop's MCP config using [`docs/mcp/claude-desktop-config.example.json`](docs/mcp/claude-desktop-config.example.json) as the development template. For an installed app, use its executable as `command` and `["--mcp-server"]` as `args`.
 
 After restarting Claude Desktop, ask:
 

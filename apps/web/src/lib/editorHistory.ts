@@ -1,5 +1,6 @@
-import type { WorkplaneShape } from "@/types/sketchforge";
+import type { WorkplaneNote, WorkplaneShape } from "@/types/sketchforge";
 import { canonicalizeShape } from "@/lib/workplaneShapes";
+import { normalizeNotes, notesSignature } from "@/lib/workplaneNotes";
 
 export const MAX_EDITOR_HISTORY_ENTRIES = 5000;
 export type EditorHistoryExportLimit = "unlimited" | number;
@@ -7,6 +8,7 @@ export type EditorHistoryExportLimit = "unlimited" | number;
 export type EditorHistoryEntry = {
   shapes: WorkplaneShape[];
   selectedIds: string[];
+  notes?: WorkplaneNote[];
   fingerprint: string;
   estimatedBytes: number;
 };
@@ -259,14 +261,35 @@ export function projectShapesFingerprint(shapes: WorkplaneShape[]) {
   return serializedSceneSignature(shapes).fingerprint;
 }
 
-export function editorHistoryEntry(shapes: WorkplaneShape[], selectedIds: string[]): EditorHistoryEntry {
+function sceneFingerprint(shapeFingerprint: string, notes: WorkplaneNote[]) {
+  const signature = notesSignature(notes);
+  return signature ? `${shapeFingerprint}#${signatureFromSerialized(signature).fingerprint}` : shapeFingerprint;
+}
+
+export function projectSceneFingerprint(shapes: WorkplaneShape[], notes: WorkplaneNote[] = []) {
+  return sceneFingerprint(projectShapesFingerprint(shapes), normalizeNotes(notes));
+}
+
+export function editorHistoryEntry(shapes: WorkplaneShape[], selectedIds: string[], notes: WorkplaneNote[] = []): EditorHistoryEntry {
   const canonicalShapes = shapes.map(canonicalizeShape);
   const validSelection = selectedIds.filter((id, index) => selectedIds.indexOf(id) === index && canonicalShapes.some((shape) => shape.id === id));
-  return {
+  const canonicalNotes = normalizeNotes(notes);
+  const shapeSignature = serializedSceneSignature(canonicalShapes);
+  const noteSignature = notesSignature(canonicalNotes);
+  const entry: EditorHistoryEntry = {
     shapes: canonicalShapes,
     selectedIds: validSelection,
-    ...serializedSceneSignature(canonicalShapes),
+    fingerprint: sceneFingerprint(shapeSignature.fingerprint, canonicalNotes),
+    estimatedBytes: shapeSignature.estimatedBytes + noteSignature.length * 2,
   };
+  if (canonicalNotes.length > 0) entry.notes = canonicalNotes;
+  return entry;
+}
+
+export function notesForHistoryIndex(entries: EditorHistoryEntry[] | undefined, index: number | undefined): WorkplaneNote[] {
+  if (!Array.isArray(entries) || entries.length === 0) return [];
+  const bounded = Number.isInteger(index) ? Math.min(Math.max(0, index as number), entries.length - 1) : entries.length - 1;
+  return normalizeNotes(entries[bounded]?.notes);
 }
 
 export function boundedEditorHistory(entries: EditorHistoryEntry[], limit: EditorHistoryExportLimit = "unlimited") {
@@ -318,8 +341,9 @@ export function hydrateEditorHistoryState(
   storedEntries: EditorHistoryEntry[] | undefined,
   requestedIndex: number | undefined,
   limit: EditorHistoryExportLimit = "unlimited",
+  currentNotes: WorkplaneNote[] = [],
 ): EditorHistoryState {
-  const fallback = editorHistoryEntry(currentShapes, []);
+  const fallback = editorHistoryEntry(currentShapes, [], currentNotes);
   if (!Array.isArray(storedEntries) || storedEntries.length === 0) {
     return { entries: [fallback], index: 0 };
   }
@@ -329,6 +353,7 @@ export function hydrateEditorHistoryState(
       editorHistoryEntry(
         Array.isArray(entry?.shapes) ? entry.shapes : [],
         Array.isArray(entry?.selectedIds) ? entry.selectedIds.filter((id): id is string => typeof id === "string") : [],
+        normalizeNotes(entry?.notes),
       ),
     );
     const index = Number.isInteger(requestedIndex)

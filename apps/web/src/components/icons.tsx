@@ -95,15 +95,39 @@ export function ToolbarRedoIcon() {
 }
 
 export function ToolbarImportIcon() {
-  return <ToolbarCommandImage file="toolbar-import.png" className="toolbar-user-art-icon" />;
+  return (
+    <svg className="toolbar-vector-art-icon" viewBox="0 0 48 48" aria-hidden="true">
+      <path d="M8 28v10a3 3 0 0 0 3 3h26a3 3 0 0 0 3-3V28" fill="none" stroke="currentColor" strokeWidth="2.7" strokeLinecap="round" />
+      <path d="M24 7v23m0 0-8-8m8 8 8-8" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
+  );
 }
 
 export function ToolbarVectorExportIcon() {
-  return <ToolbarCommandImage file="toolbar-export.png" className="toolbar-user-art-icon" />;
+  return (
+    <svg className="toolbar-vector-art-icon" viewBox="0 0 48 48" aria-hidden="true">
+      <path d="M8 28v10a3 3 0 0 0 3 3h26a3 3 0 0 0 3-3V28" fill="none" stroke="currentColor" strokeWidth="2.7" strokeLinecap="round" />
+      <path d="M24 31V8m0 0-8 8m8-8 8 8" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
+  );
 }
 
 export function ToolbarSettingsIcon() {
-  return <ToolbarCommandImage file="toolbar-settings.png" className="toolbar-user-art-icon" />;
+  return (
+    <svg className="toolbar-vector-art-icon" viewBox="0 0 48 48" aria-hidden="true">
+      <path d="M20 7h8l1.3 5.1 4 2.3 5-1.4 4 6.9-3.8 3.7v4.7l3.8 3.7-4 6.9-5-1.4-4 2.3L28 45h-8l-1.3-5.1-4-2.3-5 1.4-4-6.9 3.8-3.7v-4.7L5.7 20l4-6.9 5 1.4 4-2.3L20 7Z" fill="none" stroke="currentColor" strokeWidth="2.3" strokeLinejoin="round" />
+      <circle cx="24" cy="26" r="6" fill="none" stroke="currentColor" strokeWidth="2.7" />
+    </svg>
+  );
+}
+
+export function ToolbarNoteIcon() {
+  return (
+    <svg className="toolbar-vector-art-icon" viewBox="0 0 48 48" aria-hidden="true">
+      <path d="M11 7h17l9 9v25H11a3 3 0 0 1-3-3V10a3 3 0 0 1 3-3Z" fill="#fff4a8" stroke="currentColor" strokeWidth="2.5" strokeLinejoin="round" />
+      <path d="M28 7v9h9M15 25h15M15 32h11" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
+  );
 }
 
 export function ToolbarShapeAddIcon(props: IconProps) {

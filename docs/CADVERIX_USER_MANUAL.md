@@ -307,6 +307,12 @@ Ruler points can attach to vertices, edges, and model surfaces. Clicking an edge
 
 Ruler annotations are viewport-session state, not project geometry.
 
+## Workplane Notes
+
+Choose **Add note** in the Manage group, then click a body to pin the note to it or click empty workplane space to place a free note. Type directly in the card. Drag the numbered pin to move or reattach it, click the pin to collapse or expand it, and use **Detach** to leave a pinned note at its current position.
+
+Notes are separate from printable geometry and from Drawing-workspace paper notes. They participate in geometry undo/redo, autosave, and SKF/LYL project history. Use **Visibility options → Notes** to hide or show all workplane notes without deleting them. Deleting or grouping a referenced body keeps its note but detaches it.
+
 ## Sketch Measure And Dimension
 
 - **Measure:** temporary two-point distance. It does not constrain geometry.
@@ -494,6 +500,7 @@ Sweep supports straight and Bezier paths. It creates the body immediately and st
 | STEP/STP | Import | Requires solid geometry and retains B-Rep data. |
 | SVG | Import | Converts valid closed vector geometry to a shallow extrusion. |
 | SKF | Open project | Restores editable project state and assets. |
+| LYL | Open project | Opens compatible Layerling project state and assets. |
 | OBJ | Not imported | OBJ is export-only. |
 
 Multiple geometry files can be imported together. Importing from the dashboard creates a new local project.
@@ -507,7 +514,8 @@ Multiple geometry files can be imported together. Importing from the dashboard c
 | OBJ | Mesh interchange | General triangulated geometry. |
 | SVG | 2D manufacturing | Top-view silhouette with holes. |
 | STEP | CAD exchange | Exact supported primitives and retained STEP B-Reps. |
-| SKF | Editable backup/share | Geometry, sketches, history, assets, settings, and CAD data. |
+| SKF | Editable backup/share | Geometry, sketches, workplane notes, history, assets, settings, and CAD data. |
+| LYL | Layerling interchange | Compatible editable geometry, workplane notes, assets, and selected history; unsupported Cadverix features are reported. |
 
 If shapes are selected, direct exports use selected solids. With no selection they use all non-hole, non-construction-plane shapes. Hidden solids can be included in an all-project export, so select the intended objects when hidden content must be excluded.
 
@@ -526,6 +534,8 @@ SKF can preserve:
 - Original imported source assets and exact CAD data.
 
 Opening an SKF package creates a new local project rather than overwriting the currently open one.
+
+Choose **LYL** in the Export dialog to create a Layerling format-2 package. Drawings, construction-plane attachments, Cadverix fasteners/threads, sculpt provenance, and extended sketch constraints, dimensions, projections, text, or sweep metadata cannot be represented safely and stop the export with an explanation. Use SKF when complete Cadverix editability is required. LYL exports are available as browser or local-folder downloads; shared project storage remains SKF-only.
 
 ## Download Destinations
 

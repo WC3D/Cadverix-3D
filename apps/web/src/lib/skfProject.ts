@@ -1,14 +1,15 @@
 import { strFromU8, strToU8, unzip, zip, type AsyncZippable } from "fflate";
-import { editorHistoryEntry, hydrateEditorHistoryState, type EditorHistoryEntry } from "@/lib/editorHistory";
+import { editorHistoryEntry, hydrateEditorHistoryState, notesForHistoryIndex, type EditorHistoryEntry } from "@/lib/editorHistory";
 import { normalizePlacementWorkplane, placementWorkplaneIsBase, type PlacementWorkplane } from "@/lib/placementWorkplane";
 import { importedShapeFromObj } from "@/lib/objImport";
 import { MAX_PROJECT_ASSET_BYTES, normalizeProjectAsset, sha256Hex } from "@/lib/projectAssets";
 import { canonicalizeShape } from "@/lib/workplaneShapes";
+import { normalizeNotes } from "@/lib/workplaneNotes";
 import { importedShapeFromStl } from "@/lib/stlImport";
 import { importedShapeFromSvg } from "@/lib/svgImport";
 import { normalizeSnapGrid, normalizeWorkspaceSettings } from "@/lib/workplaneSettings";
 import { parseDrawingSheet } from "@/lib/drawingSheet";
-import type { CadDisplayEdge, GridSize, ProjectAsset, ProjectAssetSourceFormat, SketchOperation, SketchRevolveSettings, WorkplaneShape, WorkplaneWorkspaceSettings } from "@/types/sketchforge";
+import type { CadDisplayEdge, GridSize, ProjectAsset, ProjectAssetSourceFormat, SketchOperation, SketchRevolveSettings, WorkplaneNote, WorkplaneShape, WorkplaneWorkspaceSettings } from "@/types/sketchforge";
 
 export const SKF_SCHEMA_ID = "com.sketchforge.project";
 export const LYL_SCHEMA_ID = "com.layerling.project";
@@ -20,8 +21,33 @@ export const SKF_FORMAT_VERSION = 2;
 export const SKF_DRAWING_FORMAT_VERSION = 3;
 export const SKF_MINIMUM_READER_VERSION = 2;
 export const SKF_OLDEST_READABLE_FORMAT_VERSION = 1;
-export const SKF_CREATED_WITH_VERSION = "1.0.12";
+export const SKF_CREATED_WITH_VERSION = "1.0.13";
 export const SKF_MEDIA_TYPE = "application/vnd.sketchforge.project+zip";
+export const LYL_MEDIA_TYPE = "application/vnd.layerling.project+zip";
+
+type ProjectPackageFlavor = "skf" | "lyl";
+const PROJECT_PACKAGE_FLAVORS = {
+  skf: {
+    schema: SKF_SCHEMA_ID,
+    meshMagic: "SKFMSH1\0",
+    edgeMagic: "SKFEDG1\0",
+    meshExtension: "skfmesh",
+    edgeExtension: "skfedges",
+    meshMediaType: "application/vnd.sketchforge.mesh",
+    edgeMediaType: "application/vnd.sketchforge.edges",
+    brepMediaType: "application/vnd.sketchforge.brep",
+  },
+  lyl: {
+    schema: LYL_SCHEMA_ID,
+    meshMagic: "LYLMSH1\0",
+    edgeMagic: "LYLEDG1\0",
+    meshExtension: "lylmesh",
+    edgeExtension: "lyledges",
+    meshMediaType: "application/vnd.layerling.mesh",
+    edgeMediaType: "application/vnd.layerling.edges",
+    brepMediaType: "application/vnd.layerling.brep",
+  },
+} as const;
 
 export const SKF_LIMITS = {
   archiveBytes: 512 * 1024 * 1024,
@@ -97,6 +123,7 @@ export type SkfStateV1 = {
   id: string;
   rootNodeIds: string[];
   nodes: SkfShapeNodeV1[];
+  notes?: WorkplaneNote[];
 };
 
 export type SkfFeatureV1 = {
@@ -150,6 +177,7 @@ export type SkfProjectExportInput = {
   createdAt: number;
   modifiedAt: number;
   shapes: WorkplaneShape[];
+  notes?: WorkplaneNote[];
   history: EditorHistoryEntry[];
   historyIndex: number;
   assets: ProjectAsset[];
@@ -167,6 +195,7 @@ export type SkfRestoredProject = {
   createdAt: number;
   modifiedAt: number;
   shapes: WorkplaneShape[];
+  notes?: WorkplaneNote[];
   history: EditorHistoryEntry[];
   historyIndex: number;
   assets: ProjectAsset[];
@@ -230,10 +259,10 @@ function safeArchivePath(path: string) {
     && path.split("/").every((part) => part && part !== "." && part !== "..");
 }
 
-function extensionForAsset(kind: SkfAssetKind, mediaType: string, sourceFormat?: ProjectAssetSourceFormat) {
+function extensionForAsset(flavor: ProjectPackageFlavor, kind: SkfAssetKind, mediaType: string, sourceFormat?: ProjectAssetSourceFormat) {
   if (kind === "source" && sourceFormat) return sourceFormat === "step" ? "step" : sourceFormat;
-  if (kind === "derived-mesh") return "skfmesh";
-  if (kind === "display-edges") return "skfedges";
+  if (kind === "derived-mesh") return PROJECT_PACKAGE_FLAVORS[flavor].meshExtension;
+  if (kind === "display-edges") return PROJECT_PACKAGE_FLAVORS[flavor].edgeExtension;
   if (kind === "brep") return "brep";
   if (mediaType.includes("png")) return "png";
   if (mediaType.includes("jpeg")) return "jpg";
@@ -243,13 +272,13 @@ function extensionForAsset(kind: SkfAssetKind, mediaType: string, sourceFormat?:
   return "bin";
 }
 
-function encodeMeshCache(mesh: NonNullable<WorkplaneShape["importedMesh"]>) {
+function encodeMeshCache(mesh: NonNullable<WorkplaneShape["importedMesh"]>, flavor: ProjectPackageFlavor) {
   if (mesh.positions.length > SKF_LIMITS.meshNumbers || (mesh.normals?.length ?? 0) > SKF_LIMITS.meshNumbers) {
     throw new Error("Imported mesh is too large for a Cadverix 3D project file");
   }
   const normalLength = mesh.normals?.length ?? 0;
   const bytes = new Uint8Array(16 + (mesh.positions.length + normalLength) * 8);
-  bytes.set(strToU8("SKFMSH1\0"), 0);
+  bytes.set(strToU8(PROJECT_PACKAGE_FLAVORS[flavor].meshMagic), 0);
   const view = new DataView(bytes.buffer);
   view.setUint32(8, mesh.positions.length, true);
   view.setUint32(12, normalLength, true);
@@ -294,7 +323,7 @@ function decodeMeshCache(bytes: Uint8Array) {
   return { positions, normals };
 }
 
-function encodeDisplayEdges(edges: CadDisplayEdge[]) {
+function encodeDisplayEdges(edges: CadDisplayEdge[], flavor: ProjectPackageFlavor) {
   let numbers = 0;
   for (const edge of edges) {
     if (!Array.isArray(edge?.points)) throw new Error("A display edge is missing its point list");
@@ -302,7 +331,7 @@ function encodeDisplayEdges(edges: CadDisplayEdge[]) {
   }
   if (numbers > SKF_LIMITS.displayEdgeNumbers) throw new Error("Display edges are too large for a Cadverix 3D project file");
   const bytes = new Uint8Array(16 + edges.length * 4 + numbers * 8);
-  bytes.set(strToU8("SKFEDG1\0"), 0);
+  bytes.set(strToU8(PROJECT_PACKAGE_FLAVORS[flavor].edgeMagic), 0);
   const view = new DataView(bytes.buffer);
   view.setUint32(8, edges.length, true);
   view.setUint32(12, numbers, true);
@@ -370,9 +399,15 @@ function bytesToDataUrl(bytes: Uint8Array, mediaType: string) {
 // Editor geometry is immutable. Cache by the arrays themselves: restored mesh
 // wrappers may differ while their coordinate buffers are shared across history.
 type EncodedResource = { bytes: Uint8Array; sha256: string };
-const meshEncodingCache = new WeakMap<number[], WeakMap<number[], Promise<EncodedResource>>>();
+const meshEncodingCaches: Record<ProjectPackageFlavor, WeakMap<number[], WeakMap<number[], Promise<EncodedResource>>>> = {
+  skf: new WeakMap(),
+  lyl: new WeakMap(),
+};
 const absentNormals: number[] = [];
-const edgeEncodingCache = new WeakMap<object, Promise<EncodedResource>>();
+const edgeEncodingCaches: Record<ProjectPackageFlavor, WeakMap<object, Promise<EncodedResource>>> = {
+  skf: new WeakMap(),
+  lyl: new WeakMap(),
+};
 const byteEncodingCache = new WeakMap<Uint8Array, Promise<EncodedResource>>();
 const textEncodingCaches = { brep: new Map<string, Promise<EncodedResource>>(), image: new Map<string, Promise<EncodedResource>>() };
 const MAX_CACHED_TEXT_UNITS = 8 * 1024 * 1024;
@@ -417,6 +452,8 @@ class SkfArchiveBuilder {
   private readonly textByValue = { brep: new Map<string, Promise<EncodedResource>>(), image: new Map<string, Promise<EncodedResource>>() };
   readonly yieldIfNeeded = workBudget();
 
+  constructor(readonly flavor: ProjectPackageFlavor) {}
+
   async addAsset(
     kind: SkfAssetKind,
     bytes: Uint8Array,
@@ -435,7 +472,7 @@ class SkfArchiveBuilder {
     const key = `${kind}:${sha256}`;
     const existing = this.recordByKindAndHash.get(key);
     if (existing) return existing;
-    const extension = extensionForAsset(kind, mediaType, options.sourceFormat);
+    const extension = extensionForAsset(this.flavor, kind, mediaType, options.sourceFormat);
     const id = `${kind}-${sha256.slice(0, 32)}`;
     const path = `assets/${kind}/${sha256}.${extension}`;
     const record: SkfAssetRecordV1 = {
@@ -484,8 +521,8 @@ class SkfArchiveBuilder {
   }
 
   async addDisplayEdges(edges: NonNullable<WorkplaneShape["cadDisplayEdges"]>) {
-    return this.addEncodedAsset("display-edges", await memoizedEncoding(edgeEncodingCache, edges,
-      () => encodeDisplayEdges(edges)), "application/vnd.sketchforge.edges");
+    return this.addEncodedAsset("display-edges", await memoizedEncoding(edgeEncodingCaches[this.flavor], edges,
+      () => encodeDisplayEdges(edges, this.flavor)), PROJECT_PACKAGE_FLAVORS[this.flavor].edgeMediaType);
   }
 
   async addSources(assets: ProjectAsset[], referencedIds: Set<string>) {
@@ -503,13 +540,14 @@ class SkfArchiveBuilder {
   addDerivedMesh(mesh: NonNullable<WorkplaneShape["importedMesh"]>) {
     const cached = this.derivedMeshByResource.get(mesh);
     if (cached) return cached;
+    const meshEncodingCache = meshEncodingCaches[this.flavor];
     let byNormals = meshEncodingCache.get(mesh.positions);
     if (!byNormals) {
       byNormals = new WeakMap();
       meshEncodingCache.set(mesh.positions, byNormals);
     }
-    const encoded = memoizedEncoding(byNormals, mesh.normals ?? absentNormals, () => encodeMeshCache(mesh));
-    const pending = encoded.then((resource) => this.addEncodedAsset("derived-mesh", resource, "application/vnd.sketchforge.mesh"));
+    const encoded = memoizedEncoding(byNormals, mesh.normals ?? absentNormals, () => encodeMeshCache(mesh, this.flavor));
+    const pending = encoded.then((resource) => this.addEncodedAsset("derived-mesh", resource, PROJECT_PACKAGE_FLAVORS[this.flavor].meshMediaType));
     this.derivedMeshByResource.set(mesh, pending);
     return pending;
   }
@@ -662,7 +700,7 @@ async function serializeShapeNode(
   }
 
   let cadBrepAssetId: string | undefined;
-  if (cadBrep) cadBrepAssetId = (await builder.addText("brep", cadBrep, "application/vnd.sketchforge.brep")).id;
+  if (cadBrep) cadBrepAssetId = (await builder.addText("brep", cadBrep, PROJECT_PACKAGE_FLAVORS[builder.flavor].brepMediaType)).id;
 
   const groupedShapeNodeIds: string[] = [];
   for (const child of groupedShapes ?? []) {
@@ -716,6 +754,7 @@ async function serializeState(
   shapes: WorkplaneShape[],
   builder: SkfArchiveBuilder,
   sourceAssetsByArchiveId: Map<string, SkfAssetRecordV1>,
+  notes: WorkplaneNote[] = [],
 ): Promise<SkfStateV1> {
   assertUniqueRuntimeObjectIds(shapes, id);
   const nodes: SkfShapeNodeV1[] = [];
@@ -725,7 +764,9 @@ async function serializeState(
     rootNodeIds.push(await serializeShapeNode(shape, nodeId, nodes, builder, sourceAssetsByArchiveId));
   }
   nodes.sort((a, b) => a.nodeId.localeCompare(b.nodeId));
-  return { id, rootNodeIds, nodes };
+  const state: SkfStateV1 = { id, rootNodeIds, nodes };
+  if (notes.length > 0) state.notes = notes;
+  return state;
 }
 
 function nodeGroupOperation(node: SkfShapeNodeV1, nodeById: Map<string, SkfShapeNodeV1>) {
@@ -839,6 +880,47 @@ function activeProjectIndexes(state: SkfStateV1) {
   return { features, groups, sketches, exactCad };
 }
 
+const LYL_SHAPE_KINDS = new Set([
+  "box", "roundedBox", "cylinder", "slot", "ellipse", "sphere", "sketch", "scribble", "cone", "pyramid", "roof", "text", "roundRoof",
+  "halfSphere", "torus", "tube", "bentTube", "star", "heart", "crescent", "gear", "honeycomb", "dovetail", "counterbore", "countersink",
+  "teardrop", "spring", "ring", "wedge", "polygon", "icosahedron", "mesh",
+]);
+
+function assertLylShapeCompatible(shape: WorkplaneShape) {
+  if (!LYL_SHAPE_KINDS.has(shape.kind)) {
+    throw new Error(`Layerling export does not support '${shape.name}' (${shape.kind}). Export SKF to preserve it.`);
+  }
+  if (shape.constructionPlane || shape.sketchPlane) {
+    throw new Error(`Layerling export cannot preserve the construction-plane attachment on '${shape.name}'. Export SKF instead.`);
+  }
+  if (shape.sculpted || shape.sculptSource || shape.disabledFeatures?.length) {
+    throw new Error(`Layerling export cannot preserve the reversible feature state on '${shape.name}'. Export SKF instead.`);
+  }
+  if (shape.sketchFeature) {
+    throw new Error(`Layerling export cannot preserve the extended sketch feature on '${shape.name}'. Export SKF instead.`);
+  }
+  if (shape.threadMode || shape.threadFamily || shape.threadPreset || shape.threadPitch || shape.threadDepth || shape.threadHandedness) {
+    throw new Error(`Layerling uses a different thread model and cannot preserve '${shape.name}' as editable geometry. Export SKF instead.`);
+  }
+  const profile = shape.sketchProfile;
+  if (profile && (
+    profile.constraints?.length || profile.dimensions?.length || profile.texts?.length || profile.projections?.length
+    || profile.points.some((point) => point.projectionId)
+    || profile.segments.some((segment) => segment.projectionId || segment.dimensionLabelOffset)
+  )) {
+    throw new Error(`Layerling export cannot preserve extended sketch data on '${shape.name}'. Export SKF instead.`);
+  }
+  shape.groupedShapes?.forEach(assertLylShapeCompatible);
+  shape.edgeTreatmentHistory?.forEach((entry) => assertLylShapeCompatible(entry.before));
+}
+
+function assertLylProjectCompatible(input: SkfProjectExportInput, entries: EditorHistoryEntry[]) {
+  if (input.workspace.drawing !== undefined) {
+    throw new Error("Layerling export does not support Cadverix drawing sheets. Export SKF instead.");
+  }
+  entries.forEach((entry) => entry.shapes.forEach(assertLylShapeCompatible));
+}
+
 function zipAsync(files: AsyncZippable, level: NonNullable<SkfProjectExportInput["compressionLevel"]> = 6) {
   return new Promise<Uint8Array>((resolve, reject) => {
     // fflate encodes the ZIP entry mtime as a DOS date using local-time getters and
@@ -861,14 +943,15 @@ function unzipAsync(bytes: Uint8Array) {
   });
 }
 
-export async function exportSkfProject(input: SkfProjectExportInput) {
-  const hydrated = hydrateEditorHistoryState(input.shapes, input.history, input.historyIndex);
-  if (hydrated.entries.length > SKF_LIMITS.states) throw new Error("Project has too many undo states for the .skf format");
+async function exportProjectPackage(input: SkfProjectExportInput, flavor: ProjectPackageFlavor) {
+  const hydrated = hydrateEditorHistoryState(input.shapes, input.history, input.historyIndex, "unlimited", normalizeNotes(input.notes));
+  if (flavor === "lyl") assertLylProjectCompatible(input, hydrated.entries);
+  if (hydrated.entries.length > SKF_LIMITS.states) throw new Error(`Project has too many undo states for the .${flavor} format`);
   const exportEntries = hydrated.entries.map((entry) => {
     const shapes = repairDuplicateGroupedObjectIds(entry.shapes);
-    return shapes === entry.shapes ? entry : editorHistoryEntry(shapes, entry.selectedIds);
+    return shapes === entry.shapes ? entry : editorHistoryEntry(shapes, entry.selectedIds, normalizeNotes(entry.notes));
   });
-  const builder = new SkfArchiveBuilder();
+  const builder = new SkfArchiveBuilder(flavor);
   const stateShapes = exportEntries.map((entry) => entry.shapes);
   await builder.addSources(input.assets, referencedSourceAssetIds(stateShapes));
   const sourceAssetsByArchiveId = new Map(builder.assets.filter((asset) => asset.kind === "source").map((asset) => [asset.id, asset]));
@@ -880,7 +963,7 @@ export async function exportSkfProject(input: SkfProjectExportInput) {
     let stateId = stateIdByFingerprint.get(entry.fingerprint);
     if (!stateId) {
       stateId = `state-${states.length + 1}`;
-      states.push(await serializeState(stateId, entry.shapes, builder, sourceAssetsByArchiveId));
+      states.push(await serializeState(stateId, entry.shapes, builder, sourceAssetsByArchiveId, normalizeNotes(entry.notes)));
       stateIdByFingerprint.set(entry.fingerprint, stateId);
     }
     historyEntries.push({ stateId, selectedObjectIds: [...entry.selectedIds] });
@@ -898,9 +981,9 @@ export async function exportSkfProject(input: SkfProjectExportInput) {
   const workspace = normalizeWorkspaceSettings(input.workspace);
   if (input.workspace.drawing !== undefined) workspace.drawing = parseDrawingSheet(input.workspace.drawing);
   const document: SkfProjectDocumentV1 = {
-    schema: SKF_SCHEMA_ID,
-    formatVersion: workspace.drawing ? SKF_DRAWING_FORMAT_VERSION : SKF_FORMAT_VERSION,
-    minimumReaderVersion: workspace.drawing ? SKF_DRAWING_FORMAT_VERSION : SKF_MINIMUM_READER_VERSION,
+    schema: PROJECT_PACKAGE_FLAVORS[flavor].schema,
+    formatVersion: flavor === "skf" && workspace.drawing ? SKF_DRAWING_FORMAT_VERSION : SKF_FORMAT_VERSION,
+    minimumReaderVersion: flavor === "skf" && workspace.drawing ? SKF_DRAWING_FORMAT_VERSION : SKF_MINIMUM_READER_VERSION,
     createdWithVersion: SKF_CREATED_WITH_VERSION,
     metadata: {
       ...(input.projectId ? { projectId: input.projectId } : {}),
@@ -932,13 +1015,21 @@ export async function exportSkfProject(input: SkfProjectExportInput) {
   };
   const projectJson = strToU8(JSON.stringify(document));
   if (projectJson.byteLength > SKF_LIMITS.projectJsonBytes) {
-    throw new Error("Project data exceeds the 64 MB .skf limit. Export with fewer history steps or simplify the project.");
+    throw new Error(`Project data exceeds the 64 MB .${flavor} limit. Export with fewer history steps or simplify the project.`);
   }
   builder.files["project.json"] = projectJson;
   if (Object.keys(builder.files).length > SKF_LIMITS.entries) {
-    throw new Error("Project has too many stored assets for the .skf format. Export with fewer history steps.");
+    throw new Error(`Project has too many stored assets for the .${flavor} format. Export with fewer history steps.`);
   }
   return zipAsync(Object.fromEntries(Object.entries(builder.files).sort(([a], [b]) => a.localeCompare(b))), input.compressionLevel);
+}
+
+export function exportSkfProject(input: SkfProjectExportInput) {
+  return exportProjectPackage(input, "skf");
+}
+
+export function exportLylProject(input: SkfProjectExportInput) {
+  return exportProjectPackage(input, "lyl");
 }
 
 function inspectZipBeforeExpansion(bytes: Uint8Array) {
@@ -1365,12 +1456,6 @@ async function validateDocumentAndAssets(raw: unknown, files: ArchiveFiles) {
       }
       nodeById.set(nodeId, node);
     });
-    if (layerlingProject) {
-      const layerlingState = state as SkfStateV1 & { notes?: unknown[] };
-      if (Array.isArray(layerlingState.notes) && layerlingState.notes.length) {
-        throw new Error("This Layerling project contains workplane notes, which this Cadverix 3D version cannot import");
-      }
-    }
     const roots = stringArray(state.rootNodeIds, `state '${stateId}'.rootNodeIds`);
     const visiting = new Set<string>();
     const visited = new Set<string>();
@@ -1612,6 +1697,7 @@ async function restoreV1(document: SkfProjectDocumentV1, assetById: Map<string, 
   const sourceImporter = options.sourceImporter ?? defaultSourceImporter;
   const resources = new RestoredResourceCache();
   const restoredStates = new Map<string, WorkplaneShape[]>();
+  const restoredNotes = new Map<string, WorkplaneNote[]>();
   for (const state of document.states) {
     const nodeById = new Map(state.nodes.map((node) => [node.nodeId, node]));
     const shapes = await Promise.all(state.rootNodeIds.map((nodeId) => restoreShapeFromNode(
@@ -1626,10 +1712,16 @@ async function restoreV1(document: SkfProjectDocumentV1, assetById: Map<string, 
       resources,
     )));
     restoredStates.set(state.id, shapes);
+    restoredNotes.set(state.id, normalizeNotes(state.notes));
   }
-  const history = document.history.entries.map((entry) => editorHistoryEntry(restoredStates.get(entry.stateId) ?? [], entry.selectedObjectIds));
+  const history = document.history.entries.map((entry) => editorHistoryEntry(
+    restoredStates.get(entry.stateId) ?? [],
+    entry.selectedObjectIds,
+    restoredNotes.get(entry.stateId) ?? [],
+  ));
   const shapes = restoredStates.get(document.sceneStateId) ?? [];
-  const hydrated = hydrateEditorHistoryState(shapes, history, document.history.index);
+  const notes = restoredNotes.get(document.sceneStateId) ?? [];
+  const hydrated = hydrateEditorHistoryState(shapes, history, document.history.index, "unlimited", notes);
   if (hydrated.entries.length !== history.length || hydrated.index !== document.history.index) throw new Error("Undo history could not be restored without data loss");
   return {
     sourceProjectId: document.metadata.projectId,
@@ -1637,6 +1729,7 @@ async function restoreV1(document: SkfProjectDocumentV1, assetById: Map<string, 
     createdAt: parseIsoTimestamp(document.metadata.createdAt, "metadata.createdAt"),
     modifiedAt: parseIsoTimestamp(document.metadata.modifiedAt, "metadata.modifiedAt"),
     shapes: hydrated.entries[hydrated.index]?.shapes ?? shapes,
+    notes: hydrated.entries[hydrated.index]?.notes ?? notes,
     history: hydrated.entries,
     historyIndex: hydrated.index,
     assets: [...runtimeAssetByArchiveId.values()],
@@ -1656,7 +1749,8 @@ function migrateV0(raw: Record<string, unknown>): SkfRestoredProject {
   shapes.forEach((shape, index) => validateLegacyRuntimeShape(shape, `shapes[${index}]`));
   const historyRaw = Array.isArray(raw.history) ? raw.history as EditorHistoryEntry[] : undefined;
   const requestedIndex = typeof raw.historyIndex === "number" ? raw.historyIndex : undefined;
-  const hydrated = hydrateEditorHistoryState(shapes.map(canonicalizeShape), historyRaw, requestedIndex);
+  const notes = notesForHistoryIndex(historyRaw, requestedIndex);
+  const hydrated = hydrateEditorHistoryState(shapes.map(canonicalizeShape), historyRaw, requestedIndex, "unlimited", notes);
   const now = Date.now();
   return {
     sourceProjectId: typeof project.id === "string" ? project.id : undefined,
@@ -1664,6 +1758,7 @@ function migrateV0(raw: Record<string, unknown>): SkfRestoredProject {
     createdAt: safeTimestamp(typeof project.createdAt === "number" ? project.createdAt : now, now),
     modifiedAt: safeTimestamp(typeof project.modifiedAt === "number" ? project.modifiedAt : now, now),
     shapes: hydrated.entries[hydrated.index]?.shapes ?? shapes,
+    notes: hydrated.entries[hydrated.index]?.notes ?? notes,
     history: hydrated.entries,
     historyIndex: hydrated.index,
     assets: [],

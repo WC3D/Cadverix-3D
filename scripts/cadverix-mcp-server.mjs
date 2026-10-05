@@ -1,8 +1,36 @@
 #!/usr/bin/env node
 
+import fs from "node:fs";
+import os from "node:os";
+import path from "node:path";
+
 const DEFAULT_BASE_URL = "http://127.0.0.1:3000";
 const MCP_ROUTE = "/api/cadverix-mcp";
-const baseUrl = (process.env.CADVERIX_URL ?? process.env.SKETCHFORGE_URL) || DEFAULT_BASE_URL;
+
+function defaultDiscoveryPath() {
+  const appData = process.platform === "win32"
+    ? process.env.APPDATA
+    : process.platform === "darwin"
+      ? path.join(os.homedir(), "Library", "Application Support")
+      : process.env.XDG_CONFIG_HOME || path.join(os.homedir(), ".config");
+  return appData ? path.join(appData, "SketchForge", "cadverix-mcp.json") : "";
+}
+
+function readDiscovery() {
+  const discoveryPath = process.env.CADVERIX_MCP_DISCOVERY_FILE || defaultDiscoveryPath();
+  if (!discoveryPath) return null;
+  try {
+    const value = JSON.parse(fs.readFileSync(discoveryPath, "utf8"));
+    return typeof value?.url === "string" && typeof value?.token === "string" ? value : null;
+  } catch {
+    return null;
+  }
+}
+
+const configuredBaseUrl = (process.env.CADVERIX_URL ?? process.env.SKETCHFORGE_URL)?.trim();
+const discovery = configuredBaseUrl ? null : readDiscovery();
+const baseUrl = configuredBaseUrl || discovery?.url || DEFAULT_BASE_URL;
+const bridgeToken = (process.env.CADVERIX_MCP_TOKEN || discovery?.token || "").trim();
 
 const editorTargetSchema = {
   type: "object",
@@ -253,8 +281,15 @@ function bridgeUrl() {
   return new URL(MCP_ROUTE, baseUrl);
 }
 
+function bridgeHeaders(includeContentType = false) {
+  return {
+    ...(includeContentType ? { "Content-Type": "application/json" } : {}),
+    ...(bridgeToken ? { Authorization: `Bearer ${bridgeToken}` } : {}),
+  };
+}
+
 async function bridgeGet() {
-  const response = await fetch(bridgeUrl());
+  const response = await fetch(bridgeUrl(), { headers: bridgeHeaders() });
   const payload = await response.json().catch(() => null);
   if (!response.ok) {
     throw new Error(payload?.error || `Cadverix 3D bridge returned HTTP ${response.status}`);
@@ -278,7 +313,7 @@ async function bridgeCommand(action, args = {}, defaultTimeoutMs = 15000) {
 
   const response = await fetch(bridgeUrl(), {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
+    headers: bridgeHeaders(true),
     body: JSON.stringify({
       type: "command",
       editorNumber: targetNumber,
@@ -421,6 +456,7 @@ async function handleMessage(message) {
 
 let buffer = "";
 process.stdin.setEncoding("utf8");
+process.stdin.on("end", () => process.exit(0));
 process.stdin.on("data", (chunk) => {
   buffer += chunk;
   const lines = buffer.split(/\r?\n/);

@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { timingSafeEqual } from "node:crypto";
 import type { SketchForgeMcpApiPayload } from "@/lib/sketchforgeMcpProtocol";
 import {
   completeSketchForgeMcpCommand,
@@ -35,12 +36,34 @@ function isLocalRequest(request: Request) {
   return !fetchSite || fetchSite === "same-origin" || fetchSite === "none";
 }
 
+function tokensMatch(provided: string, expected: string) {
+  const providedBuffer = Buffer.from(provided);
+  const expectedBuffer = Buffer.from(expected);
+  return providedBuffer.length === expectedBuffer.length && timingSafeEqual(providedBuffer, expectedBuffer);
+}
+
+function requestToken(request: Request) {
+  const authorization = request.headers.get("authorization");
+  if (authorization?.startsWith("Bearer ")) return authorization.slice("Bearer ".length).trim();
+  const cookie = request.headers.get("cookie")
+    ?.split(";")
+    .map((entry) => entry.trim())
+    .find((entry) => entry.startsWith("cadverix_mcp="));
+  return cookie ? cookie.slice("cadverix_mcp=".length) : "";
+}
+
 function localOnly(request: Request) {
-  if (process.env.NODE_ENV === "production") {
+  if (process.env.NODE_ENV === "production" && process.env.CADVERIX_DESKTOP !== "1") {
     return NextResponse.json({ error: "Cadverix 3D MCP is only available in local development." }, { status: 404 });
   }
   if (!isLocalRequest(request)) {
     return NextResponse.json({ error: "Cadverix 3D MCP only accepts localhost requests." }, { status: 403 });
+  }
+  if (process.env.NODE_ENV === "production") {
+    const expectedToken = process.env.CADVERIX_MCP_TOKEN || "";
+    if (!expectedToken || !tokensMatch(requestToken(request), expectedToken)) {
+      return NextResponse.json({ error: "Cadverix 3D MCP authentication failed." }, { status: 401 });
+    }
   }
   return null;
 }

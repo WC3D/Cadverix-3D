@@ -2,6 +2,15 @@
 
 ## Unreleased
 
+## 1.0.13
+
+- Added editable workplane notes that can be free-positioned or pinned to bodies, collapsed, dragged, detached, deleted, persisted in SKF/Layerling files, and included in undo/redo history.
+- Added Layerling project export with compatibility checks, embedded assets, format-specific encoding caches, and project-note interoperability.
+- Added body and plane splitting, with plane splitting grouped under Combine and axes aligned to the Z-up modeling workspace.
+- Enabled authenticated MCP access in the packaged desktop app through a loopback-only, per-launch capability. Installed apps can be launched with `--mcp-server` by Codex, Claude Desktop, and other MCP clients without a source checkout.
+- Made native Electron downloads the recommended offline choice on supported desktop systems in the static/Cloudflare dashboard, while retaining the installable PWA as the desktop fallback and primary mobile option.
+- Updated the application version, README badge, and SKF `createdWithVersion` metadata to 1.0.13.
+
 - Imported Layerling's complete 190-profile printer catalog, grouped the resulting 199 presets by manufacturer, and retained existing Cadverix preset IDs and dimensions. The bundled catalog includes source attribution and a pinned update script.
 - Added an installable offline PWA for HTTPS/localhost static deployments, with Cadverix app icons, verified app/CAD-worker precaching, an offline-readiness banner, retry handling, and updates that wait for open editor tabs to close.
 - Added printer build-volume presets for the Tronxy X5SA, Wanhao Duplicator i3, original Creality HALOT-ONE, and original Elegoo Saturn.

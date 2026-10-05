@@ -3,6 +3,7 @@ import vm from "node:vm";
 import { readFile } from "node:fs/promises";
 import { describe, expect, it, vi } from "vitest";
 import { precachePaths, serviceWorkerSource } from "../../scripts/generate-service-worker.mjs";
+import { desktopPlatformForUserAgent, desktopPlatformLabel } from "@/lib/offlineInstall";
 
 const ORIGIN = "https://cadverix.example";
 const assets = new Map([["/", "app shell"], ["/runtime.js", "runtime"], ["/occt/occt-wasm.wasm", "kernel"]]);
@@ -28,6 +29,15 @@ function worker(failingPath?: string) {
 }
 
 describe("offline application service worker", () => {
+  it("offers desktop installers only on supported desktop platforms", () => {
+    expect(desktopPlatformForUserAgent("Mozilla/5.0 (Windows NT 10.0; Win64; x64)")).toBe("windows");
+    expect(desktopPlatformForUserAgent("Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7)")).toBe("macos");
+    expect(desktopPlatformForUserAgent("Mozilla/5.0 (X11; Linux x86_64)")).toBe("linux");
+    expect(desktopPlatformForUserAgent("Mozilla/5.0 (Linux; Android 15; Mobile)")).toBeNull();
+    expect(desktopPlatformForUserAgent("Mozilla/5.0 (X11; CrOS x86_64 16093.68.0)")).toBeNull();
+    expect(desktopPlatformForUserAgent("Mozilla/5.0 (Macintosh)", 5)).toBeNull();
+    expect(desktopPlatformLabel("macos")).toBe("macOS");
+  });
   it("retires only Cadverix app caches when switching to a server build", async () => {
     const deleted: string[] = [];
     const unregister = vi.fn(async () => true);

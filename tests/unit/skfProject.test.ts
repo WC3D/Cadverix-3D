@@ -7,6 +7,7 @@ import { projectAssetFromBytes } from "@/lib/projectAssets";
 import * as projectAssets from "@/lib/projectAssets";
 import { canonicalizeShape } from "@/lib/workplaneShapes";
 import {
+  exportLylProject,
   exportSkfProject,
   importSkfProject,
   inspectSkfProjectPackage,
@@ -19,7 +20,7 @@ import {
   type SkfProjectExportInput,
 } from "@/lib/skfProject";
 import { DEFAULT_SNAP_GRID, DEFAULT_WORKPLANE_WORKSPACE } from "@/lib/workplaneSettings";
-import type { CadDisplayEdge, ShapeKind, WorkplaneShape } from "@/types/sketchforge";
+import type { CadDisplayEdge, ShapeKind, WorkplaneNote, WorkplaneShape } from "@/types/sketchforge";
 
 function shape(kind: ShapeKind, id = `${kind}-1`, overrides: Partial<WorkplaneShape> = {}): WorkplaneShape {
   return {
@@ -121,6 +122,90 @@ describe("SketchForge .skf project packages", () => {
       if (asset.kind === "derived-mesh") expect(strFromU8(saved.files[asset.path].subarray(0, 8))).toBe("SKFMSH1\0");
       if (asset.kind === "display-edges") expect(strFromU8(saved.files[asset.path].subarray(0, 8))).toBe("SKFEDG1\0");
     }
+  });
+
+  it("exports genuine Layerling packages without cross-flavor cache contamination", async () => {
+    const original = shape("mesh", "portable-mesh", {
+      cadDisplayEdges: [{ points: [0, 0, 0, 1, 1, 1] }],
+      importedMesh: {
+        positions: [0, 0, 0, 1, 0, 0, 0, 1, 0],
+        baseWidth: 1,
+        baseDepth: 1,
+        baseHeight: 1,
+        triangleCount: 1,
+        sourceFormat: "json",
+      },
+    });
+    const exportInput = input([original]);
+    const skf = packageDocument(await exportSkfProject(exportInput));
+    const lyl = packageDocument(await exportLylProject(exportInput));
+
+    expect(lyl.document).toMatchObject({ schema: LYL_SCHEMA_ID, formatVersion: 2, minimumReaderVersion: 2 });
+    const lylMesh = lyl.document.assets.find((asset) => asset.kind === "derived-mesh")!;
+    const lylEdges = lyl.document.assets.find((asset) => asset.kind === "display-edges")!;
+    expect(lylMesh.path).toMatch(/\.lylmesh$/);
+    expect(lylMesh.mediaType).toBe("application/vnd.layerling.mesh");
+    expect(strFromU8(lyl.files[lylMesh.path].subarray(0, 8))).toBe("LYLMSH1\0");
+    expect(lylEdges.path).toMatch(/\.lyledges$/);
+    expect(lylEdges.mediaType).toBe("application/vnd.layerling.edges");
+    expect(strFromU8(lyl.files[lylEdges.path].subarray(0, 8))).toBe("LYLEDG1\0");
+    expect((await importSkfProject(await exportLylProject(exportInput))).shapes[0].importedMesh?.positions).toEqual(original.importedMesh?.positions);
+
+    const firstSkfMesh = skf.document.assets.find((asset) => asset.kind === "derived-mesh")!;
+    expect(strFromU8(skf.files[firstSkfMesh.path].subarray(0, 8))).toBe("SKFMSH1\0");
+    const secondSkf = packageDocument(await exportSkfProject(exportInput));
+    const secondSkfMesh = secondSkf.document.assets.find((asset) => asset.kind === "derived-mesh")!;
+    expect(strFromU8(secondSkf.files[secondSkfMesh.path].subarray(0, 8))).toBe("SKFMSH1\0");
+  });
+
+  it("round-trips free and pinned notes through SKF and Layerling history states", async () => {
+    const original = shape("box", "noted-box");
+    const notes: WorkplaneNote[] = [
+      { id: "note-free", text: "Free note", x: 4, y: 0, z: 8 },
+      { id: "note-pinned", text: "Pinned note", x: 1, y: 5, z: 2, anchor: { shapeId: original.id, normalized: [0.5, 0.25, -0.5] }, collapsed: true },
+    ];
+    const history = [editorHistoryEntry([original], [], notes)];
+
+    for (const exporter of [exportSkfProject, exportLylProject]) {
+      const bytes = await exporter(input([original], { notes, history }));
+      const { document } = packageDocument(bytes);
+      expect(document.states[0].notes).toEqual(notes);
+      const restored = await importSkfProject(bytes);
+      expect(restored.notes).toEqual(notes);
+      expect(restored.history[0].notes).toEqual(notes);
+    }
+  });
+
+  it("preserves note-only history states and tolerates malformed Layerling notes", async () => {
+    const original = shape("box", "note-history-box");
+    const before: WorkplaneNote[] = [{ id: "note-1", text: "Before", x: 0, y: 0, z: 0 }];
+    const after: WorkplaneNote[] = [{ ...before[0], text: "After" }];
+    const history = [editorHistoryEntry([original], [], before), editorHistoryEntry([original], [], after)];
+    const bytes = await exportLylProject(input([original], { notes: after, history, historyIndex: 1 }));
+    expect(packageDocument(bytes).document.states).toHaveLength(2);
+
+    const malformed = mutateProject(bytes, (document) => {
+      (document.states[1] as { notes?: unknown }).notes = [after[0], 42, null];
+    });
+    const restored = await importSkfProject(malformed);
+    expect(restored.notes).toEqual(after);
+    expect(restored.history).toHaveLength(2);
+  });
+
+  it("rejects Cadverix-only project data instead of dropping it from Layerling exports", async () => {
+    await expect(exportLylProject(input([shape("constructionPlane")]))).rejects.toThrow(/does not support.*constructionPlane/);
+    await expect(exportLylProject(input([shape("cylinder", "threaded", { threadMode: "external" })]))).rejects.toThrow(/different thread model/);
+    await expect(exportLylProject(input([shape("box", "sculpted", { sculpted: true })]))).rejects.toThrow(/reversible feature state/);
+    await expect(exportLylProject(input([shape("sketch", "constrained", {
+      sketchProfile: {
+        points: [{ id: "a", x: 0, z: 0 }, { id: "b", x: 1, z: 0 }],
+        segments: [{ id: "line", startId: "a", endId: "b" }],
+        constraints: [{ id: "fixed", kind: "fixed", pointId: "a", x: 0, z: 0 }],
+      },
+    })]))).rejects.toThrow(/extended sketch data/);
+    await expect(exportLylProject(input([shape("box")], {
+      workspace: { ...DEFAULT_WORKPLANE_WORKSPACE, drawing: {} as never },
+    }))).rejects.toThrow(/does not support Cadverix drawing sheets/);
   });
 
   it("rejects Layerling features that SketchForge cannot preserve", async () => {

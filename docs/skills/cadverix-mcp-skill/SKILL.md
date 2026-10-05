@@ -7,9 +7,15 @@ description: Control a live local Cadverix 3D editor through its MCP server. Use
 
 ## Quick Start
 
-Use this skill only with a local Cadverix 3D app running in development mode.
+Use this skill with either the installed Cadverix 3D desktop app or a local
+development checkout. MCP is intentionally unavailable from public web,
+Docker, and static/PWA deployments.
 
-1. Start Cadverix 3D from the repo:
+1. Open the installed Cadverix 3D desktop app and an editor. Configure the MCP
+   client to launch the app executable with `--mcp-server`. The helper reads a
+   private per-launch discovery file and authenticates to the app automatically.
+
+For repository development instead, start Cadverix 3D with:
 
 ```bash
 npm run dev
@@ -23,7 +29,10 @@ npm run dev
 node scripts/cadverix-mcp-server.mjs
 ```
 
-The MCP server talks to the app through `/api/cadverix-mcp`. Open editor tabs heartbeat into that route and receive commands from it. Production and Docker/static builds intentionally return 404 for the MCP route.
+The MCP server talks to the app through `/api/cadverix-mcp`. Open editor tabs
+heartbeat into that route and receive commands from it. The packaged desktop
+route accepts only loopback requests carrying its random per-launch credential.
+Other production, Docker, and static/PWA builds return 404 for the route.
 
 ## Client Compatibility
 
