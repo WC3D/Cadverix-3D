@@ -45,7 +45,12 @@ function revisionForStat(stat: { size: number; mtimeMs: number }) {
 
 function sharedThumbnailPath(root: string, fileName: string, revision: string) {
   const thumbnailKey = fileName.includes("/") ? `.nested-${createHash("sha256").update(fileName).digest("hex")}` : fileName;
-  return path.join(root, SHARED_THUMBNAILS_DIR, `${thumbnailKey}.${revision}.png`);
+  const thumbnailsRoot = path.resolve(root, SHARED_THUMBNAILS_DIR);
+  const thumbnailPath = path.resolve(thumbnailsRoot, `${thumbnailKey}.${revision}.png`);
+  if (!thumbnailPath.startsWith(`${thumbnailsRoot}${path.sep}`)) {
+    throw new Error("Shared project thumbnail path is invalid");
+  }
+  return thumbnailPath;
 }
 
 const STORAGE_CAPABILITIES = { folders: true, versions: true };

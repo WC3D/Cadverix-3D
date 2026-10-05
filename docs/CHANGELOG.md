@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Upgraded Next.js to 16.3.8 and added defense-in-depth containment for shared-project thumbnail paths.
+
 ## 1.0.13
 
 - Added editable workplane notes that can be free-positioned or pinned to bodies, collapsed, dragged, detached, deleted, persisted in SKF/Layerling files, and included in undo/redo history.
