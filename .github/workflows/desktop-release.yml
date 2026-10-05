@@ -276,7 +276,7 @@ jobs:
         run: |
           while IFS= read -r asset; do
             case "$asset" in
-              "Cadverix 3D-"*|SketchForge-*|latest.yml|latest-linux.yml|latest-mac.yml)
+              Cadverix-3D-*|Cadverix.3D-*|"Cadverix 3D-"*|SketchForge-*|latest.yml|latest-linux.yml|latest-mac.yml)
                 gh release delete-asset "$TAG" "$asset" --yes
                 ;;
             esac
@@ -302,15 +302,15 @@ jobs:
             suffix="-unsigned"
           fi
           for expected in \
-            "Cadverix 3D-Setup-$VERSION-x64.exe" \
-            "Cadverix 3D-Setup-$VERSION-x64.exe.blockmap" \
+            "Cadverix-3D-Setup-$VERSION-x64.exe" \
+            "Cadverix-3D-Setup-$VERSION-x64.exe.blockmap" \
             "latest.yml" \
-            "Cadverix 3D-$VERSION-x86_64.AppImage" \
+            "Cadverix-3D-$VERSION-x86_64.AppImage" \
             "latest-linux.yml" \
-            "Cadverix 3D-$VERSION-x64${suffix}.dmg" \
-            "Cadverix 3D-$VERSION-x64${suffix}.zip" \
-            "Cadverix 3D-$VERSION-arm64${suffix}.dmg" \
-            "Cadverix 3D-$VERSION-arm64${suffix}.zip"; do
+            "Cadverix-3D-$VERSION-x64${suffix}.dmg" \
+            "Cadverix-3D-$VERSION-x64${suffix}.zip" \
+            "Cadverix-3D-$VERSION-arm64${suffix}.dmg" \
+            "Cadverix-3D-$VERSION-arm64${suffix}.zip"; do
             grep -Fxq "$expected" <<< "$names" || {
               echo "GitHub release is missing $expected" >&2
               exit 1

@@ -95,7 +95,7 @@ runs:
           fi
         fi
         npm run desktop:dist -- --publish never --mac "--${ARCH}" \
-          "-c.mac.artifactName=\${productName}-\${version}-\${arch}${ARTIFACT_SUFFIX}.\${ext}"
+          "-c.mac.artifactName=Cadverix-3D-\${version}-\${arch}${ARTIFACT_SUFFIX}.\${ext}"
 
     - name: Verify macOS artifacts
       shell: bash
@@ -105,8 +105,8 @@ runs:
         SIGNING_ENABLED: ${{ steps.signing.outputs.signing_enabled }}
         ARTIFACT_SUFFIX: ${{ steps.signing.outputs.artifact_suffix }}
       run: |
-        test -f "dist/desktop/Cadverix 3D-${VERSION}-${ARCH}${ARTIFACT_SUFFIX}.dmg"
-        test -f "dist/desktop/Cadverix 3D-${VERSION}-${ARCH}${ARTIFACT_SUFFIX}.zip"
+        test -f "dist/desktop/Cadverix-3D-${VERSION}-${ARCH}${ARTIFACT_SUFFIX}.dmg"
+        test -f "dist/desktop/Cadverix-3D-${VERSION}-${ARCH}${ARTIFACT_SUFFIX}.zip"
         if [[ "$SIGNING_ENABLED" == "true" ]]; then
           test -f dist/desktop/latest-mac.yml
         else
@@ -125,7 +125,7 @@ runs:
       with:
         name: ${{ inputs.artifact-name }}
         path: |
-          dist/desktop/Cadverix 3D-*-${{ inputs.arch }}*.dmg
-          dist/desktop/Cadverix 3D-*-${{ inputs.arch }}*.zip
+          dist/desktop/Cadverix-3D-*-${{ inputs.arch }}*.dmg
+          dist/desktop/Cadverix-3D-*-${{ inputs.arch }}*.zip
           dist/desktop/latest-mac-${{ inputs.arch }}.yml
         if-no-files-found: error

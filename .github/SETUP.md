@@ -56,19 +56,19 @@ The macOS job reads these repository secrets:
 When all signing and Apple notarization variables are present, the macOS artifacts use their normal names:
 
 ```text
-Cadverix 3D-VERSION-x64.dmg
-Cadverix 3D-VERSION-x64.zip
-Cadverix 3D-VERSION-arm64.dmg
-Cadverix 3D-VERSION-arm64.zip
+Cadverix-3D-VERSION-x64.dmg
+Cadverix-3D-VERSION-x64.zip
+Cadverix-3D-VERSION-arm64.dmg
+Cadverix-3D-VERSION-arm64.zip
 ```
 
 When one or more signing or Apple notarization variables are missing, the workflow marks the packages as unsigned:
 
 ```text
-Cadverix 3D-VERSION-x64-unsigned.dmg
-Cadverix 3D-VERSION-x64-unsigned.zip
-Cadverix 3D-VERSION-arm64-unsigned.dmg
-Cadverix 3D-VERSION-arm64-unsigned.zip
+Cadverix-3D-VERSION-x64-unsigned.dmg
+Cadverix-3D-VERSION-x64-unsigned.zip
+Cadverix-3D-VERSION-arm64-unsigned.dmg
+Cadverix-3D-VERSION-arm64-unsigned.zip
 ```
 
 Unsigned packages trigger a Gatekeeper warning. Add the signing and notarization secrets before public distribution.

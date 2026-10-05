@@ -87,7 +87,7 @@ describe("macOS release action shell safety", () => {
       const build = run("Build macOS package", directory, env, true);
       expect(build.status, build.stderr).toBe(0);
       const output = JSON.parse(build.stdout);
-      expect(output.args).toEqual(["run", "desktop:dist", "--", "--publish", "never", "--mac", `--${arch}`, "-c.mac.artifactName=${productName}-${version}-${arch}" + suffix + ".${ext}"]);
+      expect(output.args).toEqual(["run", "desktop:dist", "--", "--publish", "never", "--mac", `--${arch}`, "-c.mac.artifactName=Cadverix-3D-${version}-${arch}" + suffix + ".${ext}"]);
       expect(output.certificate).toBe(signed ? "test-certificate" : null);
       if (signed) {
         expect(output.key).toBe(path.join(directory, `cadverix-notary-${arch}.p8`));
@@ -97,7 +97,7 @@ describe("macOS release action shell safety", () => {
 
       const artifacts = path.join(directory, "dist/desktop");
       mkdirSync(artifacts, { recursive: true });
-      for (const extension of ["dmg", "zip"]) writeFileSync(path.join(artifacts, `Cadverix 3D-1.2.3-${arch}${suffix}.${extension}`), "test artifact");
+      for (const extension of ["dmg", "zip"]) writeFileSync(path.join(artifacts, `Cadverix-3D-1.2.3-${arch}${suffix}.${extension}`), "test artifact");
       writeFileSync(path.join(artifacts, "latest-mac.yml"), "test manifest");
       const verify = run("Verify macOS artifacts", directory, env);
       expect(verify.status, verify.stderr).toBe(0);
@@ -118,7 +118,7 @@ describe("macOS release action shell safety", () => {
     expect(JSON.parse(build.stdout).args.at(-1)).toContain(payload);
     const artifacts = path.join(directory, "dist/desktop");
     mkdirSync(artifacts, { recursive: true });
-    for (const extension of ["dmg", "zip"]) writeFileSync(path.join(artifacts, `Cadverix 3D-${env.VERSION}-arm64${payload}.${extension}`), "test artifact");
+    for (const extension of ["dmg", "zip"]) writeFileSync(path.join(artifacts, `Cadverix-3D-${env.VERSION}-arm64${payload}.${extension}`), "test artifact");
     expect(run("Verify macOS artifacts", directory, env).status).toBe(0);
     expect(existsSync(path.join(directory, "injection-marker"))).toBe(false);
   });

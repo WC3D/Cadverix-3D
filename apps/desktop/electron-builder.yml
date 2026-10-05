@@ -31,7 +31,7 @@ win:
     - target: nsis
       arch:
         - x64
-  artifactName: ${productName}-Setup-${version}-${arch}.${ext}
+  artifactName: Cadverix-3D-Setup-${version}-${arch}.${ext}
 
 nsis:
   oneClick: false
@@ -45,7 +45,7 @@ mac:
     - dmg
     - zip
   category: public.app-category.graphics-design
-  artifactName: ${productName}-${version}-${arch}.${ext}
+  artifactName: Cadverix-3D-${version}-${arch}.${ext}
 
 linux:
   syncDesktopName: true
@@ -53,4 +53,4 @@ linux:
   target:
     - AppImage
   category: Graphics
-  artifactName: ${productName}-${version}-${arch}.${ext}
+  artifactName: Cadverix-3D-${version}-${arch}.${ext}

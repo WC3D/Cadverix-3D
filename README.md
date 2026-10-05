@@ -176,7 +176,7 @@ Cadverix 3D is local-first. Private projects stay in each user's browser storage
 
 Desktop packaging supports a Windows x64 installer, macOS Intel/Apple Silicon DMGs, and Linux AppImages. Download the matching asset from [GitHub Releases](https://github.com/WC3D/Cadverix-3D/releases).
 
-- **Windows:** run the `Cadverix 3D-Setup-…-x64.exe` installer.
+- **Windows:** run the `Cadverix-3D-Setup-…-x64.exe` installer.
 - **Linux:** mark the `.AppImage` executable in your file manager's permissions, then launch it.
 - **macOS:** follow the DMG instructions below.
 
@@ -576,7 +576,7 @@ per-launch credential. Typical executable paths are:
 ```text
 Windows: C:\Program Files\Cadverix 3D\Cadverix 3D.exe
 macOS:   /Applications/Cadverix 3D.app/Contents/MacOS/Cadverix 3D
-Linux:   /path/to/Cadverix 3D-1.0.13-x86_64.AppImage
+Linux:   /path/to/Cadverix-3D-1.0.13-x86_64.AppImage
 ```
 
 ### Codex
