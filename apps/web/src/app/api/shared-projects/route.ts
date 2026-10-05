@@ -45,7 +45,13 @@ function revisionForStat(stat: { size: number; mtimeMs: number }) {
 
 function sharedThumbnailPath(root: string, fileName: string, revision: string) {
   const thumbnailKey = fileName.includes("/") ? `.nested-${createHash("sha256").update(fileName).digest("hex")}` : fileName;
-  return path.join(root, SHARED_THUMBNAILS_DIR, `${thumbnailKey}.${revision}.png`);
+  const baseFull = path.resolve(root, SHARED_THUMBNAILS_DIR);
+  const target = path.join(baseFull, `${thumbnailKey}.${revision}.png`);
+  const rel = path.relative(baseFull, target);
+  if (rel === ".." || rel.startsWith(`..${path.sep}`) || path.isAbsolute(rel)) {
+    throw new Error("Invalid file path");
+  }
+  return target;
 }
 
 const STORAGE_CAPABILITIES = { folders: true, versions: true };
