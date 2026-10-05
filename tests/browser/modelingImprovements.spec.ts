@@ -63,6 +63,7 @@ test("splits disconnected bodies from the Combine toolbar and undoes as one acti
   });
   await page.locator('input[type="file"]').filter({ hasNot: page.locator("[accept*=image]") }).first().setInputFiles({ name: "disconnected.3mf", mimeType: "model/3mf", buffer: Buffer.from(archive) });
   await expect.poll(async () => (await scene(page)).shapeCount).toBe(1);
+  await expect(page.locator('[data-tool-group="combine"]').getByRole("button", { name: "Split by plane", exact: true })).toBeVisible();
   const splitBodies = page.getByRole("button", { name: "Bodies split", exact: true });
   await expect(splitBodies).toBeEnabled();
   await splitBodies.click();

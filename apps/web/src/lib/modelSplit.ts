@@ -14,7 +14,8 @@ export type ModelSplitPlane = {
 type Point3 = readonly [number, number, number];
 
 export function splitAxisNormal(axis: AlignAxis): [number, number, number] {
-  return axis === "x" ? [1, 0, 0] : axis === "y" ? [0, 1, 0] : [0, 0, 1];
+  // Split controls use CAD axes (Z-up); the renderer and mesh data use Y-up.
+  return axis === "x" ? [1, 0, 0] : axis === "y" ? [0, 0, 1] : [0, 1, 0];
 }
 
 export function splitRotationAxis(axis: AlignAxis): AlignAxis {

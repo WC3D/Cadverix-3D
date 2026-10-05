@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { modelSplitPlane, splitPlaneIntersectsPoints, splitShapeFromWorldPositions } from "@/lib/modelSplit";
+import { modelSplitPlane, splitAxisNormal, splitPlaneIntersectsPoints, splitShapeFromWorldPositions } from "@/lib/modelSplit";
 import type { WorkplaneShape } from "@/types/sketchforge";
 
 const source: WorkplaneShape = {
@@ -20,8 +20,8 @@ const source: WorkplaneShape = {
 describe("model split helpers", () => {
   it("centers and reorients the preview plane within model bounds", () => {
     const points: Array<[number, number, number]> = [[-4, 2, -6], [8, 12, 10]];
-    expect(modelSplitPlane(points, "y")).toEqual({
-      axis: "y",
+    expect(modelSplitPlane(points, "z")).toEqual({
+      axis: "z",
       rotation: 0,
       normal: [0, 1, 0],
       origin: [2, 7, 2],
@@ -33,16 +33,22 @@ describe("model split helpers", () => {
     expect(modelSplitPlane(points, "x", 6)?.origin).toEqual([6, 7, 2]);
   });
 
+  it("maps CAD Y to depth and CAD Z to model height", () => {
+    expect(splitAxisNormal("x")).toEqual([1, 0, 0]);
+    expect(splitAxisNormal("y")).toEqual([0, 0, 1]);
+    expect(splitAxisNormal("z")).toEqual([0, 1, 0]);
+  });
+
   it("rotates the plane normal and projection range for angled cuts", () => {
     const points: Array<[number, number, number]> = [[-4, 2, -6], [8, 12, 10]];
-    const plane = modelSplitPlane(points, "y", undefined, 45);
+    const plane = modelSplitPlane(points, "z", undefined, 45);
     expect(plane?.rotation).toBe(45);
-    expect(plane?.normal[0]).toBe(0);
+    expect(plane?.normal[0]).toBeCloseTo(-Math.SQRT1_2, 8);
     expect(plane?.normal[1]).toBeCloseTo(Math.SQRT1_2, 8);
-    expect(plane?.normal[2]).toBeCloseTo(Math.SQRT1_2, 8);
+    expect(plane?.normal[2]).toBe(0);
     expect(plane?.origin).toEqual([2, 7, 2]);
-    expect(plane?.min).toBeCloseTo(-2 * Math.SQRT2, 8);
-    expect(plane?.max).toBeCloseTo(11 * Math.SQRT2, 8);
+    expect(plane?.min).toBeCloseTo(2 * Math.SQRT2, 8);
+    expect(plane?.max).toBeCloseTo(3 * Math.SQRT2, 8);
   });
 
   it("only reports a cut when vertices exist on both sides", () => {

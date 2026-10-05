@@ -80,7 +80,7 @@ export function SplitPanel({
     <aside className="split-panel" ref={panelRef} tabIndex={-1} aria-labelledby="split-panel-title">
       <div className="split-panel-header">
         <div>
-          <strong id="split-panel-title">Slice / Split</strong>
+          <strong id="split-panel-title">Split by plane</strong>
           <span>Position the plane, then create two bodies</span>
         </div>
         <button type="button" aria-label="Cancel split" onClick={onCancel}><X size={20} /></button>

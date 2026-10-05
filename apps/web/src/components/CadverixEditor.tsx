@@ -9029,7 +9029,7 @@ export function CadverixEditor({
       return;
     }
     const targetPoints = selectedShapes.flatMap((shape) => meshForSplitShape(shape).vertices);
-    const plane = modelSplitPlane(targetPoints, "y");
+    const plane = modelSplitPlane(targetPoints, "z");
     if (!plane) {
       setNotice("The selection has no printable geometry to split");
       return;
@@ -12285,12 +12285,12 @@ function SecondaryToolbar({
     { label: "Ungroup", icon: ToolbarUngroupIcon, action: onUngroup, enabled: canUngroup && geometryActionsEnabled },
     { label: "Boolean Intersection", icon: ToolbarIntersectionIcon, action: onIntersect, enabled: canIntersect && geometryActionsEnabled },
     { label: "Bodies split", icon: ToolbarBodiesSplitIcon, action: onBodiesSplit, enabled: canBodiesSplit && geometryActionsEnabled },
+    { label: "Split by plane", icon: ToolbarSplitIcon, action: onSplit, enabled: splitMode || canSplit, active: splitMode },
   ];
   const modifyTools = [
     { label: "Align", icon: ToolbarAlignIcon, action: onAlign, enabled: canAlign && geometryActionsEnabled, active: alignMode },
     { label: "Mirror", icon: ToolbarMirrorIcon, action: onMirror, enabled: hasSelection && geometryActionsEnabled, active: mirrorMode },
     { label: "Modeling tools", icon: ToolbarDuplicateIcon, action: onModelingTools, enabled: geometryActionsEnabled },
-    { label: "Slice / Split", icon: ToolbarSplitIcon, action: onSplit, enabled: splitMode || canSplit, active: splitMode },
     { label: "Snap to grid", icon: ToolbarSnapGridIcon, action: onSnap, enabled: hasSelection && geometryActionsEnabled },
     { label: "Chamfer", icon: ToolbarChamferIcon, action: onChamfer, enabled: canEdgeModify && geometryActionsEnabled, active: edgeModifierKind === "chamfer" },
     { label: "Fillet", icon: ToolbarFilletIcon, action: onFillet, enabled: canEdgeModify && geometryActionsEnabled, active: edgeModifierKind === "fillet" },
