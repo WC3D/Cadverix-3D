@@ -7,7 +7,7 @@
   "author": {
     "name": "SketchForge contributors"
   },
-  "homepage": "https://github.com/WC3D/SketchForge-3D",
+  "homepage": "https://github.com/WC3D/Cadverix-3D",
   "desktopName": "cadverix-3d",
   "main": "apps/desktop/main.cjs",
   "license": "AGPL-3.0-only",

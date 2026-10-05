@@ -8,8 +8,8 @@ declare global { interface Window { cadverixInstallPrompt?: InstallPrompt | null
 type OfflineStatus = { ready: boolean; progress?: number; total?: number; bytes?: number; error?: string };
 type DesktopRelease = { state: "loading" | "available" | "unavailable" | "unknown"; url?: string; version?: string };
 const DISMISSED = "cadverix.offlineInstallDismissed";
-const RELEASES_URL = "https://github.com/WC3D/SketchForge-3D/releases";
-const LATEST_RELEASE_API = "https://api.github.com/repos/WC3D/SketchForge-3D/releases/latest";
+const RELEASES_URL = "https://github.com/WC3D/Cadverix-3D/releases";
+const LATEST_RELEASE_API = "https://api.github.com/repos/WC3D/Cadverix-3D/releases/latest";
 const installedApp = () => window.matchMedia("(display-mode: standalone)").matches || (navigator as Navigator & { standalone?: boolean }).standalone === true;
 
 export function useOfflineApp() {

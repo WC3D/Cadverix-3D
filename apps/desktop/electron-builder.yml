@@ -8,7 +8,7 @@ directories:
 publish:
   provider: github
   owner: WC3D
-  repo: SketchForge-3D
+  repo: Cadverix-3D
   releaseType: release
 
 files:

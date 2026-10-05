@@ -121,7 +121,7 @@ const ACTIVE_CHALLENGE_TUTORIAL_STORAGE_KEY = "sketchForge.activeChallengeTutori
 const DISMISSED_UPDATE_VERSION_STORAGE_KEY = "sketchForge.dismissedUpdateVersion";
 const PROJECT_ACCENTS: DashboardProject["accent"][] = ["cyan", "green", "gold", "red"];
 const STATIC_EXPORT_BUILD = process.env.NEXT_PUBLIC_STATIC_EXPORT === "true";
-const SOURCE_CODE_URL = process.env.NEXT_PUBLIC_SOURCE_CODE_URL?.trim() || "https://github.com/WC3D/SketchForge-3D";
+const SOURCE_CODE_URL = process.env.NEXT_PUBLIC_SOURCE_CODE_URL?.trim() || "https://github.com/WC3D/Cadverix-3D";
 const EDITOR_SKELETON_MIN_DURATION_MS = 320;
 const knownProjectResourceKeys = new Map<string, Set<string>>();
 

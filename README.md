@@ -16,7 +16,7 @@
 
   <p>
     <a href="LICENSE"><img alt="GNU AGPLv3 license" src="https://img.shields.io/badge/license-AGPLv3-663399"></a>
-    <a href="https://github.com/WC3D/SketchForge-3D/stargazers"><img alt="Star Cadverix 3D on GitHub" src="https://img.shields.io/github/stars/WC3D/SketchForge-3D?style=flat&logo=github"></a>
+    <a href="https://github.com/WC3D/Cadverix-3D/stargazers"><img alt="Star Cadverix 3D on GitHub" src="https://img.shields.io/github/stars/WC3D/Cadverix-3D?style=flat&logo=github"></a>
     <a href="https://github.com/sponsors/Formsmith746"><img alt="Sponsor upstream contributors on GitHub" src="https://img.shields.io/badge/GitHub-Sponsor-ea4aaa?logo=githubsponsors&logoColor=white"></a>
     <img alt="Local first" src="https://img.shields.io/badge/local--first-no%20account-0ea5e9">
     <img alt="Version v1.0.13" src="https://img.shields.io/badge/version-v1.0.13-2563eb">
@@ -174,7 +174,7 @@ Cadverix 3D is local-first. Private projects stay in each user's browser storage
 
 ## Desktop Releases
 
-Desktop packaging supports a Windows x64 installer, macOS Intel/Apple Silicon DMGs, and Linux AppImages. Download the matching asset from [GitHub Releases](https://github.com/WC3D/SketchForge-3D/releases).
+Desktop packaging supports a Windows x64 installer, macOS Intel/Apple Silicon DMGs, and Linux AppImages. Download the matching asset from [GitHub Releases](https://github.com/WC3D/Cadverix-3D/releases).
 
 - **Windows:** run the `Cadverix 3D-Setup-…-x64.exe` installer.
 - **Linux:** mark the `.AppImage` executable in your file manager's permissions, then launch it.
@@ -214,7 +214,7 @@ Some macOS virtual machines do not provide hardware WebGL. Launch Cadverix 3D wi
 If you already know Git:
 
 ```bash
-git clone https://github.com/WC3D/SketchForge-3D.git cadverix-3d
+git clone https://github.com/WC3D/Cadverix-3D.git cadverix-3d
 cd cadverix-3d
 ```
 

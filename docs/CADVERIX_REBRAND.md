@@ -12,7 +12,7 @@ Quit the old desktop app before launching the renamed build. Both use the same i
 
 Browser data remains scoped to the same site address and browser. If you host the renamed app at a different domain or port, transfer projects with `.skf` export/import.
 
-Docker Compose retains the `sketchforge` service key and `sketchforge-shared-projects` volume key so existing shared files remain attached during upgrades. Local images use `cadverix-3d:local`. The prebuilt image and release URLs follow the actual `WC3D/SketchForge-3D` repository rather than assuming a renamed GitHub repository or a new website exists.
+Docker Compose retains the `sketchforge` service key and `sketchforge-shared-projects` volume key so existing shared files remain attached during upgrades. Local images use `cadverix-3d:local`. Prebuilt image and release URLs use the canonical `WC3D/Cadverix-3D` repository.
 
 The existing Cloudflare worker name in `wrangler.jsonc` also remains a deployment identifier, so deploying the rebrand updates the current site instead of silently creating a different origin.
 

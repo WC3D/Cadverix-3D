@@ -2,7 +2,7 @@
 
 ## Repository owner
 
-The Cadverix 3D desktop updater publishes releases for `WC3D/SketchForge-3D`. The repository slug is the existing hosting address; it is not the product display name.
+The Cadverix 3D desktop updater publishes releases for `WC3D/Cadverix-3D`.
 
 Keep these values in `apps/desktop/electron-builder.yml`:
 
@@ -10,7 +10,7 @@ Keep these values in `apps/desktop/electron-builder.yml`:
 publish:
   provider: github
   owner: WC3D
-  repo: SketchForge-3D
+  repo: Cadverix-3D
 ```
 
 The Git remote can use another account or mirror. The `publish.owner` value must match the repository that hosts the release assets.
