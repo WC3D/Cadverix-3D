@@ -75,6 +75,7 @@ runs:
       run: |
         if [[ "$SIGNING_ENABLED" == "false" ]]; then
           unset CSC_LINK CSC_KEY_PASSWORD APPLE_API_KEY APPLE_API_KEY_ID APPLE_API_ISSUER
+          export CADVERIX_MAC_AD_HOC_SIGN=true
         else
           if [[ -f "$APPLE_API_KEY_INPUT" ]]; then
             export APPLE_API_KEY="$APPLE_API_KEY_INPUT"
@@ -107,6 +108,9 @@ runs:
       run: |
         test -f "dist/desktop/Cadverix-3D-${VERSION}-${ARCH}${ARTIFACT_SUFFIX}.dmg"
         test -f "dist/desktop/Cadverix-3D-${VERSION}-${ARCH}${ARTIFACT_SUFFIX}.zip"
+        apps=(dist/desktop/mac*/Cadverix\ 3D.app)
+        test "${#apps[@]}" -eq 1
+        codesign --verify --deep --strict --verbose=2 "${apps[0]}"
         if [[ "$SIGNING_ENABLED" == "true" ]]; then
           test -f dist/desktop/latest-mac.yml
         else

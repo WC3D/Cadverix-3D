@@ -1,6 +1,7 @@
 appId: com.sketchforge.desktop
 productName: Cadverix 3D
 asar: true
+afterPack: apps/desktop/after-pack.cjs
 
 directories:
   output: dist/desktop

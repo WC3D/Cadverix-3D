@@ -19,7 +19,7 @@
     <a href="https://github.com/WC3D/Cadverix-3D/stargazers"><img alt="Star Cadverix 3D on GitHub" src="https://img.shields.io/github/stars/WC3D/Cadverix-3D?style=flat&logo=github"></a>
     <a href="https://github.com/sponsors/Formsmith746"><img alt="Sponsor upstream contributors on GitHub" src="https://img.shields.io/badge/GitHub-Sponsor-ea4aaa?logo=githubsponsors&logoColor=white"></a>
     <img alt="Local first" src="https://img.shields.io/badge/local--first-no%20account-0ea5e9">
-    <img alt="Version v1.0.13" src="https://img.shields.io/badge/version-v1.0.13-2563eb">
+    <img alt="Version v1.0.14" src="https://img.shields.io/badge/version-v1.0.14-2563eb">
     <a href="docs/MOBILE_ALPHA.md"><img alt="Mobile support: alpha" src="https://img.shields.io/badge/mobile-alpha-f59e0b"></a>
   </p>
 </div>
@@ -576,7 +576,7 @@ per-launch credential. Typical executable paths are:
 ```text
 Windows: C:\Program Files\Cadverix 3D\Cadverix 3D.exe
 macOS:   /Applications/Cadverix 3D.app/Contents/MacOS/Cadverix 3D
-Linux:   /path/to/Cadverix-3D-1.0.13-x86_64.AppImage
+Linux:   /path/to/Cadverix-3D-1.0.14-x86_64.AppImage
 ```
 
 ### Codex

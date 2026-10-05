@@ -62,7 +62,7 @@ Cadverix-3D-VERSION-arm64.dmg
 Cadverix-3D-VERSION-arm64.zip
 ```
 
-When one or more signing or Apple notarization variables are missing, the workflow marks the packages as unsigned:
+When one or more signing or Apple notarization variables are missing, the workflow ad-hoc signs the app bundle for integrity and marks the unnotarized packages with the existing `-unsigned` suffix:
 
 ```text
 Cadverix-3D-VERSION-x64-unsigned.dmg
@@ -71,6 +71,6 @@ Cadverix-3D-VERSION-arm64-unsigned.dmg
 Cadverix-3D-VERSION-arm64-unsigned.zip
 ```
 
-Unsigned packages trigger a Gatekeeper warning. Add the signing and notarization secrets before public distribution.
+Ad-hoc signed packages can still trigger an unidentified-developer Gatekeeper warning, but their bundle signatures pass strict validation. Add the signing and notarization secrets to remove that warning before public distribution.
 
 Do not commit certificates, private keys, or passwords.

@@ -22,9 +22,10 @@ afterEach(() => { for (const directory of directories.splice(0)) rmSync(director
 
 const fakePrivateKey = "-----BEGIN PRIVATE KEY-----\nTEST-ONLY-NOT-A-REAL-KEY\n-----END PRIVATE KEY-----";
 function run(name: string, directory: string, env: Record<string, string>, stubNpm = false) {
-  const stub = stubNpm ? `npm() {
-    node -e 'console.log(JSON.stringify({ args: process.argv.slice(1), certificate: process.env.CSC_LINK ?? null, key: process.env.APPLE_API_KEY ?? null }))' "$@"
-  }\n` : "";
+  const stub = `codesign() { :; }
+${stubNpm ? `npm() {
+    node -e 'console.log(JSON.stringify({ args: process.argv.slice(1), certificate: process.env.CSC_LINK ?? null, key: process.env.APPLE_API_KEY ?? null, adHoc: process.env.CADVERIX_MAC_AD_HOC_SIGN ?? null }))' "$@"
+  }\n` : ""}`;
   return spawnSync("bash", ["--noprofile", "--norc", "-e", "-o", "pipefail", "-c", stub + step(name).run], {
     cwd: directory,
     encoding: "utf8",
@@ -87,8 +88,12 @@ describe("macOS release action shell safety", () => {
       const build = run("Build macOS package", directory, env, true);
       expect(build.status, build.stderr).toBe(0);
       const output = JSON.parse(build.stdout);
-      expect(output.args).toEqual(["run", "desktop:dist", "--", "--publish", "never", "--mac", `--${arch}`, "-c.mac.artifactName=Cadverix-3D-${version}-${arch}" + suffix + ".${ext}"]);
+      expect(output.args).toEqual([
+        "run", "desktop:dist", "--", "--publish", "never", "--mac", `--${arch}`,
+        "-c.mac.artifactName=Cadverix-3D-${version}-${arch}" + suffix + ".${ext}",
+      ]);
       expect(output.certificate).toBe(signed ? "test-certificate" : null);
+      expect(output.adHoc).toBe(signed ? null : "true");
       if (signed) {
         expect(output.key).toBe(path.join(directory, `cadverix-notary-${arch}.p8`));
         expect(readFileSync(output.key, "utf8")).toBe(fakePrivateKey);
@@ -98,6 +103,7 @@ describe("macOS release action shell safety", () => {
       const artifacts = path.join(directory, "dist/desktop");
       mkdirSync(artifacts, { recursive: true });
       for (const extension of ["dmg", "zip"]) writeFileSync(path.join(artifacts, `Cadverix-3D-1.2.3-${arch}${suffix}.${extension}`), "test artifact");
+      mkdirSync(path.join(artifacts, `mac-${arch}`, "Cadverix 3D.app"), { recursive: true });
       writeFileSync(path.join(artifacts, "latest-mac.yml"), "test manifest");
       const verify = run("Verify macOS artifacts", directory, env);
       expect(verify.status, verify.stderr).toBe(0);

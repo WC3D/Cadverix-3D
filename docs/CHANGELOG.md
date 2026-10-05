@@ -2,7 +2,11 @@
 
 ## Unreleased
 
+## 1.0.14
+
 - Upgraded Next.js to 16.3.8 and added defense-in-depth containment for shared-project thumbnail paths.
+- Ad-hoc signed macOS builds when Developer ID credentials are unavailable, preventing structurally invalid app bundles from being reported as damaged. These fallback builds remain unnotarized and retain the `-unsigned` filename suffix.
+- Updated the application version, README badge, and SKF `createdWithVersion` metadata to 1.0.14.
 
 ## 1.0.13
 
