@@ -1,8 +1,7 @@
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { mkdtemp, rm, writeFile } from "node:fs/promises";
 import { createRequire } from "node:module";
-import { tmpdir } from "node:os";
-import { join, relative } from "node:path";
+import { dirname, join, relative } from "node:path";
 
 // Exercise the copy Next.js actually loads, including any nested installation.
 const require = createRequire(import.meta.url);
@@ -16,7 +15,7 @@ describe("PostCSS untrusted source maps without a source filename", () => {
   const privatePath = "/private/project/source.ts";
 
   beforeAll(async () => {
-    directory = await mkdtemp(join(tmpdir(), "sketchforge-postcss-"));
+    directory = await mkdtemp(join(dirname(process.cwd()), "sketchforge-postcss-"));
     mapPath = join(directory, "outside.map");
     await writeFile(mapPath, JSON.stringify({
       version: 3,
