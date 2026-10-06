@@ -83,4 +83,45 @@ describe("model split topology (real Manifold kernel)", () => {
     expect(back?.volume()).toBeCloseTo(3_000, 5);
     dispose(created);
   });
+
+  it("splits a combined selection when the plane falls between its objects", async () => {
+    const runtime = await Module();
+    runtime.setup();
+    const created: ManifoldSolid[] = [];
+    const left = runtime.Manifold.cube([10, 10, 10], true).translate([-6, 0, 0]);
+    const right = runtime.Manifold.cube([10, 10, 10], true).translate([6, 0, 0]);
+    created.push(left, right);
+
+    const vertProperties: number[] = [];
+    const triVerts: number[] = [];
+    for (const solid of [left, right]) {
+      const mesh = solid.getMesh();
+      const vertexOffset = vertProperties.length / 3;
+      for (let vertex = 0; vertex < mesh.numVert; vertex += 1) {
+        const offset = vertex * mesh.numProp;
+        vertProperties.push(mesh.vertProperties[offset], mesh.vertProperties[offset + 1], mesh.vertProperties[offset + 2]);
+      }
+      for (const index of mesh.triVerts) triVerts.push(vertexOffset + index);
+    }
+    const aggregateMesh = new runtime.Mesh({
+      numProp: 3,
+      vertProperties: new Float32Array(vertProperties),
+      triVerts: new Uint32Array(triVerts),
+      tolerance: 0.0001,
+    });
+    aggregateMesh.merge();
+    const aggregate = runtime.Manifold.ofMesh(aggregateMesh);
+    created.push(aggregate);
+
+    const normalized = unionSplitManifoldComponents(runtime, aggregate);
+    created.push(...normalized.created);
+    const [positive, negative] = normalized.solid?.splitByPlane([1, 0, 0], 0) ?? [];
+    if (positive) created.push(positive);
+    if (negative) created.push(negative);
+    expect(positive?.status()).toBe("NoError");
+    expect(negative?.status()).toBe("NoError");
+    expect(positive?.volume()).toBeCloseTo(1_000, 5);
+    expect(negative?.volume()).toBeCloseTo(1_000, 5);
+    dispose(created);
+  });
 });

@@ -4912,16 +4912,21 @@ function meshForSplitShape(shape: WorkplaneShape) {
   return splitMeshSnapshot(shape).mesh;
 }
 
-async function splitShapeByPlane(shape: WorkplaneShape, plane: Pick<ModelSplitPlane, "axis" | "normal" | "position">) {
+async function splitMeshByPlane(
+  shape: WorkplaneShape,
+  sourceMesh: MeshData,
+  plane: Pick<ModelSplitPlane, "axis" | "normal" | "position">,
+  outputName = shape.name,
+) {
   const created: ManifoldSolid[] = [];
   try {
     const runtime = await getManifoldRuntime();
-    const sourceMesh = meshDataToManifoldMesh(runtime, meshForSplitShape(shape));
+    const manifoldMesh = meshDataToManifoldMesh(runtime, sourceMesh);
     let solid: ManifoldSolid;
     try {
-      solid = runtime.Manifold.ofMesh(sourceMesh);
+      solid = runtime.Manifold.ofMesh(manifoldMesh);
     } finally {
-      disposeManifold(sourceMesh);
+      disposeManifold(manifoldMesh);
     }
     if (!solid || solid.status() !== "NoError" || solid.numTri() < 1) {
       return { parts: null, error: `The source mesh could not form a closed solid (${solid?.status() ?? "empty"}).` };
@@ -4950,13 +4955,13 @@ async function splitShapeByPlane(shape: WorkplaneShape, plane: Pick<ModelSplitPl
         shape,
         manifoldMeshToPositions(positiveMesh),
         createLocalId(`${shape.id}-split-positive`),
-        `${shape.name} (${label}+)`,
+        `${outputName} (${label}+)`,
       );
       const negativeShape = splitShapeFromWorldPositions(
         shape,
         manifoldMeshToPositions(negativeMesh),
         createLocalId(`${shape.id}-split-negative`),
-        `${shape.name} (${label}-)`,
+        `${outputName} (${label}-)`,
       );
       return positiveShape && negativeShape
         ? { parts: [canonicalizeShape(positiveShape), canonicalizeShape(negativeShape)] as [WorkplaneShape, WorkplaneShape] }
@@ -4971,6 +4976,16 @@ async function splitShapeByPlane(shape: WorkplaneShape, plane: Pick<ModelSplitPl
   } finally {
     Array.from(new Set(created)).forEach(disposeManifold);
   }
+}
+
+function splitShapeByPlane(shape: WorkplaneShape, plane: Pick<ModelSplitPlane, "axis" | "normal" | "position">) {
+  return splitMeshByPlane(shape, meshForSplitShape(shape), plane);
+}
+
+function combinedSplitMesh(shapes: WorkplaneShape[]) {
+  const combined: MeshData = { name: "Selection", vertices: [], faces: [] };
+  shapes.forEach((shape) => appendMeshData(combined.vertices, combined.faces, meshForSplitShape(shape)));
+  return combined;
 }
 
 function positionsInteriorTriangleCount(positions: number[], cutters: WorkplaneShape[], strictInterior = false) {
@@ -9273,6 +9288,33 @@ export function CadverixEditor({
       splitCount += 1;
     }
 
+    let combinedReplacement: WorkplaneShape[] | null = null;
+    if (splitCount === 0 && splitTargetShapes.length > 1 && splitPlaneIntersectsPoints(splitTargetPoints, plane.normal, plane.position)) {
+      const result = await splitMeshByPlane(
+        splitTargetShapes[0],
+        combinedSplitMesh(splitTargetShapes),
+        plane,
+        "Selection",
+      );
+      if (splitRunRef.current !== runId) return;
+      if (!sourceContextIsCurrent()) {
+        splitRunRef.current += 1;
+        setSplitSession(null);
+        setNotice("Split cancelled because the project, selection, or model changed while processing");
+        return;
+      }
+      if (!result.parts) {
+        setSplitSession((current) => current ? {
+          ...current,
+          busy: false,
+          error: `Could not split the combined selection. ${result.error ?? "The model could not be divided at this plane."}`,
+        } : current);
+        setNotice("Could not split the combined selection");
+        return;
+      }
+      combinedReplacement = result.parts;
+    }
+
     if (splitRunRef.current !== runId) return;
     if (!sourceContextIsCurrent()) {
       splitRunRef.current += 1;
@@ -9280,21 +9322,31 @@ export function CadverixEditor({
       setNotice("Split cancelled because the project, selection, or model changed while processing");
       return;
     }
-    if (splitCount === 0) {
+    if (splitCount === 0 && !combinedReplacement) {
       setSplitSession((current) => current ? { ...current, busy: false, error: "Move the plane through at least one selected object." } : current);
       setNotice("The split plane does not cross the selection");
       return;
     }
 
-    const nextShapes = shapesRef.current.flatMap((shape) => replacements.get(shape.id) ?? [shape]);
-    const nextSelection = [...replacements.values()].flat().map((shape) => shape.id);
+    const firstTargetId = splitTargetShapes[0]?.id;
+    const targetIds = new Set(splitTargetShapes.map((shape) => shape.id));
+    const nextShapes = shapesRef.current.flatMap((shape) => {
+      if (combinedReplacement) {
+        if (shape.id === firstTargetId) return combinedReplacement;
+        if (targetIds.has(shape.id)) return [];
+      }
+      return replacements.get(shape.id) ?? [shape];
+    });
+    const nextSelection = (combinedReplacement ?? [...replacements.values()].flat()).map((shape) => shape.id);
     setSplitSession(null);
     commitShapes(
       nextShapes,
       nextSelection,
-      `Split ${splitCount} object${splitCount === 1 ? "" : "s"} into ${nextSelection.length} bodies`,
+      combinedReplacement
+        ? `Split ${splitTargetShapes.length} objects as one model into 2 bodies`
+        : `Split ${splitCount} object${splitCount === 1 ? "" : "s"} into ${nextSelection.length} bodies`,
     );
-  }, [commitShapes, splitPlane, splitSession, splitTargetShapes]);
+  }, [commitShapes, splitPlane, splitSession, splitTargetPoints, splitTargetShapes]);
 
   useEffect(() => {
     if (!splitSession) return;
