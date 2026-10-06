@@ -3,7 +3,7 @@
 import { Check, LoaderCircle, X } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { displayStepFromMillimeters, displayToMillimeters, formatMeasurementNumber, lengthDisplayUnit, millimetersToDisplay, parseMeasurementInput } from "@/lib/measurementUnits";
-import { splitRotationAxis } from "@/lib/modelSplit";
+import { splitRotationAxes, type SplitRotation } from "@/lib/modelSplit";
 import type { AlignAxis, WorkplaneWorkspaceSettings } from "@/types/sketchforge";
 
 export function SplitPanel({
@@ -23,7 +23,7 @@ export function SplitPanel({
   onCancel,
 }: {
   axis: AlignAxis;
-  rotation: number;
+  rotation: SplitRotation;
   position: number;
   min: number;
   max: number;
@@ -32,7 +32,7 @@ export function SplitPanel({
   busy: boolean;
   error: string | null;
   onAxisChange: (axis: AlignAxis) => void;
-  onRotationChange: (rotation: number) => void;
+  onRotationChange: (index: 0 | 1, rotation: number) => void;
   onPositionChange: (position: number) => void;
   onApply: () => void;
   onCancel: () => void;
@@ -44,20 +44,15 @@ export function SplitPanel({
   const displayStep = displayStepFromMillimeters(0.1, workspace);
   const unit = lengthDisplayUnit(workspace).label;
   const formattedPosition = formatMeasurementNumber(displayPosition, workspace.accuracy, displayStep);
-  const formattedRotation = String(Number(rotation.toFixed(2)));
+  const rotationAxes = splitRotationAxes(axis);
   const [positionEditing, setPositionEditing] = useState(false);
   const [positionDraft, setPositionDraft] = useState(formattedPosition);
-  const [rotationEditing, setRotationEditing] = useState(false);
-  const [rotationDraft, setRotationDraft] = useState(formattedRotation);
   const applyDisplayPosition = (value: number) => {
     if (Number.isFinite(value)) onPositionChange(displayToMillimeters(value, workspace));
   };
   useEffect(() => {
     if (!positionEditing) setPositionDraft(formattedPosition);
   }, [formattedPosition, positionEditing]);
-  useEffect(() => {
-    if (!rotationEditing) setRotationDraft(formattedRotation);
-  }, [formattedRotation, rotationEditing]);
   useEffect(() => {
     const previousFocus = document.activeElement instanceof HTMLElement ? document.activeElement : null;
     panelRef.current?.focus({ preventScroll: true });
@@ -70,12 +65,6 @@ export function SplitPanel({
     if (Number.isFinite(value)) applyDisplayPosition(value);
     setPositionEditing(false);
   };
-  const commitRotationDraft = () => {
-    const value = parseMeasurementInput(rotationDraft);
-    if (Number.isFinite(value)) onRotationChange(value);
-    setRotationEditing(false);
-  };
-
   return (
     <aside className="split-panel" ref={panelRef} tabIndex={-1} aria-labelledby="split-panel-title">
       <div className="split-panel-header">
@@ -108,50 +97,15 @@ export function SplitPanel({
         </div>
       </fieldset>
 
-      <div className="split-position-control split-rotation-control">
-        <span>
-          <strong>Rotation around {splitRotationAxis(axis).toUpperCase()}</strong>
-          <span className="split-position-value">
-            <input
-              type="text"
-              inputMode="decimal"
-              value={rotationEditing ? rotationDraft : formattedRotation}
-              aria-label={`Split plane rotation around ${splitRotationAxis(axis).toUpperCase()} axis`}
-              aria-describedby="split-rotation-unit"
-              disabled={busy}
-              onFocus={() => {
-                setRotationDraft(formattedRotation);
-                setRotationEditing(true);
-              }}
-              onChange={(event) => setRotationDraft(event.currentTarget.value)}
-              onBlur={commitRotationDraft}
-              onKeyDown={(event) => {
-                if (event.key === "Enter") {
-                  event.preventDefault();
-                  event.stopPropagation();
-                  event.currentTarget.blur();
-                } else if (event.key === "Escape") {
-                  event.preventDefault();
-                  event.stopPropagation();
-                  setRotationDraft(formattedRotation);
-                }
-              }}
-            />
-            <small id="split-rotation-unit">deg</small>
-          </span>
-        </span>
-        <input
-          type="range"
-          min={-180}
-          max={180}
-          step={1}
-          value={rotation}
-          aria-label={`Split plane rotation around ${splitRotationAxis(axis).toUpperCase()} axis slider`}
-          aria-valuetext={`${formattedRotation} degrees around ${splitRotationAxis(axis).toUpperCase()} axis`}
-          disabled={busy}
-          onChange={(event) => onRotationChange(event.currentTarget.valueAsNumber)}
+      {rotationAxes.map((rotationAxis, index) => (
+        <SplitRotationControl
+          key={rotationAxis}
+          axisLabel={rotationAxis.toUpperCase() as "X" | "Y" | "Z"}
+          rotation={rotation[index]}
+          busy={busy}
+          onChange={(value) => onRotationChange(index as 0 | 1, value)}
         />
-      </div>
+      ))}
 
       <div className="split-position-control">
         <span>
@@ -209,5 +163,78 @@ export function SplitPanel({
         </button>
       </div>
     </aside>
+  );
+}
+
+function SplitRotationControl({
+  axisLabel,
+  rotation,
+  busy,
+  onChange,
+}: {
+  axisLabel: "X" | "Y" | "Z";
+  rotation: number;
+  busy: boolean;
+  onChange: (rotation: number) => void;
+}) {
+  const formatted = String(Number(rotation.toFixed(2)));
+  const unitId = `split-rotation-${axisLabel.toLowerCase()}-unit`;
+  const [editing, setEditing] = useState(false);
+  const [draft, setDraft] = useState(formatted);
+  useEffect(() => {
+    if (!editing) setDraft(formatted);
+  }, [formatted, editing]);
+  const commitDraft = () => {
+    const value = parseMeasurementInput(draft);
+    if (Number.isFinite(value)) onChange(value);
+    setEditing(false);
+  };
+
+  return (
+    <div className="split-position-control split-rotation-control">
+      <span>
+        <strong>Rotation around {axisLabel}</strong>
+        <span className="split-position-value">
+          <input
+            type="text"
+            inputMode="decimal"
+            value={editing ? draft : formatted}
+            aria-label={`Split plane rotation around ${axisLabel} axis`}
+            aria-describedby={unitId}
+            disabled={busy}
+            onFocus={() => {
+              setDraft(formatted);
+              setEditing(true);
+            }}
+            onChange={(event) => setDraft(event.currentTarget.value)}
+            onBlur={commitDraft}
+            onKeyDown={(event) => {
+              if (event.key === "Enter") {
+                event.preventDefault();
+                event.stopPropagation();
+                event.currentTarget.blur();
+              } else if (event.key === "Escape") {
+                event.preventDefault();
+                event.stopPropagation();
+                setDraft(formatted);
+                setEditing(false);
+              }
+            }}
+          />
+          <small id={unitId}>deg</small>
+        </span>
+      </span>
+      <input
+        type="range"
+        min={-180}
+        max={180}
+        step={1}
+        value={rotation}
+        aria-label={`Split plane rotation around ${axisLabel} axis slider`}
+        aria-valuetext={`${formatted} degrees around ${axisLabel} axis`}
+        disabled={busy}
+        onChange={(event) => onChange(event.currentTarget.valueAsNumber)}
+      />
+    </div>
   );
 }

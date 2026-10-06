@@ -120,7 +120,7 @@ import { createKeyboardMovementInteraction, isMovementKey, moveShapesByKeyboard 
 import { useToolbarMenuPosition } from "@/components/useToolbarMenuPosition";
 import { createLocalId } from "@/lib/localIds";
 import { unionSplitManifoldComponents } from "@/lib/manifoldSplit";
-import { modelSplitPlane, splitPlaneIntersectsPoints, splitShapeFromWorldPositions, type ModelSplitPlane } from "@/lib/modelSplit";
+import { NO_SPLIT_ROTATION, modelSplitPlane, splitPlaneIntersectsPoints, splitShapeFromWorldPositions, type ModelSplitPlane, type SplitRotation } from "@/lib/modelSplit";
 import { circleFromPoints, circleSketchGeometry } from "@/lib/sketchCircles";
 import { appendSketchArc } from "@/lib/sketchArcs";
 import { moveConstrainedSketchPoint, pruneSketchParameters, setSketchPointFixed, setSketchSegmentConstraint, setSketchSegmentLength, solveSketchProfile } from "@/lib/sketchConstraints";
@@ -248,7 +248,7 @@ type EdgeModifierSession = {
 type SplitSession = {
   targetIds: string[];
   axis: AlignAxis;
-  rotation: number;
+  rotation: SplitRotation;
   position: number;
   pivot: [number, number, number];
   sourceFingerprint: string;
@@ -6772,7 +6772,7 @@ export function CadverixEditor({
   const splitTargetPoints = useMemo(() => splitTargetShapes.flatMap((shape) => meshForSplitShape(shape).vertices), [splitTargetShapes]);
   const splitPlane = useMemo(
     () => splitSession ? modelSplitPlane(splitTargetPoints, splitSession.axis, splitSession.position, splitSession.rotation) : null,
-    [splitSession?.axis, splitSession?.position, splitSession?.rotation, splitTargetPoints],
+    [splitSession?.axis, splitSession?.position, splitSession?.rotation[0], splitSession?.rotation[1], splitTargetPoints],
   );
   const constructionPlanes = useMemo(() => shapes.filter((shape) => shape.kind === "constructionPlane" && shape.constructionPlane), [shapes]);
   const activeConstructionPlane = useMemo(
@@ -9179,7 +9179,7 @@ export function CadverixEditor({
     setSplitSession({
       targetIds: selectedShapes.map((shape) => shape.id),
       axis: plane.axis,
-      rotation: 0,
+      rotation: NO_SPLIT_ROTATION,
       position: plane.position,
       pivot: plane.origin,
       sourceFingerprint: projectShapesFingerprint(shapesRef.current),
@@ -9195,7 +9195,7 @@ export function CadverixEditor({
     setSplitSession((current) => current && !current.busy ? {
       ...current,
       axis,
-      rotation: 0,
+      rotation: NO_SPLIT_ROTATION,
       position: plane.position,
       pivot: plane.origin,
       error: null,
@@ -9210,10 +9210,11 @@ export function CadverixEditor({
     });
   }, [splitTargetPoints]);
 
-  const changeSplitRotation = useCallback((rotation: number) => {
-    const nextRotation = Math.max(-180, Math.min(180, rotation));
+  const changeSplitRotation = useCallback((index: 0 | 1, rotation: number) => {
+    const angle = Math.max(-180, Math.min(180, rotation));
     setSplitSession((current) => {
       if (!current || current.busy) return current;
+      const nextRotation: SplitRotation = index === 0 ? [angle, current.rotation[1]] : [current.rotation[0], angle];
       const centeredPlane = modelSplitPlane(splitTargetPoints, current.axis, undefined, nextRotation);
       if (!centeredPlane) return current;
       const position = centeredPlane.normal[0] * current.pivot[0]

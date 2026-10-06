@@ -1,8 +1,13 @@
 import type { AlignAxis, WorkplaneShape } from "@/types/sketchforge";
 
+/** Degrees about the two axes returned by `splitRotationAxes`, in that order. */
+export type SplitRotation = readonly [number, number];
+
+export const NO_SPLIT_ROTATION: SplitRotation = [0, 0];
+
 export type ModelSplitPlane = {
   axis: AlignAxis;
-  rotation: number;
+  rotation: SplitRotation;
   normal: [number, number, number];
   origin: [number, number, number];
   position: number;
@@ -18,14 +23,14 @@ export function splitAxisNormal(axis: AlignAxis): [number, number, number] {
   return axis === "x" ? [1, 0, 0] : axis === "y" ? [0, 0, 1] : [0, 1, 0];
 }
 
-export function splitRotationAxis(axis: AlignAxis): AlignAxis {
-  return axis === "x" ? "z" : axis === "y" ? "x" : "y";
+/** The two axes the plane can turn about, excluding the axis it cuts across. */
+export function splitRotationAxes(axis: AlignAxis): readonly [AlignAxis, AlignAxis] {
+  return axis === "x" ? ["z", "y"] : axis === "y" ? ["x", "z"] : ["y", "x"];
 }
 
-function rotatedSplitNormal(axis: AlignAxis, rotation: number): [number, number, number] {
-  const normal = splitAxisNormal(axis);
-  const rotationVector = splitAxisNormal(splitRotationAxis(axis));
-  const radians = rotation * Math.PI / 180;
+function rotateAboutAxis(normal: readonly [number, number, number], axis: AlignAxis, degrees: number): [number, number, number] {
+  const rotationVector = splitAxisNormal(axis);
+  const radians = degrees * Math.PI / 180;
   const cosine = Math.cos(radians);
   const sine = Math.sin(radians);
   const dot = rotationVector[0] * normal[0] + rotationVector[1] * normal[1] + rotationVector[2] * normal[2];
@@ -40,11 +45,18 @@ function rotatedSplitNormal(axis: AlignAxis, rotation: number): [number, number,
   }) as [number, number, number];
 }
 
+// Apply the second turn about a fixed axis so either control tilts the plane
+// exactly around the CAD axis shown in the panel.
+function rotatedSplitNormal(axis: AlignAxis, rotation: SplitRotation): [number, number, number] {
+  const [first, second] = splitRotationAxes(axis);
+  return rotateAboutAxis(rotateAboutAxis(splitAxisNormal(axis), first, rotation[0]), second, rotation[1]);
+}
+
 function pointProjection(point: Point3, normal: Point3) {
   return point[0] * normal[0] + point[1] * normal[1] + point[2] * normal[2];
 }
 
-export function modelSplitPlane(points: readonly Point3[], axis: AlignAxis, requestedPosition?: number, rotation = 0): ModelSplitPlane | null {
+export function modelSplitPlane(points: readonly Point3[], axis: AlignAxis, requestedPosition?: number, rotation: SplitRotation = NO_SPLIT_ROTATION): ModelSplitPlane | null {
   if (points.length === 0) return null;
   const mins = [Number.POSITIVE_INFINITY, Number.POSITIVE_INFINITY, Number.POSITIVE_INFINITY];
   const maxs = [Number.NEGATIVE_INFINITY, Number.NEGATIVE_INFINITY, Number.NEGATIVE_INFINITY];
