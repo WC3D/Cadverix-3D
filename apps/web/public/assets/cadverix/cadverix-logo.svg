@@ -1,6 +1,6 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img" aria-labelledby="title description">
-  <title id="title">Cadverix 3D — C3D</title>
-  <desc id="description">An isometric modeling cube, a drafting pencil and a curved sketch path above the C3D monogram, on a blue drafting-grid badge.</desc>
+  <title id="title">Cadverix 3D — WC3D</title>
+  <desc id="description">An isometric modeling cube, a drafting pencil and a curved sketch path above the WC3D monogram, on a blue drafting-grid badge.</desc>
   <defs>
     <linearGradient id="badge" x1="0" y1="0" x2="1" y2="1">
       <stop stop-color="#163858"/>
@@ -62,10 +62,13 @@
     <path d="M-11-65h22" stroke="#8eabbf" stroke-width="3"/>
   </g>
 
-  <!-- Font-independent C3D lettering renders identically in SVG, PNG and ICNS. -->
-  <g transform="translate(30 0)" fill="none" stroke="#f4fbff" stroke-width="17" stroke-linecap="round" stroke-linejoin="round">
-    <path d="M164 381c-9-9-19-12-31-12-21 0-37 15-37 35s16 35 37 35c12 0 23-5 31-14"/>
-    <path d="M199 373h24c26 0 28 28 4 30 27 1 27 34-1 34h-27m16-34h12"/>
-    <path d="M281 373v64h21c46 0 46-64 0-64Z"/>
+  <!-- Font-independent WC3D lettering renders identically in SVG, PNG and ICNS. -->
+  <g transform="translate(20 0)" fill="none" stroke="#f4fbff" stroke-width="17" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M66 373l14 64 22-44 22 44 14-64"/>
+    <g transform="translate(70 0)">
+      <path d="M164 381c-9-9-19-12-31-12-21 0-37 15-37 35s16 35 37 35c12 0 23-5 31-14"/>
+      <path d="M199 373h24c26 0 28 28 4 30 27 1 27 34-1 34h-27m16-34h12"/>
+      <path d="M281 373v64h21c46 0 46-64 0-64Z"/>
+    </g>
   </g>
 </svg>

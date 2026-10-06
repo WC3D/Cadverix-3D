@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- Changed the icon monogram from C3D to WC3D and regenerated the desktop, favicon, Apple touch, and PWA icons.
 ## 1.0.14
 
 - Upgraded Next.js to 16.3.8 and added defense-in-depth containment for shared-project thumbnail paths.

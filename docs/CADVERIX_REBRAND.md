@@ -2,7 +2,7 @@
 
 The product name is **Cadverix 3D**, and the package/local image slug is `cadverix-3d`. Browser titles, dashboard branding, desktop menus, installer names, export labels, current documentation, and MCP tool names use the new brand.
 
-The logo combines a **C3D** monogram, a shaded isometric cube, a pencil drawing a curved profile, dimension ticks, and a subtle drafting grid. Its lettering uses vector paths rather than system fonts. The SVG master lives under `apps/web/public/assets/cadverix`; `npm run brand:icons` generates the 1024px desktop PNG, 180px Apple touch icon, and 32px PNG favicon from that source.
+The logo combines a **WC3D** monogram, a shaded isometric cube, a pencil drawing a curved profile, dimension ticks, and a subtle drafting grid. Its lettering uses vector paths rather than system fonts. The SVG master lives under `apps/web/public/assets/cadverix`; `npm run brand:icons` generates the 1024px desktop PNG, 180px Apple touch icon, 32px PNG favicon, and 192px/512px PWA icons (including a maskable variant) from that source.
 
 ## Existing projects and installations
 
