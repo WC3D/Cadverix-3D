@@ -13,7 +13,7 @@ import {
   inspectSkfProjectPackage,
   LYL_SCHEMA_ID,
   SKF_FORMAT_VERSION,
-  SKF_DRAWING_FORMAT_VERSION,
+  SKF_HYBRID_FORMAT_VERSION,
   SKF_LIMITS,
   SKF_SCHEMA_ID,
   type SkfProjectDocumentV1,
@@ -866,7 +866,7 @@ describe("SketchForge .skf project packages", () => {
   it("rejects unsupported future versions before restoring any state", async () => {
     const exported = await exportSkfProject(input([shape("box")]));
     const future = mutateProject(exported, (document) => {
-      (document as { formatVersion: number }).formatVersion = SKF_DRAWING_FORMAT_VERSION + 1;
+      (document as { formatVersion: number }).formatVersion = SKF_HYBRID_FORMAT_VERSION + 1;
     });
 
     await expect(importSkfProject(future)).rejects.toThrow("requires a newer Cadverix 3D version");

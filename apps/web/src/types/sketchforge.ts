@@ -1,5 +1,6 @@
 import type { AppTheme } from "@/lib/themes";
 import type { DrawingSheet } from "@/lib/drawingSheet";
+import type { PcbInstanceLink } from "@/pcb/pcbDocument";
 import type { ConstructionPlaneAttachment, ConstructionPlanePose, PrincipalPlane, Vector3Tuple } from "@/lib/constructionPlanes";
 
 export type ShapeKind =
@@ -321,6 +322,7 @@ export type CadPrimitiveFrame = {
 };
 
 export type WorkplaneShape = {
+  pcbInstance?: PcbInstanceLink;
   id: string;
   name: string;
   kind: ShapeKind;

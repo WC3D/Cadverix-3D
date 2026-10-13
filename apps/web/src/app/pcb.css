@@ -1,0 +1,29 @@
+.cadverix-editor.pcb-active { --editor-toolbar-height:40px; --editor-toolbar-tools-height:0px; }
+.cadverix-editor.pcb-active .toolbar-mode-content { display:none; }
+.pcb-workspace { --background:#fafafa; --foreground:#31465d; --panel:#fafafa; --tile:#f4f5f7; --subbar:#f1f1f3; --border:#cfd9e2; position:relative; display:flex; flex:1; min-width:0; min-height:0; flex-direction:column; height:100%; width:100%; background:var(--background); color:var(--foreground); overflow:hidden; }
+.pcb-project-tools { display:flex; align-items:center; gap:6px; padding:6px; min-height:48px; flex-shrink:0; overflow-x:auto; background:var(--panel); color:var(--foreground); }
+.pcb-project-tools label { display:flex; align-items:center; gap:6px; white-space:nowrap; }
+.pcb-project-tools select { width:160px; }
+.pcb-workspace .pcb-project-tools button,.pcb-workspace .pcb-project-tools select,.pcb-workspace .pcb-project-manager button,.pcb-workspace .pcb-project-manager input,.pcb-workspace .pcb-project-manager select { flex-shrink:0; border:1px solid var(--border); border-radius:5px; background:var(--tile); color:var(--foreground); padding:7px; white-space:nowrap; }
+.pcb-editor-host { position:relative; flex:1; min-height:0; transform:translateZ(0); overflow:hidden; }
+.pcb-workspace .sketchforge-editor { position:relative; width:100%; height:100%; min-width:0; }
+.pcb-project-manager { position:absolute; z-index:100; right:8px; top:54px; width:320px; max-width:calc(100% - 16px); max-height:calc(100% - 100px); overflow:auto; padding:12px; background:var(--panel); color:var(--foreground); border:1px solid var(--border); border-radius:8px; }
+.pcb-project-manager label { display:grid; gap:5px; margin:10px 0; }
+.pcb-project-manager button { margin:3px 0; }
+.pcb-project-manager h3 { margin-top:12px; }
+.pcb-project-status { flex-shrink:0; padding:5px 10px; font-size:12px; background:var(--panel); color:var(--foreground); max-height:70px; overflow:auto; }
+.pcb-empty { padding:25px; }
+.pcb-empty button { margin-top:15px; padding:12px; background:var(--primary); color:white; border-radius:6px; }
+.pcb-workspace .editor-ribbon { position:absolute; }
+.pcb-workspace .pcb-board-3d-overlay { z-index:90; }
+.pcb-workspace .pcb-workspace-modal-card { height:100%; max-height:100%; }
+.pcb-workspace .part-library-panel { height:min(650px, calc(100% - var(--editor-ribbon-height) - 8px)); }
+.pcb-reference-actions { position:absolute; left:12px; bottom:90px; z-index:20; display:flex; flex-wrap:wrap; gap:6px; max-width:calc(100% - 24px); background:var(--panel); color:var(--foreground); padding:8px; border:1px solid var(--border); border-radius:6px; }
+.pcb-reference-actions button { background:var(--tile); color:var(--foreground); padding:6px; border-radius:4px; }
+.pcb-workspace .editor-mode-tabs,.pcb-workspace .editor-tool-groups { background:var(--subbar); }
+.pcb-workspace .editor-mode-tabs button,.pcb-workspace .tool-group-label { color:var(--foreground); }
+@media(max-width:700px) {
+  .cadverix-editor.pcb-active { --editor-toolbar-height:calc(40px + env(safe-area-inset-top, 0px)); }
+  .pcb-project-manager { top:auto; bottom:35px; max-height:60%; }
+  .pcb-workspace .component-inspector { top:auto; bottom:0; left:0; right:0; width:100%; max-height:44%; border-top:1px solid #cfd9e2; }
+}

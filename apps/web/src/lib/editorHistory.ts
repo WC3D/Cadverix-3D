@@ -1,11 +1,13 @@
 import type { WorkplaneNote, WorkplaneShape } from "@/types/sketchforge";
 import { canonicalizeShape } from "@/lib/workplaneShapes";
 import { normalizeNotes, notesSignature } from "@/lib/workplaneNotes";
+import { parseElectronics, type ElectronicsDocument } from "@/pcb/pcbDocument";
 
 export const MAX_EDITOR_HISTORY_ENTRIES = 5000;
 export type EditorHistoryExportLimit = "unlimited" | number;
 
 export type EditorHistoryEntry = {
+  electronics?: ElectronicsDocument;
   shapes: WorkplaneShape[];
   selectedIds: string[];
   notes?: WorkplaneNote[];
@@ -266,11 +268,12 @@ function sceneFingerprint(shapeFingerprint: string, notes: WorkplaneNote[]) {
   return signature ? `${shapeFingerprint}#${signatureFromSerialized(signature).fingerprint}` : shapeFingerprint;
 }
 
-export function projectSceneFingerprint(shapes: WorkplaneShape[], notes: WorkplaneNote[] = []) {
-  return sceneFingerprint(projectShapesFingerprint(shapes), normalizeNotes(notes));
+export function projectSceneFingerprint(shapes: WorkplaneShape[], notes: WorkplaneNote[] = [], electronics?: ElectronicsDocument) {
+  const base = sceneFingerprint(projectShapesFingerprint(shapes), normalizeNotes(notes));
+  return electronics?.boards.length ? `${base}#pcb:${objectResourceSignature(electronics).fingerprint}` : base;
 }
 
-export function editorHistoryEntry(shapes: WorkplaneShape[], selectedIds: string[], notes: WorkplaneNote[] = []): EditorHistoryEntry {
+export function editorHistoryEntry(shapes: WorkplaneShape[], selectedIds: string[], notes: WorkplaneNote[] = [], electronics?: ElectronicsDocument): EditorHistoryEntry {
   const canonicalShapes = shapes.map(canonicalizeShape);
   const validSelection = selectedIds.filter((id, index) => selectedIds.indexOf(id) === index && canonicalShapes.some((shape) => shape.id === id));
   const canonicalNotes = normalizeNotes(notes);
@@ -283,7 +286,19 @@ export function editorHistoryEntry(shapes: WorkplaneShape[], selectedIds: string
     estimatedBytes: shapeSignature.estimatedBytes + noteSignature.length * 2,
   };
   if (canonicalNotes.length > 0) entry.notes = canonicalNotes;
+  if (electronics?.boards.length) {
+    entry.electronics = parseElectronics(electronics);
+    const signature = objectResourceSignature(entry.electronics);
+    entry.fingerprint += `#pcb:${signature.fingerprint}`;
+    entry.estimatedBytes += signature.estimatedBytes;
+  }
   return entry;
+}
+
+export function electronicsForHistoryIndex(entries: EditorHistoryEntry[] | undefined, index: number | undefined): ElectronicsDocument | undefined {
+  if (!entries?.length) return undefined;
+  const entry = entries[Number.isInteger(index) ? Math.max(0, Math.min(index!, entries.length - 1)) : entries.length - 1];
+  return entry?.electronics;
 }
 
 export function notesForHistoryIndex(entries: EditorHistoryEntry[] | undefined, index: number | undefined): WorkplaneNote[] {
@@ -343,7 +358,7 @@ export function hydrateEditorHistoryState(
   limit: EditorHistoryExportLimit = "unlimited",
   currentNotes: WorkplaneNote[] = [],
 ): EditorHistoryState {
-  const fallback = editorHistoryEntry(currentShapes, [], currentNotes);
+  const fallback = editorHistoryEntry(currentShapes, [], currentNotes, electronicsForHistoryIndex(storedEntries, requestedIndex));
   if (!Array.isArray(storedEntries) || storedEntries.length === 0) {
     return { entries: [fallback], index: 0 };
   }
@@ -354,6 +369,7 @@ export function hydrateEditorHistoryState(
         Array.isArray(entry?.shapes) ? entry.shapes : [],
         Array.isArray(entry?.selectedIds) ? entry.selectedIds.filter((id): id is string => typeof id === "string") : [],
         normalizeNotes(entry?.notes),
+        entry?.electronics ? parseElectronics(entry.electronics) : undefined,
       ),
     );
     const index = Number.isInteger(requestedIndex)

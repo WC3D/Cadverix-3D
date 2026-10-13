@@ -2,6 +2,7 @@
 
 import { Check, Circle, Circle as CircleIcon, CircleDot, CircleMinus, CirclePlus, CloudUpload, CopyPlus, Download, Eye, EyeOff, FolderOpen, Grid2X2, Hexagon, Hexagon as HexagonIcon, Paintbrush, Pentagon, RotateCw, Route, Ruler, ScanLine, Sparkles, Square, Square as SquareIcon, Triangle as TriangleIcon, Type, X } from "lucide-react";
 import type manifoldModule from "manifold-3d";
+import dynamic from "next/dynamic";
 import type { ManifoldToplevel } from "manifold-3d";
 import { useCallback, useEffect, useMemo, useRef, useState, type FormEvent } from "react";
 import { ADDITION, Brush, Evaluator, HOLLOW_INTERSECTION, HOLLOW_SUBTRACTION, INTERSECTION, SUBTRACTION, type CSGOperation } from "three-bvh-csg";
@@ -69,6 +70,9 @@ import { DrawingWorkspace } from "./DrawingWorkspace";
 import { ModelingTools } from "./ModelingTools";
 import { modelingPatternSteps, type PatternOptions } from "@/lib/modelingPatterns";
 import { PRINTER_PRESETS } from "@/lib/printerPresets";
+import { EMPTY_ELECTRONICS, parseElectronics, type ElectronicsDocument } from "@/pcb/pcbDocument";
+import { pcbGeometryRevision } from "@/pcb/pcbRevision";
+import { electronicsForHistoryIndex, immutableResourceFingerprint } from "@/lib/editorHistory";
 import { copySketchSelection, pasteSketchSelection } from "@/lib/sketchClipboard";
 import { treatSketchCorner } from "@/lib/sketchCorners";
 import { SketchWorkspace, type SketchCircleDraft, type SketchMeasurement, type SketchPolygonDraft, type SketchPrimitive, type SketchRectDraft, type SketchSelection, type SketchTextDraft, type SketchTool } from "./SketchWorkspace";
@@ -204,7 +208,9 @@ type ProjectPackageExportFormat = Extract<ExportFormat, "skf" | "lyl">;
 type DirectExportFormat = Exclude<ExportFormat, "step" | ProjectPackageExportFormat>;
 type SkfHistoryLimit = EditorHistoryExportLimit;
 type SkfExportTarget = "download" | "shared";
-type ToolbarMode = "geometry" | "sketch" | "sculpt" | "drawing";
+const PcbWorkspace = dynamic(() => import("@/pcb/PcbWorkspace").then((module) => module.PcbWorkspace), { ssr: false });
+type ToolbarMode = "geometry" | "sketch" | "sculpt" | "drawing" | "pcb";
+type GeometryExportContent = "selection" | "mechanical" | "pcb" | "assembly";
 const NOTE_COMMIT_IDLE_MS = 700;
 type SketchCommandKind = "sweep" | "project" | "offset" | "mirror" | "rectangular-pattern" | "circular-pattern";
 type SketchOffsetCommandOptions = { distance: number; includeConnected: boolean };
@@ -2948,6 +2954,7 @@ function cadModifierPrimitiveForShape(shape: WorkplaneShape): CadModifierPrimiti
 }
 
 function bakeShapeTransformIntoMesh(shape: WorkplaneShape, force = false): WorkplaneShape {
+  if (shape.pcbInstance) return shape; // Keep a rigid, editable instance pose, not a baked board transform.
   // Text and groups must retain their editable source data across transforms.
   // Baking a group would discard groupedShapes and make Ungroup unavailable.
   if (!force && (shapeTransformShouldRemainEditable(shape) || !shapeHasTransformToBake(shape))) {
@@ -5962,6 +5969,7 @@ async function buildGroupedShapeFromSelection(groupable: WorkplaneShape[]): Prom
 
 function debugShapeSummary(shape: WorkplaneShape): Record<string, unknown> {
   return {
+    pcbInstance: shape.pcbInstance,
     id: shape.id,
     name: shape.name,
     kind: shape.kind,
@@ -6213,6 +6221,17 @@ export function CadverixEditor({
   }
   const [shapes, setShapes] = useState<WorkplaneShape[]>(() => initialSceneRef.current as WorkplaneShape[]);
   const [notes, setNotes] = useState<WorkplaneNote[]>(() => notesForHistoryIndex(initialHistory, initialHistoryIndex));
+  const [electronics, setElectronics] = useState<ElectronicsDocument>(() => electronicsForHistoryIndex(initialHistory, initialHistoryIndex) ?? EMPTY_ELECTRONICS);
+  const electronicsRef = useRef(electronics); electronicsRef.current = electronics;
+  const [pcbReset, setPcbReset] = useState(0);
+  const lastProjectElectronicsEchoRef = useRef("");
+  const pcbTransactionRef = useRef<{ key: string; index: number } | null>(null);
+  const pcbJobsRef = useRef(new Map<string, { revision: string }>());
+  const pcbEpochRef = useRef(0);
+  const [pcbRetry, setPcbRetry] = useState(0);
+  const [pcbMessages, setPcbMessages] = useState<Record<string, string>>({});
+  const [requestedPcbBoard, setRequestedPcbBoard] = useState<string | null>(null);
+  useEffect(() => { pcbEpochRef.current++; pcbJobsRef.current.clear(); pcbTransactionRef.current = null; setPcbMessages({}); setRequestedPcbBoard(null); return () => { pcbEpochRef.current++; }; }, [projectId]);
   const [notesVisible, setNotesVisible] = useState(true);
   const [noteMode, setNoteMode] = useState(false);
   const [projectAssets, setProjectAssets] = useState<ProjectAsset[]>(() => dedupeProjectAssets(initialAssets));
@@ -6844,9 +6863,9 @@ export function CadverixEditor({
         : mirrorMode && mirrorPreviewAxis
           ? mirroredShapesForSelection(shapes, selectedIds, selectedShapes, mirrorPreviewAxis).nextShapes
           : shapes;
-      return previewShapes.map(shapeWithFeatureToggles);
+      return previewShapes.map((shape) => shape.pcbInstance && shape.pcbInstance.revision !== pcbGeometryRevision(electronicsRef.current.boards.find((board) => board.id === shape.pcbInstance!.boardId)?.scene ?? {}) ? { ...shape, hidden: true } : shapeWithFeatureToggles(shape));
     },
-    [alignMode, alignPreview, edgeModifier?.preview, effectiveAlignAnchorId, mirrorMode, mirrorPreviewAxis, selectedIds, selectedShapes, shapes],
+    [alignMode, alignPreview, edgeModifier?.preview, effectiveAlignAnchorId, mirrorMode, mirrorPreviewAxis, selectedIds, selectedShapes, shapes, electronics],
   );
   const sketchReferenceShapes = useMemo(
     () => sketchOperation === "revolve" || placementWorkplaneIsBase(activeSketchWorkplane)
@@ -6862,9 +6881,10 @@ export function CadverixEditor({
         notice,
         selectedIds,
         shapeCount: shapes.length,
+        pcbBoards: electronics.boards.map((board) => ({ id: board.id, name: board.name, revision: pcbGeometryRevision(board.scene), parts: board.scene.parts.length, wires: board.scene.wires.length })),
         shapes: shapes.map(debugShapeSummary),
       }),
-    [notice, selectedIds, shapes],
+    [notice, selectedIds, shapes, electronics],
   );
   const printerOutsideCount = useMemo(() => {
     if (!workspaceSettings.buildHeight) return 0;
@@ -7002,6 +7022,7 @@ export function CadverixEditor({
         projectSyncTimerRef.current = null;
         lastProjectShapesSyncRef.current = serialized;
         lastProjectShapesEchoRef.current = serialized;
+        lastProjectElectronicsEchoRef.current = immutableResourceFingerprint(electronicsRef.current);
         onProjectShapesChange({
           projectId,
           shapes: canonicalNext,
@@ -7058,7 +7079,7 @@ export function CadverixEditor({
 
   const appendHistorySnapshot = useCallback(
     (nextShapes: WorkplaneShape[], nextSelection: string[], nextNotes: WorkplaneNote[] = notesRef.current) =>
-      appendHistoryEntry(editorHistoryEntry(nextShapes, nextSelection, nextNotes)),
+      appendHistoryEntry(editorHistoryEntry(nextShapes, nextSelection, nextNotes, electronicsRef.current)),
     [appendHistoryEntry],
   );
 
@@ -7071,7 +7092,7 @@ export function CadverixEditor({
       return;
     }
 
-    const entry = editorHistoryEntry(shapesRef.current, selectedIdsRef.current, notesRef.current);
+    const entry = editorHistoryEntry(shapesRef.current, selectedIdsRef.current, notesRef.current, electronicsRef.current);
     if (!startFingerprint || startFingerprint === entry.fingerprint) {
       return;
     }
@@ -7102,7 +7123,7 @@ export function CadverixEditor({
           finalizeInteractionHistory();
         }
         if (!projectInteractionActiveRef.current) {
-          interactionHistoryStartRef.current = projectSceneFingerprint(shapesRef.current, notesRef.current);
+          interactionHistoryStartRef.current = projectSceneFingerprint(shapesRef.current, notesRef.current, electronicsRef.current);
           interactionHistoryChangedRef.current = false;
         }
         projectInteractionActiveRef.current = true;
@@ -7216,6 +7237,15 @@ export function CadverixEditor({
 
   const commitShapes = useCallback(
     (next: WorkplaneShape[], nextSelection: string | string[] | null = selectedIds, message?: string) => {
+      if (next.filter((shape) => shape.pcbInstance).length > 128) { setNotice("A project supports up to 128 linked PCB instances"); return; }
+      for (const shape of next) {
+        const previous = shapesRef.current.find((candidate) => candidate.id === shape.id);
+        if (!previous?.pcbInstance) continue;
+        const allowed = new Set(["x", "z", "elevation", "rotation", "rotationX", "rotationZ", "name", "hidden", "locked"]);
+        if (Object.keys(shape).some((key) => !allowed.has(key) && shape[key as keyof WorkplaneShape] !== previous[key as keyof WorkplaneShape])) { setNotice("Linked PCB geometry is generated from its circuit. Make an independent CAD copy before modifying it."); return; }
+      }
+      const nestedPcb = (shape: WorkplaneShape): boolean => Boolean(shape.groupedShapes?.some((child) => child.pcbInstance || nestedPcb(child)));
+      if (next.some(nestedPcb) || next.some((shape) => shape.pcbInstance && !electronicsRef.current.boards.some((board) => board.id === shape.pcbInstance!.boardId))) { setNotice("Linked PCB references must stay in their combined project at the assembly root. Make an independent CAD copy to combine them."); return; }
       const canonicalNext = refreshConstructionPlaneShapes(next.map(canonicalizeShape), shapesRef.current);
       const requestedSelection = Array.isArray(nextSelection) ? nextSelection : nextSelection ? [nextSelection] : [];
       const validSelection = requestedSelection.filter((id, index) => requestedSelection.indexOf(id) === index && canonicalNext.some((shape) => shape.id === id));
@@ -7242,16 +7272,92 @@ export function CadverixEditor({
     const normalized = normalizeNotes(next);
     notesRef.current = normalized;
     setNotes(normalized);
-    const changed = appendHistoryEntry(editorHistoryEntry(shapesRef.current, selectedIdsRef.current, normalized));
+    const changed = appendHistoryEntry(editorHistoryEntry(shapesRef.current, selectedIdsRef.current, normalized, electronicsRef.current));
     if (message) setNotice(message);
     if (changed) syncProjectShapes(shapesRef.current, true);
   }, [appendHistoryEntry, syncProjectShapes]);
+
+  const pcbPlaceholder = (board: ElectronicsDocument["boards"][number], index: number): WorkplaneShape => ({ id: createLocalId("pcb-instance"), name: board.name, kind: "box", width: 60, depth: 40, height: 1.6, size: 60, x: 30 + index * 80, z: 20, elevation: 0, rotation: 0, color: "#237847", hidden: false, locked: false, hole: false, pcbInstance: { boardId: board.id, revision: "pending", originOffset: [-30, -0.8, -20] } });
+  const commitElectronics = useCallback((value: ElectronicsDocument, label: string, transaction?: string) => {
+    const next = parseElectronics(value);
+    const previous = electronicsRef.current;
+    if (immutableResourceFingerprint(next) === immutableResourceFingerprint(previous)) return;
+    let nextShapes = shapesRef.current.filter((shape) => !shape.pcbInstance || next.boards.some((board) => board.id === shape.pcbInstance!.boardId));
+    nextShapes = nextShapes.map((shape) => {
+      const before = previous.boards.find((board) => board.id === shape.pcbInstance?.boardId), after = next.boards.find((board) => board.id === shape.pcbInstance?.boardId);
+      let updated = before && after && immutableResourceFingerprint(before.scene) !== immutableResourceFingerprint(after.scene) ? { ...shape, pcbInstance: { ...shape.pcbInstance!, revision: "pending" } } : shape;
+      if (before && after && before.name !== after.name && (shape.name === before.name || shape.name.startsWith(`${before.name} ·`))) updated = { ...updated, name: after.name + shape.name.slice(before.name.length) };
+      return updated;
+    });
+    for (const board of next.boards) if (!previous.boards.some((old) => old.id === board.id)) nextShapes.push(pcbPlaceholder(board, nextShapes.filter((shape) => shape.pcbInstance).length));
+    nextShapes = refreshConstructionPlaneShapes(nextShapes.map(canonicalizeShape), shapesRef.current);
+    const nextNotes = detachNotesFromMissingShapes(notesRef.current, nextShapes, shapesRef.current);
+    const nextSelection = selectedIdsRef.current.filter((id) => nextShapes.some((shape) => shape.id === id));
+    selectedIdsRef.current = nextSelection; setSelectedIds(nextSelection);
+    electronicsRef.current = next; shapesRef.current = nextShapes; notesRef.current = nextNotes;
+    setElectronics(next); setShapes(nextShapes); setNotes(nextNotes);
+    const entry = editorHistoryEntry(nextShapes, selectedIdsRef.current, nextNotes, next);
+    if (transaction && pcbTransactionRef.current?.key === transaction && pcbTransactionRef.current.index === historyIndexRef.current) {
+      const updated = historyRef.current.map((candidate, index) => index === historyIndexRef.current ? entry : candidate);
+      historyRef.current = updated; setHistory(updated);
+    } else appendHistoryEntry(entry);
+    pcbTransactionRef.current = transaction ? { key: transaction, index: historyIndexRef.current } : null;
+    setNotice(label); syncProjectShapes(nextShapes, true);
+  }, [appendHistoryEntry, syncProjectShapes]);
+
+  useEffect(() => {
+    if (projectInteractionActive) return;
+    const epoch = pcbEpochRef.current;
+    const timer = window.setTimeout(() => {
+      for (const board of electronics.boards) {
+        const revision = pcbGeometryRevision(board.scene);
+        if (!shapes.some((shape) => shape.pcbInstance?.boardId === board.id && shape.pcbInstance.revision !== revision) || pcbJobsRef.current.get(board.id)?.revision === revision) continue;
+        const job = { revision }; pcbJobsRef.current.set(board.id, job);
+        setPcbMessages((messages) => ({ ...messages, [board.id]: `Updating ${board.name} geometry…` }));
+        void import("@/pcb/pcbGeometry").then(async ({ buildPcbGeometry, refreshPcbInstance }) => {
+          const result = await buildPcbGeometry(board);
+          const current = electronicsRef.current.boards.find((candidate) => candidate.id === board.id);
+          if (pcbEpochRef.current !== epoch || pcbJobsRef.current.get(board.id) !== job) return;
+          if (!current || pcbGeometryRevision(current.scene) !== revision) { pcbJobsRef.current.delete(board.id); return; }
+          pcbJobsRef.current.delete(board.id);
+          const nextShapes = refreshConstructionPlaneShapes(shapesRef.current.map((shape) => shape.pcbInstance?.boardId === board.id ? canonicalizeShape(refreshPcbInstance(shape, result.shape, revision, result.warnings.length)) : shape), shapesRef.current);
+          shapesRef.current = nextShapes; setShapes(nextShapes);
+          const entry = editorHistoryEntry(nextShapes, selectedIdsRef.current, notesRef.current, electronicsRef.current);
+          const updated = historyRef.current.map((candidate, index) => index === historyIndexRef.current ? entry : candidate);
+          historyRef.current = updated; setHistory(updated);
+          setPcbMessages((messages) => ({ ...messages, [board.id]: result.warnings.length ? `${current.name}: ${result.warnings.join("; ")}` : "" }));
+          syncProjectShapes(nextShapes, true);
+        }).catch((error) => {
+          const current = electronicsRef.current.boards.find((candidate) => candidate.id === board.id);
+          if (pcbEpochRef.current === epoch && pcbJobsRef.current.get(board.id) === job && current && pcbGeometryRevision(current.scene) === revision) setPcbMessages((messages) => ({ ...messages, [board.id]: `${current.name}: geometry failed — ${error instanceof Error ? error.message : "unknown error"}` }));
+          else if (pcbJobsRef.current.get(board.id) === job) pcbJobsRef.current.delete(board.id);
+        });
+      }
+    }, 150);
+    return () => { window.clearTimeout(timer); };
+  }, [electronics, shapes, pcbRetry, projectInteractionActive, syncProjectShapes]);
+
+  const addPcbInstance = (boardId: string) => {
+    const board = electronicsRef.current.boards.find((board) => board.id === boardId); if (!board) return;
+    const instances = shapesRef.current.filter((shape) => shape.pcbInstance);
+    if (instances.length >= 128) { setNotice("A project supports up to 128 PCB instances"); return; }
+    const existing = instances.find((shape) => shape.pcbInstance?.boardId === boardId);
+    const instance = existing ? { ...cloneWorkplaneShapeTreeWithFreshIds(existing, "pcb-instance"), x: existing.x + 80, locked: false, hidden: false, name: `${board.name} · ${instances.filter((shape) => shape.pcbInstance?.boardId === boardId).length + 1}` } : pcbPlaceholder(board, instances.length);
+    commitShapes([...shapesRef.current, instance], instance.id, "Added linked PCB instance");
+  };
+  const detachPcbCopy = (id: string) => {
+    const source = shapesRef.current.find((shape) => shape.id === id); if (!source?.pcbInstance) return;
+    const board = electronicsRef.current.boards.find((board) => board.id === source.pcbInstance!.boardId);
+    if (!board || source.pcbInstance.revision !== pcbGeometryRevision(board.scene)) { setNotice("Wait for PCB geometry to finish before making a CAD copy"); return; }
+    const copy = { ...cloneWorkplaneShapeTreeWithFreshIds(source, "pcb-copy"), pcbInstance: undefined, name: `${source.name} (independent CAD copy)`, x: source.x + 80, locked: false };
+    commitShapes([...shapesRef.current, copy], copy.id, "Created independent mechanical copy of PCB");
+  };
 
   const flushPendingNoteCommit = useCallback(() => {
     if (noteCommitTimerRef.current === null) return;
     window.clearTimeout(noteCommitTimerRef.current);
     noteCommitTimerRef.current = null;
-    appendHistoryEntry(editorHistoryEntry(shapesRef.current, selectedIdsRef.current, notesRef.current));
+    appendHistoryEntry(editorHistoryEntry(shapesRef.current, selectedIdsRef.current, notesRef.current, electronicsRef.current));
     syncProjectShapes(shapesRef.current, true, true);
   }, [appendHistoryEntry, syncProjectShapes]);
 
@@ -8632,8 +8738,10 @@ export function CadverixEditor({
     }
     const incoming = refreshConstructionPlaneShapes(initialShapes.map(canonicalizeShape));
     const incomingSerialized = projectShapesFingerprint(incoming);
+    const incomingElectronics = electronicsForHistoryIndex(initialHistory, initialHistoryIndex) ?? EMPTY_ELECTRONICS;
+    const incomingPcbFingerprint = immutableResourceFingerprint(incomingElectronics);
     // The parent echoes shapes after a local save; rehydrating that echo can reset active transform state.
-    if (!projectChanged && lastProjectShapesEchoRef.current !== null && incomingSerialized === lastProjectShapesEchoRef.current) {
+    if (!projectChanged && lastProjectShapesEchoRef.current !== null && incomingSerialized === lastProjectShapesEchoRef.current && incomingPcbFingerprint === lastProjectElectronicsEchoRef.current) {
       lastProjectShapesSyncRef.current = incomingSerialized;
       return;
     }
@@ -8642,7 +8750,7 @@ export function CadverixEditor({
       window.clearTimeout(projectSyncTimerRef.current);
       projectSyncTimerRef.current = null;
     }
-    if (!projectChanged && incomingSerialized === projectShapesFingerprint(shapes)) {
+    if (!projectChanged && incomingSerialized === projectShapesFingerprint(shapes) && incomingPcbFingerprint === immutableResourceFingerprint(electronicsRef.current)) {
       return;
     }
     const incomingNotes = notesForHistoryIndex(initialHistory, initialHistoryIndex);
@@ -8661,6 +8769,7 @@ export function CadverixEditor({
     historyIndexRef.current = hydratedHistory.index;
     setShapes(incoming);
     setNotes(incomingNotes);
+    electronicsRef.current = incomingElectronics; setElectronics(incomingElectronics); setPcbReset((value) => value + 1);
     setSelectedIds([]);
     setHistory(hydratedHistory.entries);
     setHistoryIndex(hydratedHistory.index);
@@ -8763,6 +8872,8 @@ export function CadverixEditor({
 
   const updateShape = useCallback(
     (id: string, patch: ShapeUpdatePatch) => {
+      const linked = shapesRef.current.find((shape) => shape.id === id);
+      if (linked?.pcbInstance && Object.keys(patch).some((key) => !["x", "z", "elevation", "rotation", "rotationX", "rotationZ", "name", "hidden", "locked", "bakeTransform"].includes(key) && patch[key as keyof ShapeUpdatePatch] !== linked[key as keyof WorkplaneShape])) { setNotice("Edit this board in PCB, or make an independent CAD copy before changing its geometry."); return; }
       const bakeTransform = Boolean(patch.bakeTransform);
       const cleanedPatch = cleanShapePatch(patch);
       if (cleanedPatch.sketchRevolve) {
@@ -8814,6 +8925,7 @@ export function CadverixEditor({
   );
 
   const startSculpt = useCallback(() => {
+    if (selectedShapes.some((shape) => shape.pcbInstance)) { setNotice("Make an independent CAD copy before sculpting a PCB reference"); return; }
     const source = selectedShapes.length === 1 ? selectedShapes[0] : null;
     if (!source || source.locked || source.hidden || source.hole || source.kind === "constructionPlane" || source.imagePlate) {
       return;
@@ -8965,8 +9077,9 @@ export function CadverixEditor({
       setNotice("Select a shape first");
       return;
     }
-    setClipboard(selectedShapes);
-    writeSharedClipboard(selectedShapes);
+    const copied = selectedShapes.map((shape) => shape.pcbInstance ? { ...shape, pcbInstance: { ...shape.pcbInstance, clipboardProjectId: projectInfoRef.current.projectId ?? "local-workplane" } } : shape);
+    setClipboard(copied);
+    writeSharedClipboard(copied);
     setNotice(`Copied ${selectedShapes.length} shape${selectedShapes.length === 1 ? "" : "s"}`);
   }, [hasSelection, selectedShapes]);
 
@@ -8983,6 +9096,7 @@ export function CadverixEditor({
       setNotice("Paste cancelled because the project changed");
       return;
     }
+    if (sourceClipboard.some((shape) => shape.pcbInstance && shape.pcbInstance.clipboardProjectId !== (sourceProjectId ?? "local-workplane"))) { setNotice("Transfer PCB designs between projects using SFPCB import/export, or copy independent CAD geometry instead."); return; }
     if (serializeShapesForSync(sourceClipboard) !== serializeShapesForSync(clipboard)) {
       setClipboard(sourceClipboard);
     }
@@ -8990,6 +9104,7 @@ export function CadverixEditor({
       const pastedShape = cloneWorkplaneShapeTreeWithFreshIds(shape, "paste");
       return {
         ...pastedShape,
+        pcbInstance: pastedShape.pcbInstance ? { ...pastedShape.pcbInstance, clipboardProjectId: undefined } : undefined,
         x: Math.min(110, shape.x + 12),
         z: Math.min(110, shape.z + 12),
       };
@@ -9022,6 +9137,7 @@ export function CadverixEditor({
     setShapes(nextShapes);
     setNotes(nextNotes);
     setSelectedIds(nextSelection);
+    pcbTransactionRef.current = null; electronicsRef.current = entry.electronics ?? EMPTY_ELECTRONICS; setElectronics(electronicsRef.current); setPcbReset((value) => value + 1); pcbJobsRef.current.clear(); setPcbMessages({});
     syncProjectShapes(nextShapes, true);
     setNotice(modifierCancelled ? "Edge modifier cancelled · Undo" : "Undo");
   }, [invalidateCadModifierSession, syncProjectShapes]);
@@ -9051,6 +9167,7 @@ export function CadverixEditor({
     setShapes(nextShapes);
     setNotes(nextNotes);
     setSelectedIds(nextSelection);
+    pcbTransactionRef.current = null; electronicsRef.current = entry.electronics ?? EMPTY_ELECTRONICS; setElectronics(electronicsRef.current); setPcbReset((value) => value + 1); pcbJobsRef.current.clear(); setPcbMessages({});
     syncProjectShapes(nextShapes, true);
     setNotice(modifierCancelled ? "Edge modifier cancelled · Redo" : "Redo");
   }, [invalidateCadModifierSession, syncProjectShapes]);
@@ -9119,6 +9236,7 @@ export function CadverixEditor({
   }, []);
 
   const toggleMirrorMode = useCallback(() => {
+    if (selectedShapes.some((shape) => shape.pcbInstance)) { setNotice("Make an independent CAD copy before mirroring a PCB reference"); return; }
     if (!hasSelection) {
       setNotice("Select a shape first");
       return;
@@ -9168,6 +9286,7 @@ export function CadverixEditor({
   }, []);
 
   const toggleSplitMode = useCallback(() => {
+    if (selectedShapes.some((shape) => shape.pcbInstance)) { setNotice("Make an independent CAD copy before splitting a PCB reference"); return; }
     if (splitSession) {
       cancelSplit();
       return;
@@ -9436,6 +9555,7 @@ export function CadverixEditor({
   }, [invalidateCadModifierSession]);
 
   const startEdgeModifier = useCallback((kind: CadModifierKind) => {
+    if (selectedShapes.some((shape) => shape.pcbInstance)) { setNotice("Make an independent CAD copy before treating PCB reference edges"); return; }
     if (selectedShapes.length !== 1 || !selectedShape || selectedShape.locked || selectedShape.hole) {
       setNotice(`Select one unlocked solid to ${kind}`);
       return;
@@ -9864,8 +9984,9 @@ export function CadverixEditor({
       return;
     }
     const selected = new Set(selectedIds);
-    setClipboard(selectedShapes);
-    writeSharedClipboard(selectedShapes);
+    const copied = selectedShapes.map((shape) => shape.pcbInstance ? { ...shape, pcbInstance: { ...shape.pcbInstance, clipboardProjectId: projectInfoRef.current.projectId ?? "local-workplane" } } : shape);
+    setClipboard(copied);
+    writeSharedClipboard(copied);
     commitShapes(
       shapes.filter((shape) => !selected.has(shape.id)),
       [],
@@ -9969,6 +10090,7 @@ export function CadverixEditor({
   }, []);
 
   const groupSelected = useCallback(async () => {
+    if (selectedShapes.some((shape) => shape.pcbInstance)) { setNotice("Make independent CAD copies before combining PCB references"); return; }
     if (selectedShapes.length < 2) {
       setNotice("Select at least two shapes to group");
       return;
@@ -10037,6 +10159,7 @@ export function CadverixEditor({
   }, [commitShapes, selectedShapes]);
 
   const ungroupSelected = useCallback(() => {
+    if (selectedShapes.some((shape) => shape.pcbInstance)) { setNotice("Use Edit PCB or make an independent CAD copy before ungrouping"); return; }
     const groups = selectedShapes.filter((shape) => shape.groupedShapes?.length);
     if (groups.length === 0) {
       setNotice("Select a group first");
@@ -10686,9 +10809,10 @@ export function CadverixEditor({
     void run();
   }, [commitShapes]);
 
-  const exportDesign = useCallback((format: DirectExportFormat, exportName: string) => {
-    const sourceShapes = hasSelection ? selectedShapes : shapes;
-    const exportable = sourceShapes.filter((shape) => !shape.hole && shape.kind !== "constructionPlane");
+  const exportDesign = useCallback((format: DirectExportFormat, exportName: string, content: GeometryExportContent = "selection") => {
+    const sourceShapes = content === "selection" ? hasSelection ? selectedShapes : shapes : content === "assembly" ? shapes : shapes.filter((shape) => Boolean(shape.pcbInstance) === (content === "pcb"));
+    const exportable = sourceShapes.filter((shape) => !shape.hidden && !shape.hole && shape.kind !== "constructionPlane");
+    if (exportable.some((shape) => shape.pcbInstance && shape.pcbInstance.revision !== pcbGeometryRevision(electronicsRef.current.boards.find((board) => board.id === shape.pcbInstance!.boardId)?.scene ?? {}))) { setNotice("PCB references are updating or failed to build. Finish/retry PCB geometry before exporting the assembly."); return; }
     if (exportable.length === 0) {
       setNotice(hasSelection ? "Select at least one solid shape before exporting" : "Add a solid shape before exporting");
       return;
@@ -10741,11 +10865,12 @@ export function CadverixEditor({
       .catch((error: unknown) => failNotice("OBJ", error));
   }, [hasSelection, projectName, selectedShapes, shapes]);
 
-  const exportStepDesign = useCallback(async (exportName: string) => {
+  const exportStepDesign = useCallback(async (exportName: string, content: GeometryExportContent = "selection") => {
     if (stepExporting) {
       return;
     }
-    const sourceShapes = (hasSelection ? selectedShapes : shapes).filter((shape) => shape.kind !== "constructionPlane");
+    const sourceShapes = (content === "selection" ? hasSelection ? selectedShapes : shapes : content === "assembly" ? shapes : shapes.filter((shape) => Boolean(shape.pcbInstance) === (content === "pcb"))).filter((shape) => !shape.hidden && shape.kind !== "constructionPlane");
+    if (sourceShapes.some((shape) => shape.pcbInstance)) { setNotice("PCB references are mesh assemblies. Use STL, OBJ or 3MF, or choose Mechanical only for STEP."); return; }
     if (sourceShapes.some((shape) => shape.hole) && !sourceShapes.some((shape) => !shape.hole)) {
       setNotice("Select at least one solid shape before exporting STEP");
       return;
@@ -11140,7 +11265,8 @@ export function CadverixEditor({
     };
 
     const handleKeyDown = (event: KeyboardEvent) => {
-      if (toolbarMode === "drawing") return;
+      if (!document.querySelector(".cadverix-editor")?.getClientRects().length) return;
+      if (toolbarMode === "drawing" || toolbarMode === "pcb") return;
       if (pickingPatternCenter && event.key === "Escape") {
         event.preventDefault(); setPickingPatternCenter(false); setWorkplaneMode(false); setNotice("Pattern center picking cancelled"); return;
       }
@@ -11348,7 +11474,7 @@ export function CadverixEditor({
   ]);
 
   return (
-    <div className="cadverix-editor" style={themeStyles}>
+    <div className={`cadverix-editor${toolbarMode === "pcb" ? " pcb-active" : ""}`} style={themeStyles}>
       <SecondaryToolbar
         toolbarMode={toolbarMode}
         drawingToolbarRef={setDrawingToolbarHost}
@@ -11356,6 +11482,7 @@ export function CadverixEditor({
         onProjectNameChange={onProjectNameChange}
         showProjectNameInToolbar={showProjectNameInToolbar}
         onToolbarModeChange={(mode) => {
+          if (mode === "pcb") { if (sketchActive) return; if (edgeModifier) cancelEdgeModifier(); setModelingToolsOpen(false); }
           if (mode !== "geometry" && pickingPatternCenter) { setPickingPatternCenter(false); setWorkplaneMode(false); }
           if (mode === "drawing") {
             if (sketchActive) { setNotice("Finish or cancel the current sketch before opening Drawing"); return; }
@@ -11468,7 +11595,7 @@ export function CadverixEditor({
         }}
       />
       <div className="editor-body">
-        {toolbarMode !== "drawing" ? <SceneOverviewSidebar
+        {toolbarMode !== "drawing" && toolbarMode !== "pcb" ? <SceneOverviewSidebar
           shapes={shapes}
           selectedIds={selectedIds}
           actionsDisabled={Boolean(splitSession || edgeModifier || projectInteractionActive || sketchActive)}
@@ -11491,7 +11618,7 @@ export function CadverixEditor({
           projectName={projectName}
           shapes={shapes}
           selectedIds={selectedIds}
-          getMesh={meshForShape}
+          getMesh={(shape) => { if (shape.pcbInstance && shape.pcbInstance.revision !== pcbGeometryRevision(electronicsRef.current.boards.find((board) => board.id === shape.pcbInstance!.boardId)?.scene ?? {})) throw new Error("PCB reference is updating; retry its geometry in PCB before drawing or exporting"); return meshForShape(shape); }}
           toolbarHost={drawingToolbarHost}
           onHome={onHome}
           onChange={(drawing) => {
@@ -11508,7 +11635,14 @@ export function CadverixEditor({
             void exportProjectDesign("skf", projectName, "unlimited");
           }}
         /> : null}
-        {toolbarMode === "drawing" ? null : toolbarMode === "sketch" && sketchActive ? (
+        {toolbarMode === "pcb" ? <PcbWorkspace document={electronics} shapes={shapes} projectId={projectId} reset={pcbReset} requestedBoard={requestedPcbBoard}
+          onActiveBoard={setRequestedPcbBoard}
+          onChange={commitElectronics} onAddInstance={addPcbInstance} onDetach={detachPcbCopy} onUndo={undo} onRedo={redo}
+          onLocate={(id) => { setSelectedIds([id]); setToolbarMode("geometry"); }} onHome={() => setToolbarMode("geometry")}
+          onSave={() => { syncProjectShapes(shapesRef.current, true, true); void exportProjectDesign("skf", projectName, "unlimited"); }}
+          geometryStatus={electronics.boards.map((board) => pcbMessages[board.id]).filter(Boolean).join(" · ")} onRetry={() => { pcbJobsRef.current.clear(); setPcbRetry((value) => value + 1); }} /> : null}
+        {toolbarMode === "geometry" && selectedShape?.pcbInstance ? <div className="pcb-reference-actions"><strong>Linked PCB reference</strong><button type="button" onClick={() => { setRequestedPcbBoard(selectedShape.pcbInstance!.boardId); setToolbarMode("pcb"); }}>Edit PCB</button><button type="button" onClick={() => detachPcbCopy(selectedShape.id)}>Make independent CAD copy</button></div> : null}
+        {toolbarMode === "drawing" || toolbarMode === "pcb" ? null : toolbarMode === "sketch" && sketchActive ? (
           <>
             <SketchWorkspace
             profile={sketchProfile}
@@ -11824,6 +11958,7 @@ export function CadverixEditor({
           projectName={projectName}
           shapeCount={exportableShapeCount}
           scopeLabel={exportScopeLabel}
+          assemblyCounts={electronics.boards.length ? { mechanical: shapes.filter((shape) => !shape.pcbInstance && !shape.hidden && !shape.hole && shape.kind !== "constructionPlane").length, pcb: shapes.filter((shape) => shape.pcbInstance && !shape.hidden).length, assembly: shapes.filter((shape) => !shape.hidden && !shape.hole && shape.kind !== "constructionPlane").length } : undefined}
           onClose={() => setTopPanel(null)}
           onExport={exportDesign}
           onExportProject={exportProjectDesign}
@@ -12590,7 +12725,7 @@ function SecondaryToolbar({
   return (
     <div className="secondary-toolbar">
       <div className={`toolbar-mode-content ${toolbarMode}`}>
-        {toolbarMode === "drawing" ? <div className="drawing-toolbar-host" ref={drawingToolbarRef} /> : toolbarMode === "geometry" ? (
+        {toolbarMode === "pcb" ? null : toolbarMode === "drawing" ? <div className="drawing-toolbar-host" ref={drawingToolbarRef} /> : toolbarMode === "geometry" ? (
           <>
       {onHome ? (
         <div className="tool-group editor-nav-group">
@@ -13080,6 +13215,7 @@ function SecondaryToolbar({
           >
             Drawing
           </button>
+          <button className={toolbarMode === "pcb" ? "active" : ""} type="button" role="tab" aria-selected={toolbarMode === "pcb"} disabled={sketchActive} title="Edit PCB designs in this project" onClick={() => selectToolbarMode("pcb")}>PCB</button>
         </div>
         {showProjectNameInToolbar ? (
           <div className="toolbar-project-name">
@@ -13116,6 +13252,7 @@ function SecondaryToolbar({
 }
 
 function TopActionPanel({
+  assemblyCounts,
   panel,
   workspace,
   onWorkspaceChange,
@@ -13138,10 +13275,11 @@ function TopActionPanel({
   projectName: string;
   shapeCount: number;
   scopeLabel: "selected" | "total";
+  assemblyCounts?: Record<Exclude<GeometryExportContent, "selection">, number>;
   onClose: () => void;
-  onExport: (format: DirectExportFormat, exportName: string) => void;
+  onExport: (format: DirectExportFormat, exportName: string, content?: GeometryExportContent) => void;
   onExportProject: (format: ProjectPackageExportFormat, exportName: string, historyLimit: SkfHistoryLimit, target?: SkfExportTarget) => void;
-  onExportStep: (exportName: string) => void;
+  onExportStep: (exportName: string, content?: GeometryExportContent) => void;
   sharedProjectsEnabled: boolean;
   skfExporting: boolean;
   stepExporting: boolean;
@@ -13153,6 +13291,8 @@ function TopActionPanel({
   onWorkspaceChange: (w: WorkplaneWorkspaceSettings) => void;
 }) {
   const [exportFormat, setExportFormat] = useState<ExportFormat>("stl");
+  const [exportContent, setExportContent] = useState<GeometryExportContent>("selection");
+  const exportCount = exportContent !== "selection" && assemblyCounts ? assemblyCounts[exportContent] : shapeCount;
   const [exportName, setExportName] = useState(projectName);
   const previousProjectNameRef = useRef(projectName);
   const [skfHistoryLimit, setSkfHistoryLimit] = useState<SkfHistoryLimit>("unlimited");
@@ -13215,9 +13355,9 @@ function TopActionPanel({
   const selectedExport = exportDetails[exportFormat];
   const projectPackageExport = exportFormat === "skf" || exportFormat === "lyl";
   const runSelectedExport = () => {
-    if (exportFormat === "step") onExportStep(exportName);
+    if (exportFormat === "step") onExportStep(exportName, exportContent);
     else if (projectPackageExport) onExportProject(exportFormat, exportName, skfHistoryLimit);
-    else onExport(exportFormat, exportName);
+    else onExport(exportFormat, exportName, exportContent);
   };
 
   return (
@@ -13278,7 +13418,7 @@ function TopActionPanel({
                 onChange={(event) => setExportName(event.target.value)}
                 onFocus={(event) => event.currentTarget.select()}
                 onKeyDown={(event) => {
-                  if (event.key === "Enter" && (shapeCount > 0 || projectPackageExport) && !stepExporting && !skfExporting) runSelectedExport();
+                  if (event.key === "Enter" && (exportCount > 0 || projectPackageExport) && !stepExporting && !skfExporting) runSelectedExport();
                 }}
               />
               <span>.{exportFormat}</span>
@@ -13290,7 +13430,7 @@ function TopActionPanel({
               <div>
                 <strong>Format</strong>
               </div>
-              <span className="export-scope-badge">{projectPackageExport ? "Full project" : `${shapeCount} ${scopeLabel}`}</span>
+              <span className="export-scope-badge">{projectPackageExport ? assemblyCounts ? "Full combined project" : "Full project" : exportContent !== "selection" && assemblyCounts ? `${assemblyCounts[exportContent]} ${exportContent}` : `${shapeCount} ${scopeLabel}`}</span>
             </div>
             <div className="export-format-slider" data-format={exportFormat} role="radiogroup" aria-label="Export format">
               {(["stl", "3mf", "obj", "step", "svg", "skf", "lyl"] as const).map((format) => (
@@ -13308,6 +13448,7 @@ function TopActionPanel({
             </div>
           </section>
 
+          {assemblyCounts && !projectPackageExport ? <label className="export-setting-section">Geometry to export<select aria-label="Geometry export contents" value={exportContent} onChange={(event) => setExportContent(event.target.value as GeometryExportContent)}><option value="selection">Current selection / all if none selected</option><option value="mechanical">Mechanical only</option><option value="pcb">PCB references only</option><option value="assembly">Complete visible assembly</option></select></label> : null}
           {projectPackageExport ? (
             <section className="export-setting-section skf-history-section">
               <div className="export-section-heading">
@@ -13360,7 +13501,7 @@ function TopActionPanel({
                   <span>Save to shared</span>
                 </button>
               ) : null}
-              <button className="export-primary-button" onClick={runSelectedExport} disabled={(shapeCount === 0 && !projectPackageExport) || stepExporting || skfExporting}>
+              <button className="export-primary-button" onClick={runSelectedExport} disabled={(exportCount === 0 && !projectPackageExport) || stepExporting || skfExporting}>
                 <Download />
                 {projectPackageExport ? (skfExporting ? "Saving project…" : exportFormat === "lyl" ? "Export Layerling Project" : "Save Cadverix 3D Project") : null}
                 <span hidden={projectPackageExport}>

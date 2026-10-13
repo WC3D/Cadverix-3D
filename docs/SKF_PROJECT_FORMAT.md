@@ -8,7 +8,7 @@ Cadverix 3D uses a packaged container (format option B). A `.skf` file is a ZIP 
 
 This was selected over pure JSON because imported STL/STEP data and exact B-Rep can be large, Base64 would add size and parsing overhead, and an archive lets Cadverix 3D validate and hash each asset independently. The editable model is still JSON and can be inspected by opening `project.json` from the package.
 
-## Version 2 / 3 layout
+## Version 2 / 3 / 4 layout
 
 ```text
 project.skf
@@ -35,6 +35,7 @@ project.skf
 - `exactCad`: objects with exact B-Rep or imported STEP sources
 - `editor`: workspace dimensions, units, snap grid, and selected workplane elevation
 - `editor.workspace.drawing` (format 3): paper template/orientation, title-block fields, projection convention, source-linked model views, paper entities, and dimensions with geometry fingerprints
+- `states[].electronics` (format 4): versioned PCB document containing independent board IDs, names, circuits, outlines, routing, and trace widths for each history state. Root shape definitions may carry `pcbInstance` links with board ID, geometry revision, and document-origin offset; generated component meshes use the existing deduplicated assets.
 
 Object nodes keep stable Cadverix 3D object IDs. Groups refer to child node IDs instead of array positions. Fillet/chamfer history refers to explicit “before” nodes. Feature dependencies are explicit and checked for cycles.
 
@@ -68,7 +69,9 @@ Each state accepts at most 200 workplane notes and 2,000 UTF-16 code units per n
 
 ## Compatibility and migrations
 
-Modeling-only saves use format version 2 and minimum reader version 2. Projects containing `editor.workspace.drawing` use format version 3 and minimum reader version 3, so older readers reject them instead of dropping the drawing. The current reader accepts packaged versions 1, 2, and 3, including version 1 inline display edges. The importer also migrates the documented version 0 pure-JSON prototype and preserves its object IDs and valid history.
+Modeling-only saves use format version 2 and minimum reader version 2. Projects containing `editor.workspace.drawing` use format version 3 and minimum reader version 3. Projects with PCB data in any retained state use format/minimum reader 4, so older readers reject them rather than losing circuits or their undo history. The current native reader accepts packaged versions 1–4, including version 1 inline display edges. The importer also migrates the documented version 0 pure-JSON prototype and preserves its object IDs and valid history.
+
+PCB documents have their own version (currently 1). IDs and electrical references are validated within each board; repeated R1/J1 designators across independent boards are valid. Instance links must resolve to a board in the same state and remain root assembly objects. PCB geometry is a derived cache; stale revisions are regenerated without adding a user undo action. See [combined PCB projects](PCB_WORKSPACE.md).
 
 Drawing-sheet data has its own version (currently 1). It stores view source IDs and orientation/scale/position, not duplicate meshes. Projected linework is regenerated from the model. Dimension anchors, paper entities, and title-block text are validated before import, including element limits and internal references. Model-space dimensions carry a geometry fingerprint so edits to a source cannot silently reuse stale values. Drawing undo/redo history is session-local; the saved package contains the current sheet state.
 
