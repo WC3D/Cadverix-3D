@@ -1,5 +1,7 @@
 "use client";
 import { useEffect, useRef, useState } from "react";
+import { createPortal } from "react-dom";
+import { Box, FolderInput, Plus, Redo2, Save, Settings2, Undo2 } from "lucide-react";
 import { zipSync } from "fflate";
 import { createLocalId } from "@/lib/localIds";
 import { createPcbDesign, parseCircuitScene, type ElectronicsDocument, type PcbDesign } from "./pcbDocument";
@@ -12,12 +14,13 @@ function download(name: string, blob: Blob) {
   anchor.href = url; anchor.download = name; document.body.appendChild(anchor); anchor.click(); anchor.remove();
   window.setTimeout(() => URL.revokeObjectURL(url), 30000);
 }
-function BoardEditor({ board, projectId, reset, onScene, onUndo, onRedo, onHome, onSave }: { board: PcbDesign; projectId?: string | null; reset: number; onScene: (scene: CircuitScene, transaction: string) => void; onUndo: () => void; onRedo: () => void; onHome: () => void; onSave: () => void }) {
+function BoardEditor({ board, toolbarHost, projectId, reset, onScene, onUndo, onRedo, onHome, onSave }: { board: PcbDesign; toolbarHost: HTMLDivElement | null; projectId?: string | null; reset: number; onScene: (scene: CircuitScene, transaction: string) => void; onUndo: () => void; onRedo: () => void; onHome: () => void; onSave: () => void }) {
   const session = useRef(createLocalId("pcb-editor-session"));
-  return <FunctionalCircuitEditor initialScene={board.scene} projectId={`${projectId}:${board.id}`} projectName={board.name} resetKey={reset} onProjectUndo={onUndo} onProjectRedo={onRedo} onProjectSave={onSave} onHome={onHome} onSceneChange={(scene, transaction) => onScene(scene, `${session.current}:${transaction}`)} />;
+  return <FunctionalCircuitEditor toolbarHost={toolbarHost} initialScene={board.scene} projectId={`${projectId}:${board.id}`} projectName={board.name} resetKey={reset} onProjectUndo={onUndo} onProjectRedo={onRedo} onProjectSave={onSave} onHome={onHome} onSceneChange={(scene, transaction) => onScene(scene, `${session.current}:${transaction}`)} />;
 }
 
-export function PcbWorkspace({ document, shapes, projectId, reset, requestedBoard, onActiveBoard, onChange, onAddInstance, onLocate, onDetach, onSave, onUndo, onRedo, onHome, geometryStatus, onRetry }: {
+export function PcbWorkspace({ toolbarHost, document, shapes, projectId, reset, requestedBoard, onActiveBoard, onChange, onAddInstance, onLocate, onDetach, onSave, onUndo, onRedo, onHome, geometryStatus, onRetry }: {
+  toolbarHost: HTMLDivElement | null;
   document: ElectronicsDocument; shapes: WorkplaneShape[]; projectId?: string | null; reset: number; requestedBoard?: string | null;
   onActiveBoard: (id: string) => void;
   onChange: (document: ElectronicsDocument, label: string, transaction?: string) => void;
@@ -27,6 +30,7 @@ export function PcbWorkspace({ document, shapes, projectId, reset, requestedBoar
   const [activeId, setActiveId] = useState(requestedBoard ?? document.boards[0]?.id ?? "");
   const [notice, setNotice] = useState("");
   const [managerOpen, setManagerOpen] = useState(false);
+  const [circuitToolbarHost, setCircuitToolbarHost] = useState<HTMLDivElement | null>(null);
   const [exportFormat, setExportFormat] = useState<PCBExportFormat>("sfpcb");
   const [exportBusy, setExportBusy] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
@@ -69,16 +73,21 @@ export function PcbWorkspace({ document, shapes, projectId, reset, requestedBoar
     finally { setExportBusy(false); }
   };
   return <section className="pcb-workspace" aria-label="Multi-board PCB workspace">
-    <header className="pcb-project-tools">
-      <label>Board<select aria-label="Active PCB board" value={current?.id ?? ""} onChange={(event) => setActiveId(event.target.value)}>{!current ? <option value="">No boards</option> : document.boards.map((board) => <option key={board.id} value={board.id}>{board.name}</option>)}</select></label>
-      <button type="button" onClick={add}>Add board</button><button type="button" onClick={() => inputRef.current?.click()}>Import PCB</button>
-      <button type="button" disabled={!current} onClick={() => setManagerOpen(!managerOpen)}>Manage boards / exports</button>
-      <button type="button" onClick={onSave}>Save combined SKF</button>
-      <button type="button" onClick={onUndo}>Project undo</button><button type="button" onClick={onRedo}>Project redo</button>
-      <button type="button" onClick={onHome}>Geometry</button>
-    </header>
+    {toolbarHost ? createPortal(<div className="pcb-workspace pcb-toolbar" aria-label="PCB toolbar">
+      <div className="pcb-project-tools">
+        <div className="toolbar-section" data-tool-group="home"><div className="toolbar-section-label">Home</div><div className="toolbar-section-tools"><button type="button" aria-label="Geometry" title="Return to Geometry" onClick={onHome}><Box size={20} /></button></div></div>
+        <div className="toolbar-section" data-tool-group="history"><div className="toolbar-section-label">History</div><div className="toolbar-section-tools"><button type="button" aria-label="Project undo" title="Project undo" onClick={onUndo}><Undo2 size={20} /></button><button type="button" aria-label="Project redo" title="Project redo" onClick={onRedo}><Redo2 size={20} /></button></div></div>
+        <div className="toolbar-section" data-tool-group="shapes"><div className="toolbar-section-label">Boards</div><div className="toolbar-section-tools">
+          <select aria-label="Active PCB board" value={current?.id ?? ""} onChange={(event) => setActiveId(event.target.value)}>{!current ? <option value="">No boards</option> : document.boards.map((board) => <option key={board.id} value={board.id}>{board.name}</option>)}</select>
+          <button type="button" aria-label="Add board" title="Add board" onClick={add}><Plus size={20} /></button><button type="button" aria-label="Import PCB" title="Import PCB" onClick={() => inputRef.current?.click()}><FolderInput size={20} /></button>
+          <button type="button" aria-label="Manage boards / exports" title="Manage boards / exports" aria-expanded={managerOpen} aria-controls="pcb-board-manager" disabled={!current} onClick={() => setManagerOpen(!managerOpen)}><Settings2 size={20} /></button>
+        </div></div>
+        <div className="toolbar-section" data-tool-group="manage"><div className="toolbar-section-label">Project</div><div className="toolbar-section-tools"><button type="button" aria-label="Save combined SKF" title="Save combined SKF" onClick={onSave}><Save size={20} /></button></div></div>
+      </div>
+      <div className="pcb-circuit-tools-host" ref={setCircuitToolbarHost} />
+    </div>, toolbarHost) : null}
     <input ref={inputRef} type="file" hidden accept=".sfpcb,.kicad_pcb,.json" onChange={(event) => { const file = event.target.files?.[0]; event.target.value = ""; if (file) void importBoard(file); }} />
-    {managerOpen && current ? <aside className="pcb-project-manager" aria-label="PCB board management">
+    {managerOpen && current ? <aside className="pcb-project-manager" id="pcb-board-manager" aria-label="PCB board management">
       <button type="button" onClick={() => setManagerOpen(false)}>Close board manager</button>
       <label>Board name<input key={current.id + reset} aria-label="PCB board name" defaultValue={current.name} maxLength={120} onBlur={(event) => { const name = event.target.value.trim(); if (name && name !== current.name) onChange({ ...document, boards: document.boards.map((board) => board.id === current.id ? { ...board, name } : board) }, "Renamed PCB design"); }} onKeyDown={(event) => { if (event.key === "Enter") event.currentTarget.blur(); }} /></label>
       <button type="button" onClick={() => { if (document.boards.length >= 32) { setNotice("A project supports up to 32 boards"); return; } const copy = { ...current, id: createLocalId("pcb-board"), name: uniqueName(`${current.name} copy`), scene: structuredClone(current.scene) }; onChange({ ...document, boards: [...document.boards, copy] }, "Duplicated independent PCB design"); setActiveId(copy.id); }}>Duplicate independent board</button>
@@ -88,7 +97,7 @@ export function PcbWorkspace({ document, shapes, projectId, reset, requestedBoar
       <label>Board export<select aria-label="PCB export format" value={exportFormat} onChange={(event) => setExportFormat(event.target.value as PCBExportFormat)}><option value="sfpcb">SFPCB</option><option value="kicad_pcb">KiCad PCB</option><option value="gerber">Gerber ZIP</option><option value="svg">SVG</option><option value="bom">BOM CSV</option></select></label>
       <button type="button" disabled={exportBusy} onClick={() => void exportBoards(false)}>Export selected board</button><button type="button" disabled={exportBusy} onClick={() => void exportBoards(true)}>Export all boards</button>
     </aside> : null}
-    <div className="pcb-editor-host">{current ? <BoardEditor key={current.id} board={current} reset={reset} projectId={projectId} onUndo={onUndo} onRedo={onRedo} onHome={onHome} onSave={onSave} onScene={(scene, transaction) => {
+    <div className="pcb-editor-host">{current ? <BoardEditor key={current.id} toolbarHost={circuitToolbarHost} board={current} reset={reset} projectId={projectId} onUndo={onUndo} onRedo={onRedo} onHome={onHome} onSave={onSave} onScene={(scene, transaction) => {
       try {
         const clean = parseCircuitScene(scene);
         if (JSON.stringify(clean) === JSON.stringify(currentRef.current?.scene)) return;

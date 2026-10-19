@@ -6350,6 +6350,7 @@ export function CadverixEditor({
   const [toolbarMode, setToolbarMode] = useState<ToolbarMode>("geometry");
   const [drawingOpened, setDrawingOpened] = useState(false);
   const [drawingToolbarHost, setDrawingToolbarHost] = useState<HTMLDivElement | null>(null);
+  const [pcbToolbarHost, setPcbToolbarHost] = useState<HTMLDivElement | null>(null);
   const [sketchActive, setSketchActive] = useState(false);
   const [activeSketchWorkplane, setActiveSketchWorkplane] = useState<PlacementWorkplane>(
     () => normalizePlacementWorkplane(initialPlacementWorkplane, initialPlacementElevation),
@@ -11478,6 +11479,7 @@ export function CadverixEditor({
       <SecondaryToolbar
         toolbarMode={toolbarMode}
         drawingToolbarRef={setDrawingToolbarHost}
+        pcbToolbarRef={setPcbToolbarHost}
         projectName={projectName}
         onProjectNameChange={onProjectNameChange}
         showProjectNameInToolbar={showProjectNameInToolbar}
@@ -11635,7 +11637,7 @@ export function CadverixEditor({
             void exportProjectDesign("skf", projectName, "unlimited");
           }}
         /> : null}
-        {toolbarMode === "pcb" ? <PcbWorkspace document={electronics} shapes={shapes} projectId={projectId} reset={pcbReset} requestedBoard={requestedPcbBoard}
+        {toolbarMode === "pcb" ? <PcbWorkspace toolbarHost={pcbToolbarHost} document={electronics} shapes={shapes} projectId={projectId} reset={pcbReset} requestedBoard={requestedPcbBoard}
           onActiveBoard={setRequestedPcbBoard}
           onChange={commitElectronics} onAddInstance={addPcbInstance} onDetach={detachPcbCopy} onUndo={undo} onRedo={redo}
           onLocate={(id) => { setSelectedIds([id]); setToolbarMode("geometry"); }} onHome={() => setToolbarMode("geometry")}
@@ -12297,6 +12299,7 @@ function SecondaryToolbar({
   onSketchClipboard,
   toolbarMode,
   drawingToolbarRef,
+  pcbToolbarRef,
   projectName,
   onProjectNameChange,
   showProjectNameInToolbar,
@@ -12387,6 +12390,7 @@ function SecondaryToolbar({
   onModelingTools: () => void;
   onSketchClipboard: (action: "copy" | "cut" | "paste" | "duplicate") => void;
   drawingToolbarRef: (element: HTMLDivElement | null) => void;
+  pcbToolbarRef: (element: HTMLDivElement | null) => void;
   projectName: string;
   onProjectNameChange?: (name: string) => void;
   showProjectNameInToolbar: boolean;
@@ -12725,7 +12729,7 @@ function SecondaryToolbar({
   return (
     <div className="secondary-toolbar">
       <div className={`toolbar-mode-content ${toolbarMode}`}>
-        {toolbarMode === "pcb" ? null : toolbarMode === "drawing" ? <div className="drawing-toolbar-host" ref={drawingToolbarRef} /> : toolbarMode === "geometry" ? (
+        {toolbarMode === "pcb" ? <div className="pcb-toolbar-host" ref={pcbToolbarRef} /> : toolbarMode === "drawing" ? <div className="drawing-toolbar-host" ref={drawingToolbarRef} /> : toolbarMode === "geometry" ? (
           <>
       {onHome ? (
         <div className="tool-group editor-nav-group">

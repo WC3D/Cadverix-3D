@@ -1,7 +1,6 @@
 "use client";
 
 import {
-  Fragment,
   useEffect,
   useLayoutEffect,
   useMemo,
@@ -13,6 +12,7 @@ import {
   type PointerEvent as ReactPointerEvent,
   type WheelEvent as ReactWheelEvent,
 } from "react";
+import { createPortal } from "react-dom";
 import polygonClipping, { type Polygon } from "polygon-clipping";
 import {
   PART_BY_KIND,
@@ -96,7 +96,6 @@ type ToolDefinition = {
 type ToolGroup = {
   label: string;
   tools: ToolDefinition[];
-  trailingSpacer?: boolean;
 };
 
 export type CircuitPart = {
@@ -274,7 +273,6 @@ const toolGroups: ToolGroup[] = [
   {
     label: "Components",
     tools: [{ label: "Add Part", action: "add-part", artwork: "add-part", shortcut: "A" }],
-    trailingSpacer: true,
   },
   {
     label: "Connect",
@@ -2479,6 +2477,7 @@ function PCBTransferPanel({
 }
 
 type FunctionalCircuitEditorProps = {
+  toolbarHost: HTMLDivElement | null;
   initialScene?: CircuitScene;
   projectId?: string | null;
   projectName?: string;
@@ -2490,7 +2489,7 @@ type FunctionalCircuitEditorProps = {
   onProjectSave?: () => void;
 };
 
-export function FunctionalCircuitEditor({ initialScene = EMPTY_SCENE, projectId = null, projectName = "Cadverix PCB", onHome, onSceneChange, resetKey, onProjectUndo, onProjectRedo, onProjectSave }: FunctionalCircuitEditorProps) {
+export function FunctionalCircuitEditor({ toolbarHost, initialScene = EMPTY_SCENE, projectId = null, projectName = "Cadverix PCB", onHome, onSceneChange, resetKey, onProjectUndo, onProjectRedo, onProjectSave }: FunctionalCircuitEditorProps) {
   const [scene, setScene] = useState<CircuitScene>(() => ({
     parts: initialScene.parts,
     wires: initialScene.wires,
@@ -4196,7 +4195,8 @@ export function FunctionalCircuitEditor({ initialScene = EMPTY_SCENE, projectId 
       case "undo": undo(); break;
       case "redo": redo(); break;
       case "add-part": {
-        setLibraryLeft(Math.max(12, Math.min(anchorLeft - 12, window.innerWidth - 442)));
+        // Leave a 12px gutter beside the 780px component library.
+        setLibraryLeft(Math.max(12, Math.min(anchorLeft - 12, window.innerWidth - 792)));
         setLibraryOpen((open) => !open);
         setSnapOpen(false);
         break;
@@ -5721,21 +5721,20 @@ export function FunctionalCircuitEditor({ initialScene = EMPTY_SCENE, projectId 
     })(),
     label: formatBoardLength(boardSegmentLengthMm),
   } : null;
-  return (
-    <main className="sketchforge-editor">
-      <header className="editor-ribbon">
-        <nav className="editor-mode-tabs" aria-label="PCB editor mode">
-          <button className={`mode-tab-enabled ${editorMode === "circuit" ? "active" : ""}`} type="button" aria-current={editorMode === "circuit" ? "page" : undefined} onClick={() => switchEditorMode("circuit")}>Circuit</button>
-          <button className={`mode-tab-enabled ${editorMode === "board" ? "active" : ""}`} type="button" aria-current={editorMode === "board" ? "page" : undefined} title="Board outline for the 3D viewer" onClick={() => switchEditorMode("board")}>Board</button>
-        </nav>
+  const toolbar = <header className="editor-ribbon">
+        <div className="toolbar-section" data-tool-group="manage"><div className="toolbar-section-label">PCB mode</div>
+          <nav className="toolbar-section-tools" aria-label="PCB editor mode">
+            <button type="button" aria-pressed={editorMode === "circuit"} onClick={() => switchEditorMode("circuit")}>Circuit</button>
+            <button type="button" aria-pressed={editorMode === "board"} title="Board outline for the 3D viewer" onClick={() => switchEditorMode("board")}>Board</button>
+          </nav>
+        </div>
 
         {editorMode === "circuit" ? (
           <nav className="editor-tool-groups" aria-label="Circuit editor tools">
-            {toolGroups.map((group) => (
-              <Fragment key={group.label}>
-                <section className="ribbon-group" aria-label={group.label}>
-                  <h2>{group.label}</h2>
-                  <div className="ribbon-group-tools">
+            {toolGroups.filter((group) => group.label !== "Home" && group.label !== "History").map((group) => (
+                <section key={group.label} className="ribbon-group toolbar-section" data-tool-group={group.label === "Components" ? "shapes" : group.label === "Connect" ? "combine" : group.label === "Inspect" ? "generators" : group.label.toLowerCase()} aria-label={group.label}>
+                  <h2 className="toolbar-section-label">{group.label}</h2>
+                  <div className="ribbon-group-tools toolbar-section-tools">
                     {group.tools.map((tool) => (
                       <RibbonTool
                         key={tool.label}
@@ -5752,26 +5751,13 @@ export function FunctionalCircuitEditor({ initialScene = EMPTY_SCENE, projectId 
                     ))}
                   </div>
                 </section>
-                {group.trailingSpacer ? <div className="ribbon-spacer" aria-hidden="true" /> : null}
-              </Fragment>
             ))}
           </nav>
         ) : (
           <nav className="editor-tool-groups board-tool-groups" aria-label="Board outline tools">
-            <section className="ribbon-group" aria-label="Home">
-              <h2>Home</h2>
-              <div className="ribbon-group-tools">
-                <RibbonTool
-                  tool={toolGroups[0].tools[0]}
-                  active={false}
-                  disabled={false}
-                  onActivate={activateTool}
-                />
-              </div>
-            </section>
-            <section className="ribbon-group" aria-label="Board outline">
-              <h2>Board Outline</h2>
-              <div className="ribbon-group-tools">
+            <section className="ribbon-group toolbar-section" data-tool-group="shapes" aria-label="Board outline">
+              <h2 className="toolbar-section-label">Board outline</h2>
+              <div className="ribbon-group-tools toolbar-section-tools">
                 <button className={`ribbon-tool ${boardDrawing ? "active" : ""}`} type="button" aria-pressed={boardDrawing} title={boardDrawing ? "Stop board drawing (D)" : "Draw or edit the board with corner points (D)"} onClick={startBoardDrawing}>
                   <span className="ribbon-tool-art" aria-hidden="true">
                     <ToolbarBoardDrawIcon />
@@ -5793,9 +5779,9 @@ export function FunctionalCircuitEditor({ initialScene = EMPTY_SCENE, projectId 
                 </button>
               </div>
             </section>
-            <section className="ribbon-group" aria-label="Board view">
-              <h2>View</h2>
-              <div className="ribbon-group-tools">
+            <section className="ribbon-group toolbar-section" data-tool-group="visibility" aria-label="Board view">
+              <h2 className="toolbar-section-label">View</h2>
+              <div className="ribbon-group-tools toolbar-section-tools">
                 <button className="ribbon-tool" type="button" title="Fit the board outline in the workspace (F)" disabled={!scene.board && !showingBoardDraft} onClick={fitBoard}>
                   <span className="ribbon-tool-art" aria-hidden="true">
                     <ToolbarBoardFitIcon />
@@ -5813,10 +5799,13 @@ export function FunctionalCircuitEditor({ initialScene = EMPTY_SCENE, projectId 
                 </button>
               </div>
             </section>
-            <div className="ribbon-spacer" aria-hidden="true" />
           </nav>
         )}
-      </header>
+      </header>;
+
+  return (
+    <main className="sketchforge-editor">
+      {toolbarHost ? createPortal(toolbar, toolbarHost) : null}
 
       {settingsOpen ? (
         <PCBWorkspaceSettingsModal
