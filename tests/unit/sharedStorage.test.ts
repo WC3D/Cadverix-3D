@@ -2,7 +2,8 @@ import { promises as fs } from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { afterEach, beforeEach, expect, it } from "vitest";
-import { GET, PATCH, POST } from "@/app/api/shared-projects/route";
+import { DELETE, GET, PATCH, POST } from "@/app/api/shared-projects/route";
+import { createHash } from "node:crypto";
 import { exportSkfProject } from "@/lib/skfProject";
 import { DEFAULT_WORKPLANE_WORKSPACE } from "@/lib/workplaneSettings";
 import { editorHistoryEntry } from "@/lib/editorHistory";
@@ -43,4 +44,41 @@ it("rejects traversal and symlink directories and does not remove another writer
   const result = await patch({ action: "copy", path: "Source.skf", destination: "Copy.skf" }, listed.revision);
   expect(result.ok).toBe(false);
   expect(await fs.readFile(path.join(root, "Source.skf.lock"), "utf8")).toBe("owned by another request");
+});
+
+it.each([".backups", "version-directory", "project.json"])("refuses a linked %s without deleting the project or writing outside storage", async (linked) => {
+  const outside = await fs.mkdtemp(path.join(os.tmpdir(), "cadverix-outside-"));
+  try {
+    await fs.writeFile(path.join(outside, "secret"), "private");
+    await fs.writeFile(path.join(root, "Source.skf"), "project");
+    const hash = createHash("sha256").update("Source.skf").digest("hex");
+    const directory = path.join(root, ".backups", hash);
+    if (linked === ".backups") await fs.symlink(outside, path.join(root, ".backups"));
+    else if (linked === "version-directory") {
+      await fs.mkdir(path.join(root, ".backups"));
+      await fs.symlink(outside, directory);
+    } else {
+      await fs.mkdir(directory, { recursive: true });
+      await fs.symlink(path.join(outside, "secret"), path.join(directory, "project.json"));
+    }
+    const project = (await (await GET(new Request(url))).json()).projects[0];
+    const response = await DELETE(new Request(`${url}?fileName=Source.skf`, { method: "DELETE", headers: { "If-Match": `"${project.revision}"` } }));
+    expect(response.ok).toBe(false);
+    expect(await fs.readFile(path.join(root, "Source.skf"), "utf8")).toBe("project");
+    expect(await fs.readdir(outside)).toEqual(["secret"]);
+    expect(await fs.readFile(path.join(outside, "secret"), "utf8")).toBe("private");
+  } finally {
+    await fs.rm(outside, { recursive: true, force: true });
+  }
+});
+
+it("does not read a linked backup file", async () => {
+  const hash = createHash("sha256").update("Source.skf").digest("hex");
+  const directory = path.join(root, ".backups", hash);
+  await fs.mkdir(directory, { recursive: true });
+  await fs.writeFile(path.join(root, "secret"), "private");
+  await fs.symlink(path.join(root, "secret"), path.join(directory, "1-abcd.skf"));
+  const response = await GET(new Request(`${url}?fileName=Source.skf&backup=1-abcd.skf`));
+  expect(response.ok).toBe(false);
+  expect(await response.text()).not.toContain("private");
 });

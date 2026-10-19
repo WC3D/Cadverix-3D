@@ -1,5 +1,6 @@
 import { createHash } from "node:crypto";
-import { readdir, readFile, writeFile } from "node:fs/promises";
+import { constants } from "node:fs";
+import { readdir, readFile, realpath, writeFile } from "node:fs/promises";
 import { dirname, join, relative, sep } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 
@@ -111,10 +112,13 @@ self.addEventListener("fetch", event => {
 
 async function listFiles(root) {
   const entries = await readdir(root, { withFileTypes: true });
+  if (entries.some((entry) => entry.isSymbolicLink() || (!entry.isFile() && !entry.isDirectory()))) throw new Error("Static export must contain only regular files and directories");
   return (await Promise.all(entries.map((entry) => entry.isDirectory() ? listFiles(join(root, entry.name)) : [join(root, entry.name)]))).flat();
 }
 
 export async function generateServiceWorker(exportRoot) {
+  // The build chooses this directory, not a request; reject links within it.
+  exportRoot = await realpath(exportRoot);
   const paths = precachePaths((await listFiles(exportRoot)).map((file) => relative(exportRoot, file)));
   if (!paths.includes("/") || !paths.includes("/manifest.webmanifest") || !paths.includes("/occt/occt-wasm.wasm")) throw new Error("Static export is missing required offline app assets");
   const entries = await Promise.all(paths.map(async (url) => {
@@ -122,7 +126,7 @@ export async function generateServiceWorker(exportRoot) {
     return { url, integrity: `sha256-${createHash("sha256").update(bytes).digest("base64")}`, bytes: bytes.length };
   }));
   const version = createHash("sha256").update(serviceWorkerSource("BUILD", entries)).digest("hex").slice(0, 20);
-  await writeFile(join(exportRoot, "sw.js"), serviceWorkerSource(version, entries));
+  await writeFile(join(exportRoot, "sw.js"), serviceWorkerSource(version, entries), { flag: constants.O_WRONLY | constants.O_CREAT | constants.O_TRUNC | constants.O_NOFOLLOW });
   console.log(`Offline app: ${entries.length} assets, ${(entries.reduce((sum, entry) => sum + entry.bytes, 0) / 1024 / 1024).toFixed(1)} MiB, version ${version}`);
   return { version, entries };
 }
