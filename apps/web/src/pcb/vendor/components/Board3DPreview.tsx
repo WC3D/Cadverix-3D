@@ -854,9 +854,10 @@ export function disposeObject(object: THREE.Object3D) {
   });
 }
 
-export function Board3DPreview({ board, parts, wires, traceWidthMm, projectName, onClose }: { board: PreviewBoard; parts: PreviewPart[]; wires: PreviewWire[]; traceWidthMm: number; projectName?: string; onClose: () => void }) {
+export function Board3DPreview({ board, parts, wires, traceWidthMm, projectName, onClose, backgroundColor = "#f8fbfc" }: { board: PreviewBoard; parts: PreviewPart[]; wires: PreviewWire[]; traceWidthMm: number; projectName?: string; onClose: () => void; backgroundColor?: string }) {
   const hostRef = useRef<HTMLDivElement>(null);
   const setViewRef = useRef<(view: PreviewView) => void>(() => undefined);
+  const setBackgroundRef = useRef<(color: string) => void>(() => undefined);
   const exportGroupRef = useRef<THREE.Group | null>(null);
   const componentsGroupRef = useRef<THREE.Group | null>(null);
   const tracesGroupRef = useRef<THREE.Group | null>(null);
@@ -884,11 +885,12 @@ export function Board3DPreview({ board, parts, wires, traceWidthMm, projectName,
     const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: false });
     renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
     renderer.outputColorSpace = THREE.SRGBColorSpace;
-    renderer.setClearColor(0xf8fbfc, 1);
+    renderer.setClearColor(backgroundColor, 1);
     host.appendChild(renderer.domElement);
 
     const scene = new THREE.Scene();
-    scene.background = new THREE.Color(0xf8fbfc);
+    scene.background = new THREE.Color(backgroundColor);
+    setBackgroundRef.current = (color) => { scene.background = new THREE.Color(color); renderer.setClearColor(color, 1); };
     const camera = new THREE.PerspectiveCamera(38, 1, 0.05, 5000);
     const controls = new OrbitControls(camera, renderer.domElement);
     controls.enableDamping = true;
@@ -1059,8 +1061,11 @@ export function Board3DPreview({ board, parts, wires, traceWidthMm, projectName,
       tracesGroupRef.current = null;
       gridRef.current = null;
       setViewRef.current = () => undefined;
+      setBackgroundRef.current = () => undefined;
     };
   }, [board, parts, wires, traceWidthMm]);
+
+  useEffect(() => { setBackgroundRef.current(backgroundColor); }, [backgroundColor]);
 
   useEffect(() => {
     if (componentsGroupRef.current) componentsGroupRef.current.visible = showComponents;

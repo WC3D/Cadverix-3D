@@ -1,0 +1,22 @@
+{
+  "format": "sketchforge-pcb",
+  "version": 1,
+  "createdWith": "Cadverix 3D",
+  "scene": {
+    "parts": [
+      { "id": "battery", "kind": "battery", "reference": "BT1", "value": "5 V", "footprint": "Wire Pads", "x": 120, "y": 160, "mirrored": false, "hidden": false, "rotation": 0 },
+      { "id": "resistor", "kind": "resistor", "reference": "R1", "value": "330 Ω", "footprint": "Axial DIN0207", "x": 500, "y": 160, "mirrored": false, "hidden": false, "rotation": 0 },
+      { "id": "switch", "kind": "pushbutton", "reference": "SW1", "value": "Momentary", "footprint": "Tactile 6 mm", "x": 800, "y": 160, "mirrored": false, "hidden": false, "rotation": 0 },
+      { "id": "led", "kind": "led", "reference": "D1", "value": "Red", "footprint": "LED 5 mm", "x": 500, "y": 500, "mirrored": false, "hidden": false, "rotation": 0 }
+    ],
+    "wires": [
+      { "id": "supply-resistor", "from": { "partId": "battery", "pinId": "1" }, "to": { "partId": "resistor", "pinId": "1" }, "points": [{ "x": 69.2, "y": 40 }, { "x": 398.4, "y": 40 }] },
+      { "id": "resistor-switch", "from": { "partId": "resistor", "pinId": "2" }, "to": { "partId": "switch", "pinId": "1a" }, "points": [{ "x": 650, "y": 160 }, { "x": 650, "y": 70 }, { "x": 735, "y": 70 }] },
+      { "id": "switch-led", "from": { "partId": "switch", "pinId": "2a" }, "to": { "partId": "led", "pinId": "2" }, "points": [{ "x": 735, "y": 620 }, { "x": 525.4, "y": 620 }] },
+      { "id": "led-return", "from": { "partId": "led", "pinId": "1" }, "to": { "partId": "battery", "pinId": "2" }, "points": [{ "x": 474.6, "y": 680 }, { "x": 30, "y": 680 }, { "x": 30, "y": 260 }, { "x": 170.8, "y": 260 }] }
+    ],
+    "junctions": [],
+    "traceWidthMm": 0.25,
+    "board": { "thicknessMm": 1.6, "shapes": [{ "id": "outline", "closed": true, "points": [{ "xMm": 0, "yMm": 0 }, { "xMm": 60, "yMm": 0 }, { "xMm": 60, "yMm": 40 }, { "xMm": 0, "yMm": 40 }] }] }
+  }
+}

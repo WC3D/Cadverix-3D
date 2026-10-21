@@ -165,7 +165,7 @@ function wireJunctionKeys(scene: CircuitScene, wire: CircuitWire) {
   }).map((junction) => junction.id));
 }
 
-function buildElectricalNets(scene: CircuitScene) {
+export function buildElectricalNets(scene: CircuitScene) {
   const parent = new Map(scene.wires.map((wire) => [wire.id, wire.id]));
   const find = (wireId: string): string => {
     const current = parent.get(wireId) ?? wireId;
@@ -201,7 +201,8 @@ function buildElectricalNets(scene: CircuitScene) {
   const groups = [...groupsByRoot.values()];
   const netByWire = new Map<string, number>();
   groups.forEach((wires, index) => wires.forEach((wire) => netByWire.set(wire.id, index + 1)));
-  return { groups, netByWire };
+  const netByPin = new Map([...ownersByPin].map(([pin, wireId]) => [pin, netByWire.get(wireId)!]));
+  return { groups, netByWire, netByPin };
 }
 
 function boardPathData(scene: CircuitScene) {

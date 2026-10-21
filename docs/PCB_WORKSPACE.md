@@ -36,7 +36,64 @@ The embedded editor provides **Circuit** and **Board** views, a component and
 footprint library, component values and reference designators, routed wires,
 junctions, outline/cutout tools, placement tools, design checks, and a 3D board
 preview. The initial editing scope follows upstream's top-side placement and
-routing tools; it is not a full multilayer EDA suite or circuit simulator.
+routing tools; it is not a full multilayer EDA suite. A bounded DC test mode is
+available for basic switch/LED circuits, as described below.
+
+### Themes
+
+Open **PCB → Settings → Appearance → Theme preset** to use the same project
+theme as Geometry and Drawing. The circuit background/grid, toolbars, inspectors,
+settings, import/export panels, test panel and 3D preview follow the selected
+preset. Saved custom themes are supported; edit custom colours in Geometry's
+workspace settings. Component artwork, pad and copper colours retain their
+physical meaning rather than being recoloured by the theme.
+
+### Interactive DC tests
+
+In **Circuit** view, click **Test circuit**. Click a pushbutton on the canvas or
+its button in the test panel to close/open its two electrical contacts. A powered
+LED glows and shows ON; the panel reports estimated LED and supply current.
+Keyboard users can focus a pushbutton and press Space or Enter. Click **Stop
+circuit test**, press Escape, or switch to Board view to finish. Contacts start
+open each time; test state is not saved, exported, added to undo history, or used
+to regenerate mechanical geometry. Test clicks latch contacts until clicked
+again; physical momentary timing/contact bounce are not simulated.
+
+Supported components are **one battery/DC source**, fixed resistors, ordinary
+two-pin LEDs, pushbuttons, and passive pin headers. Set the battery value to a
+voltage such as `5 V`. Resistance accepts values such as `330 Ω`, `1 kΩ`, and
+`4k7`. LED pin **2 is anode (+)** and pin **1 is cathode (−)**. The pushbutton's
+1A/1B pads are the same contact, as are 2A/2B; closing joins contacts 1 and 2.
+Hidden components remain electrically present.
+
+A [ready-to-import example](../tests/fixtures/pcb-led-switch.sfpcb) connects:
+
+```text
+BT1 + (5 V) → R1 (330 Ω) → SW1 → D1 anode (2)
+BT1 −       ←                 D1 cathode (1)
+```
+
+Use **Import PCB** for the `.sfpcb` example. With the contacts closed, its red LED
+draws approximately 9.41 mA. An open return path or reversed LED does not light it.
+The test uses the same pad aliases, wire contacts, and explicit junctions as the
+electrical-net exporter. Crossing wires do not join without a junction/contact.
+
+This is **not SPICE**, a fabrication check, or a guarantee a real circuit is safe.
+It solves a small steady-state resistor network with ideal switches/source,
+nominal LED forward drops (red 1.8 V, orange/yellow 2 V, green 2.1 V, blue/white
+3.1 V), 10 Ω LED dynamic resistance, and negligible numerical leakage to ground
+for floating nodes. Below 0.1 mA an LED reads OFF. Source voltage must be above 0
+and at most 60 V; resistance must be 0.01 Ω–1 GΩ. Current above a generic 20 mA LED
+limit, high supply current, reverse bias, and resistor dissipation above 0.25 W
+produce warnings—verify actual device ratings and use an appropriate resistor.
+Direct supply shorts, invalid values, non-convergence, missing/multiple sources,
+and unsupported devices produce an explicit error, not a guessed LED result.
+
+Tests are bounded to 32 components, 128 wires, 128 junctions and 1,024 route points.
+Capacitors, inductors, transistors, ICs, RGB/addressable LEDs, motors and other
+dynamic devices are not modelled. Designs containing them remain editable and
+exportable, but this test mode refuses to simulate them. A real analog/transient
+or microcontroller simulator would be a separate integration.
 
 PCB preferences such as grid visibility remain separate from mechanical
 workspace preferences. Undo retention uses the combined project's history

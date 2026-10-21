@@ -14,12 +14,13 @@ function download(name: string, blob: Blob) {
   anchor.href = url; anchor.download = name; document.body.appendChild(anchor); anchor.click(); anchor.remove();
   window.setTimeout(() => URL.revokeObjectURL(url), 30000);
 }
-function BoardEditor({ board, toolbarHost, projectId, reset, onScene, onUndo, onRedo, onHome, onSave }: { board: PcbDesign; toolbarHost: HTMLDivElement | null; projectId?: string | null; reset: number; onScene: (scene: CircuitScene, transaction: string) => void; onUndo: () => void; onRedo: () => void; onHome: () => void; onSave: () => void }) {
+function BoardEditor({ board, toolbarHost, projectId, reset, onScene, onUndo, onRedo, onHome, onSave, themeId, gridColor, backgroundColor, onThemeChange }: { board: PcbDesign; toolbarHost: HTMLDivElement | null; projectId?: string | null; reset: number; onScene: (scene: CircuitScene, transaction: string) => void; onUndo: () => void; onRedo: () => void; onHome: () => void; onSave: () => void; themeId: string; gridColor: string; backgroundColor: string; onThemeChange: (id: string) => void }) {
   const session = useRef(createLocalId("pcb-editor-session"));
-  return <FunctionalCircuitEditor toolbarHost={toolbarHost} initialScene={board.scene} projectId={`${projectId}:${board.id}`} projectName={board.name} resetKey={reset} onProjectUndo={onUndo} onProjectRedo={onRedo} onProjectSave={onSave} onHome={onHome} onSceneChange={(scene, transaction) => onScene(scene, `${session.current}:${transaction}`)} />;
+  return <FunctionalCircuitEditor themeId={themeId} gridColor={gridColor} backgroundColor={backgroundColor} onThemeChange={onThemeChange} toolbarHost={toolbarHost} initialScene={board.scene} projectId={`${projectId}:${board.id}`} projectName={board.name} resetKey={reset} onProjectUndo={onUndo} onProjectRedo={onRedo} onProjectSave={onSave} onHome={onHome} onSceneChange={(scene, transaction) => onScene(scene, `${session.current}:${transaction}`)} />;
 }
 
-export function PcbWorkspace({ toolbarHost, document, shapes, projectId, reset, requestedBoard, onActiveBoard, onChange, onAddInstance, onLocate, onDetach, onSave, onUndo, onRedo, onHome, geometryStatus, onRetry }: {
+export function PcbWorkspace({ toolbarHost, document, shapes, projectId, reset, requestedBoard, onActiveBoard, onChange, onAddInstance, onLocate, onDetach, onSave, onUndo, onRedo, onHome, geometryStatus, onRetry, themeId, gridColor, backgroundColor, onThemeChange }: {
+  themeId: string; gridColor: string; backgroundColor: string; onThemeChange: (id: string) => void;
   toolbarHost: HTMLDivElement | null;
   document: ElectronicsDocument; shapes: WorkplaneShape[]; projectId?: string | null; reset: number; requestedBoard?: string | null;
   onActiveBoard: (id: string) => void;
@@ -97,7 +98,7 @@ export function PcbWorkspace({ toolbarHost, document, shapes, projectId, reset, 
       <label>Board export<select aria-label="PCB export format" value={exportFormat} onChange={(event) => setExportFormat(event.target.value as PCBExportFormat)}><option value="sfpcb">SFPCB</option><option value="kicad_pcb">KiCad PCB</option><option value="gerber">Gerber ZIP</option><option value="svg">SVG</option><option value="bom">BOM CSV</option></select></label>
       <button type="button" disabled={exportBusy} onClick={() => void exportBoards(false)}>Export selected board</button><button type="button" disabled={exportBusy} onClick={() => void exportBoards(true)}>Export all boards</button>
     </aside> : null}
-    <div className="pcb-editor-host">{current ? <BoardEditor key={current.id} toolbarHost={circuitToolbarHost} board={current} reset={reset} projectId={projectId} onUndo={onUndo} onRedo={onRedo} onHome={onHome} onSave={onSave} onScene={(scene, transaction) => {
+    <div className="pcb-editor-host">{current ? <BoardEditor key={current.id} themeId={themeId} gridColor={gridColor} backgroundColor={backgroundColor} onThemeChange={onThemeChange} toolbarHost={circuitToolbarHost} board={current} reset={reset} projectId={projectId} onUndo={onUndo} onRedo={onRedo} onHome={onHome} onSave={onSave} onScene={(scene, transaction) => {
       try {
         const clean = parseCircuitScene(scene);
         if (JSON.stringify(clean) === JSON.stringify(currentRef.current?.scene)) return;

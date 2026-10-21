@@ -34,6 +34,40 @@
 .pcb-workspace .part-library-panel button:focus-visible,.pcb-workspace .part-library-search input:focus-visible { outline:2px solid var(--primary); outline-offset:-2px; }
 .pcb-reference-actions { position:absolute; left:12px; bottom:90px; z-index:20; display:flex; flex-wrap:wrap; gap:6px; max-width:calc(100% - 24px); background:var(--panel); color:var(--foreground); padding:8px; border:1px solid var(--border); border-radius:6px; }
 .pcb-reference-actions button { background:var(--tile); color:var(--foreground); padding:6px; border-radius:4px; }
+/* Theme the editing chrome without recolouring physical components, pads or copper. */
+.pcb-workspace .sketchforge-editor,.pcb-workspace .circuit-workspace,.pcb-workspace .blank-workspace { background:var(--background); color:var(--foreground); }
+.pcb-workspace .board-3d-preview { background:var(--background); }
+.pcb-workspace .sketchforge-editor :is(.component-inspector,.pcb-workspace-modal-card,.pcb-transfer-panel,.pcb-export-dialog,.arrange-panel,.design-check-panel,.design-check-loading-panel,.board-3d-header,.board-3d-settings,.snap-menu,.pcb-test-panel) { color:var(--foreground); background:var(--panel); border-color:var(--border); box-shadow:var(--shadow); }
+.pcb-workspace .sketchforge-editor :is(.component-inspector,.pcb-workspace-modal-card,.pcb-transfer-panel,.pcb-export-dialog,.arrange-panel,.design-check-panel,.design-check-loading-panel,.board-3d-header,.board-3d-settings,.snap-menu) :is(strong,h2,h3,span,small,label,p,b) { color:inherit; border-color:var(--border); text-shadow:none; }
+.pcb-workspace .sketchforge-editor :is(.component-inspector-header,.component-summary-card,.component-property-card,.connection-selection-card,.pcb-workspace-settings-nav,.pcb-workspace-modal-footer,.pcb-export-format-summary,.pcb-export-file-section,.design-check-section,.arrange-action-grid button) { background:var(--tile); border-color:var(--border); }
+.pcb-workspace .sketchforge-editor :is(.component-inspector,.pcb-workspace-modal-card,.pcb-transfer-panel,.pcb-export-dialog,.arrange-panel,.design-check-panel,.board-3d-header,.board-3d-settings,.snap-menu) :is(button,input,select) { color:var(--foreground); background:var(--tile); border-color:var(--border); accent-color:var(--primary); }
+.pcb-workspace .sketchforge-editor :is(.component-inspector,.pcb-workspace-modal-card,.pcb-transfer-panel,.pcb-export-dialog,.arrange-panel,.design-check-panel,.board-3d-header,.board-3d-settings,.snap-menu) button:hover:not(:disabled) { background:var(--tile-hover); color:var(--foreground); }
+.pcb-workspace .sketchforge-editor :is(.pcb-workspace-settings-nav,.board-3d-view-buttons,.board-3d-header-actions) button.active { background:color-mix(in srgb,var(--primary) 15%,var(--tile)); border-color:var(--primary); color:var(--foreground); }
+.pcb-workspace .sketchforge-editor :is(input,select,button,[role="button"]):focus-visible { outline:2px solid var(--primary); outline-offset:-2px; }
+.pcb-workspace .sketchforge-editor :is(.circuit-empty-state,.board-empty-prompt,.board-3d-help,.grid-settings,.snap-button,.editor-toast) { color:var(--foreground); background:var(--panel); border-color:var(--border); }
+.pcb-workspace .sketchforge-editor :is(.snap-row,.snap-select) { color:var(--foreground); border-color:var(--border); }
+.pcb-workspace .sketchforge-editor :is(.snap-select,.inspector-snap-dock) { background:var(--tile); }
+.pcb-workspace .sketchforge-editor :is(.circuit-empty-state,.board-empty-prompt) span { color:var(--foreground); opacity:.75; }
+.pcb-workspace .board-dimension-bubble rect { fill:var(--panel); stroke:var(--border); }
+.pcb-workspace .board-dimension-bubble text { fill:var(--foreground); }
+.pcb-workspace .pcb-workspace-modal { padding:12px; }
+.pcb-workspace .pcb-workspace-modal-card { height:min(620px,100%); max-height:100%; border-radius:8px; }
+.pcb-workspace .pcb-test-panel { position:absolute; z-index:45; right:12px; top:12px; width:330px; max-width:calc(100% - 24px); max-height:calc(100% - 24px); overflow:auto; padding:12px; border:1px solid var(--border); border-radius:8px; font-size:13px; }
+.pcb-test-panel header { display:flex; align-items:center; justify-content:space-between; gap:10px; }
+.pcb-test-panel button { padding:6px 8px; border:1px solid var(--border); border-radius:5px; background:var(--tile); color:var(--foreground); cursor:pointer; }
+.pcb-test-panel p { margin:8px 0; line-height:1.5; }
+.pcb-test-panel ul { margin:8px 0; padding-left:18px; }
+.pcb-test-panel .pcb-test-switch { margin:3px; }
+.pcb-test-panel .pcb-test-switch[aria-pressed="true"] { border-color:var(--primary); background:color-mix(in srgb,var(--primary) 18%,var(--tile)); }
+.pcb-test-panel [role="alert"] { padding:8px; border:1px solid #d89028; border-radius:5px; }
+.pcb-workspace .test-switch-closed .circuit-part-graphic { outline:3px solid var(--primary); outline-offset:3px; border-radius:5px; }
+.pcb-workspace .test-led-on .circuit-part-artwork { filter:drop-shadow(0 0 8px var(--test-led-color)) drop-shadow(0 0 12px var(--test-led-color)); }
+.pcb-workspace .test-led-on .circuit-part-graphic::after { content:""; position:absolute; inset:20%; border-radius:50%; background:var(--test-led-color); opacity:.35; box-shadow:0 0 20px 8px var(--test-led-color); pointer-events:none; }
+.pcb-workspace .pcb-test-badge { position:absolute; left:50%; top:100%; transform:translateX(-50%); padding:3px 6px; color:var(--foreground); background:var(--panel); border:1px solid var(--border); border-radius:4px; white-space:nowrap; font-size:14px; pointer-events:none; }
+.pcb-workspace .circuit-testing :is(.circuit-pin,.circuit-junction,.circuit-wire-layer,.circuit-wire-layer *) { pointer-events:none; }
+.pcb-workspace .circuit-testing .circuit-part { cursor:default; }
+.pcb-workspace .circuit-testing .circuit-part[role="button"] { cursor:pointer; }
+@media(max-width:700px) { .pcb-workspace .pcb-test-panel { top:auto; bottom:8px; max-height:45%; } }
 @media(max-width:700px) {
   .pcb-project-manager { top:auto; bottom:35px; max-height:60%; }
   .pcb-workspace .component-inspector { top:auto; bottom:0; left:0; right:0; width:100%; max-height:44%; border-top:1px solid #cfd9e2; }

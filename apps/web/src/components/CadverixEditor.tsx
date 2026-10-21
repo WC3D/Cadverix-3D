@@ -8797,7 +8797,8 @@ export function CadverixEditor({
     setHistory(hydratedHistory.entries);
     setHistoryIndex(hydratedHistory.index);
     setNotice("Ready");
-  }, [initialAssets, initialHistory, initialHistoryIndex, initialPlacementElevation, initialPlacementWorkplane, initialShapes, projectId, projectRevision]);
+    // Placement-only metadata echoes must not replay a stale scene before the pending autosave publishes.
+  }, [initialAssets, initialHistory, initialHistoryIndex, initialShapes, projectId, projectRevision]);
 
   useEffect(() => {
     if (!projectId || !onProjectShapesChange) {
@@ -11700,6 +11701,8 @@ export function CadverixEditor({
           }}
         /> : null}
         {toolbarMode === "pcb" ? <PcbWorkspace toolbarHost={pcbToolbarHost} document={electronics} shapes={shapes} projectId={projectId} reset={pcbReset} requestedBoard={requestedPcbBoard}
+          themeId={workspaceSettings.themeId ?? "sketchforge"} gridColor={activeTheme.viewport.gridMajor} backgroundColor={activeTheme.ui.background}
+          onThemeChange={(themeId) => updateProjectWorkspaceSettings({ workspace: { ...workspaceSettingsRef.current, themeId, ...(themeId === "custom" ? { customTheme: customThemeWithDefaults(workspaceSettingsRef.current.customTheme ?? activeTheme) } : {}) }, snap: snapGridRef.current })}
           onActiveBoard={setRequestedPcbBoard}
           onChange={commitElectronics} onAddInstance={addPcbInstance} onDetach={detachPcbCopy} onUndo={undo} onRedo={redo}
           onLocate={(id) => { setSelectedIds([id]); setToolbarMode("geometry"); }} onHome={() => setToolbarMode("geometry")}

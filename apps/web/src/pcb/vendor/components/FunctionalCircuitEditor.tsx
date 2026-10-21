@@ -13,6 +13,8 @@ import {
   type WheelEvent as ReactWheelEvent,
 } from "react";
 import { createPortal } from "react-dom";
+import { testCircuit } from "@/pcb/pcbSimulation";
+import { PcbTestPanel } from "@/pcb/PcbTestPanel";
 import polygonClipping, { type Polygon } from "polygon-clipping";
 import {
   PART_BY_KIND,
@@ -175,6 +177,7 @@ type RotationEdit = {
 };
 
 const STANDARD_LED_COLORS = ["Red", "Green", "Blue", "Yellow", "Orange", "White"] as const;
+const TEST_LED_COLORS = new Map([["red", "#ff3939"], ["green", "#47ed75"], ["blue", "#5c9cff"], ["yellow", "#ffe14b"], ["orange", "#ffa447"], ["white", "#ffffff"]]);
 
 const DEFAULT_WIRE_COLOR = "#2f9e44";
 const WIRE_COLORS = [
@@ -1559,12 +1562,14 @@ function CircuitGridCanvas({
   grid,
   majorGrid = GRID_OPTIONS[0],
   view,
+  color,
 }: {
   width: number;
   height: number;
   grid: GridOption;
   majorGrid?: GridOption;
   view: { x: number; y: number; scale: number };
+  color: string;
 }) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
 
@@ -1583,7 +1588,7 @@ function CircuitGridCanvas({
 
     const physicalLineWidth = Math.max(1, Math.round(pixelRatio));
     const lineOffset = physicalLineWidth % 2 === 1 ? 0.5 : 0;
-    const drawGrid = (step: number, color: string) => {
+    const drawGrid = (step: number, opacity: number) => {
       if (step < 4) return;
       const originX = ((view.x % step) + step) % step;
       const originY = ((view.y % step) + step) % step;
@@ -1599,15 +1604,17 @@ function CircuitGridCanvas({
         context.lineTo(physicalWidth, physicalY);
       }
       context.strokeStyle = color;
+      context.globalAlpha = opacity;
       context.lineWidth = physicalLineWidth;
       context.stroke();
     };
 
     const minorStep = grid.pixels * view.scale;
     const majorStep = majorGrid.pixels * view.scale;
-    if (Math.abs(minorStep - majorStep) > 0.01) drawGrid(minorStep, "rgba(41, 180, 224, 0.17)");
-    drawGrid(majorStep, "rgba(31, 153, 198, 0.24)");
-  }, [grid.pixels, height, majorGrid.pixels, view.scale, view.x, view.y, width]);
+    if (Math.abs(minorStep - majorStep) > 0.01) drawGrid(minorStep, .17);
+    drawGrid(majorStep, .28);
+    context.globalAlpha = 1;
+  }, [color, grid.pixels, height, majorGrid.pixels, view.scale, view.x, view.y, width]);
 
   return <canvas ref={canvasRef} className="circuit-grid-layer" aria-hidden="true" />;
 }
@@ -2477,6 +2484,10 @@ function PCBTransferPanel({
 }
 
 type FunctionalCircuitEditorProps = {
+  themeId: string;
+  gridColor: string;
+  backgroundColor: string;
+  onThemeChange: (id: string) => void;
   toolbarHost: HTMLDivElement | null;
   initialScene?: CircuitScene;
   projectId?: string | null;
@@ -2489,7 +2500,7 @@ type FunctionalCircuitEditorProps = {
   onProjectSave?: () => void;
 };
 
-export function FunctionalCircuitEditor({ toolbarHost, initialScene = EMPTY_SCENE, projectId = null, projectName = "Cadverix PCB", onHome, onSceneChange, resetKey, onProjectUndo, onProjectRedo, onProjectSave }: FunctionalCircuitEditorProps) {
+export function FunctionalCircuitEditor({ toolbarHost, initialScene = EMPTY_SCENE, projectId = null, projectName = "Cadverix PCB", onHome, onSceneChange, resetKey, onProjectUndo, onProjectRedo, onProjectSave, themeId, gridColor, backgroundColor, onThemeChange }: FunctionalCircuitEditorProps) {
   const [scene, setScene] = useState<CircuitScene>(() => ({
     parts: initialScene.parts,
     wires: initialScene.wires,
@@ -2497,6 +2508,11 @@ export function FunctionalCircuitEditor({ toolbarHost, initialScene = EMPTY_SCEN
     board: initialScene.board,
   }));
   const [editorMode, setEditorMode] = useState<EditorMode>("circuit");
+  const [testing, setTesting] = useState(false);
+  const [closedSwitches, setClosedSwitches] = useState<Set<string>>(() => new Set());
+  const testResult = useMemo(() => testing ? testCircuit(scene, closedSwitches) : null, [scene, testing, closedSwitches]);
+  const toggleTestSwitch = (id: string) => setClosedSwitches((current) => { const next = new Set(current); if (next.has(id)) next.delete(id); else next.add(id); return next; });
+  const stopTesting = () => { setTesting(false); setClosedSwitches(new Set()); };
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [activeTool, setActiveTool] = useState<ActiveTool>("select");
   const [grid, setGrid] = useState<GridOption>(GRID_OPTIONS[0]);
@@ -2510,7 +2526,7 @@ export function FunctionalCircuitEditor({ toolbarHost, initialScene = EMPTY_SCEN
   const [traceWidthMm, setTraceWidthMm] = useState(initialScene.traceWidthMm ?? DEFAULT_PCB_EDITOR_PREFERENCES.traceWidthMm);
   const transactionRef = useRef(0);
   const sceneChangeRef = useRef(onSceneChange); sceneChangeRef.current = onSceneChange;
-  useEffect(() => { if (resetKey !== undefined) { setScene(initialScene); setTraceWidthMm(initialScene.traceWidthMm ?? 0.25); } }, [resetKey]);
+  useEffect(() => { if (resetKey !== undefined) { setScene(initialScene); setTraceWidthMm(initialScene.traceWidthMm ?? 0.25); setTesting(false); setClosedSwitches(new Set()); } }, [resetKey]);
   const [snapOpen, setSnapOpen] = useState(false);
   const [libraryOpen, setLibraryOpen] = useState(false);
   const [libraryLeft, setLibraryLeft] = useState(380);
@@ -2778,6 +2794,7 @@ export function FunctionalCircuitEditor({ toolbarHost, initialScene = EMPTY_SCEN
   };
 
   const switchEditorMode = (mode: EditorMode) => {
+    stopTesting();
     setEditorMode(mode);
     setBoard3DOpen(false);
     setBoardDeleteMode(false);
@@ -3210,6 +3227,7 @@ export function FunctionalCircuitEditor({ toolbarHost, initialScene = EMPTY_SCEN
   };
 
   const commitScene = (producer: (current: CircuitScene) => CircuitScene) => {
+    if (testing) { setToast("Stop the circuit test before editing"); return; }
     setScene((current) => {
       const next = producer(current);
       if (next === current) return current;
@@ -3484,6 +3502,7 @@ export function FunctionalCircuitEditor({ toolbarHost, initialScene = EMPTY_SCEN
 
   const executeMcpCommand = async (command: SketchForgePcbMcpCommand): Promise<unknown> => {
     try {
+      if (testing && !["get_scene", "list_components", "inspect_design", "capture_board_image"].includes(command.action)) throw new Error("Stop the circuit test before editing through MCP");
       const params = command.params;
       const currentScene = sceneRef.current;
       const sceneSnapshot = (source: CircuitScene = currentScene) => ({
@@ -4168,6 +4187,7 @@ export function FunctionalCircuitEditor({ toolbarHost, initialScene = EMPTY_SCEN
   };
 
   const activateAction = (action: ToolbarAction, anchorLeft = 392) => {
+    if (testing && !["home", "settings", "check", "export"].includes(action)) { setToast("Stop the circuit test before editing"); return; }
     replaceConnectionSelection([]);
     if (action !== "delete") replaceSelectedWire(null);
     if (action !== "delete") setSelectedJunctionId(null);
@@ -4327,6 +4347,10 @@ export function FunctionalCircuitEditor({ toolbarHost, initialScene = EMPTY_SCEN
       }
       const isEditing = Boolean(target?.isContentEditable || target?.closest("input, textarea, select"));
       if (isEditing || event.altKey) return;
+      if (testing) {
+        if (event.key === "Escape") { event.preventDefault(); if (settingsOpen) setSettingsOpen(false); else stopTesting(); }
+        return;
+      }
 
       const key = event.key.toLowerCase();
       const command = event.ctrlKey || event.metaKey;
@@ -4667,6 +4691,7 @@ export function FunctionalCircuitEditor({ toolbarHost, initialScene = EMPTY_SCEN
   };
 
   const handleWorkspacePointerDownCapture = (event: ReactPointerEvent<HTMLDivElement>) => {
+    if (testing) return;
     if (event.button !== 0 || editorMode !== "circuit" || !wireStartRef.current) return;
     if (event.target instanceof HTMLElement && event.target.closest(".circuit-pin")) return;
     const destination = wirePreviewTarget(event.clientX, event.clientY)?.endpoint;
@@ -5158,6 +5183,7 @@ export function FunctionalCircuitEditor({ toolbarHost, initialScene = EMPTY_SCEN
       return;
     }
     if (event.button !== 0) return;
+    if (testing) return;
     if (editorMode === "board") {
       const point = screenToWorld(event.clientX, event.clientY);
       if (!point) return;
@@ -5722,6 +5748,15 @@ export function FunctionalCircuitEditor({ toolbarHost, initialScene = EMPTY_SCEN
     label: formatBoardLength(boardSegmentLengthMm),
   } : null;
   const toolbar = <header className="editor-ribbon">
+        <div className="toolbar-section" data-tool-group="generators"><div className="toolbar-section-label">Test</div><div className="toolbar-section-tools">
+          <button type="button" disabled={editorMode !== "circuit"} aria-pressed={testing} onClick={() => {
+            if (testing) { stopTesting(); return; }
+            if (dragRef.current || wireEditRef.current || wireGestureRef.current || rotationGestureRef.current) { setToast("Finish the current gesture before testing"); return; }
+            replaceWireStart(null); replaceConnectionSelection([]); replaceSelectedWire(null); setSelectedIds([]); setSelectedJunctionId(null);
+            setIsolatedIds(null); setIsolatedWireIds(null); setHighlightedNet(null); setRotationEdit(null); setRotationReadout(null); setSnapOpen(false);
+            setLibraryOpen(false); setArrangePanel(null); setTransferPanel(null); setActiveTool("select"); closeDesignCheck(); setClosedSwitches(new Set()); setTesting(true);
+          }}>{testing ? "Stop test" : "Test circuit"}</button>
+        </div></div>
         <div className="toolbar-section" data-tool-group="manage"><div className="toolbar-section-label">PCB mode</div>
           <nav className="toolbar-section-tools" aria-label="PCB editor mode">
             <button type="button" aria-pressed={editorMode === "circuit"} onClick={() => switchEditorMode("circuit")}>Circuit</button>
@@ -5740,7 +5775,7 @@ export function FunctionalCircuitEditor({ toolbarHost, initialScene = EMPTY_SCEN
                         key={tool.label}
                         tool={tool}
                         active={activeAction(tool.action)}
-                        disabled={((tool.action === "delete" ? selectedIds.length === 0 && !selectedWireId && !selectedJunctionId : isSelectionAction(tool.action) && selectedIds.length === 0)
+                        disabled={(testing && !["settings", "check", "export"].includes(tool.action)) || ((tool.action === "delete" ? selectedIds.length === 0 && !selectedWireId && !selectedJunctionId : isSelectionAction(tool.action) && selectedIds.length === 0)
                           || (tool.action === "hide" && selectedIds.length === 0 && !scene.parts.some((part) => part.hidden))
                           || (tool.action === "isolate" && selectedIds.length === 0 && !selectedWireId && isolatedIds === null && isolatedWireIds === null))
                           || (tool.action === "align" && selectedIds.length < 2)
@@ -5809,6 +5844,7 @@ export function FunctionalCircuitEditor({ toolbarHost, initialScene = EMPTY_SCEN
 
       {settingsOpen ? (
         <PCBWorkspaceSettingsModal
+          themeId={themeId} onThemeChange={onThemeChange}
           managedHistory={Boolean(onProjectUndo)}
           showGrid={showGrid}
           showBoardReference={showBoardReference}
@@ -5872,12 +5908,12 @@ export function FunctionalCircuitEditor({ toolbarHost, initialScene = EMPTY_SCEN
       ) : null}
 
       {board3DOpen && scene.board ? (
-        <Board3DPreview board={scene.board} parts={scene.parts} wires={scene.wires} traceWidthMm={traceWidthMm} projectName={projectName} onClose={() => setBoard3DOpen(false)} />
+        <Board3DPreview backgroundColor={backgroundColor} board={scene.board} parts={scene.parts} wires={scene.wires} traceWidthMm={traceWidthMm} projectName={projectName} onClose={() => setBoard3DOpen(false)} />
       ) : null}
 
       <div
         ref={workspaceRef}
-        className={`circuit-workspace mode-${editorMode} tool-${activeTool} ${boardDrawing ? "drawing-board" : ""} ${boardDeleteMode ? "deleting-board" : ""} ${isPanning ? "panning" : ""}`}
+        className={`circuit-workspace ${testing ? "circuit-testing" : ""} mode-${editorMode} tool-${activeTool} ${boardDrawing ? "drawing-board" : ""} ${boardDeleteMode ? "deleting-board" : ""} ${isPanning ? "panning" : ""}`}
         aria-label={editorMode === "board" ? "Board outline editor" : "2D circuit editor"}
         onPointerDownCapture={handleWorkspacePointerDownCapture}
         onPointerDown={handleWorkspacePointerDown}
@@ -5896,6 +5932,7 @@ export function FunctionalCircuitEditor({ toolbarHost, initialScene = EMPTY_SCEN
       >
         {showGrid ? (
           <CircuitGridCanvas
+            color={gridColor}
             width={canvasSize.width}
             height={canvasSize.height}
             grid={editorMode === "board" ? boardGrid : grid}
@@ -6074,19 +6111,24 @@ export function FunctionalCircuitEditor({ toolbarHost, initialScene = EMPTY_SCEN
             const partInteractive = editorMode === "circuit" && !isolationLocked;
             return (
               <div
-                className={`circuit-part ${locatedPartSet.has(part.id) ? `check-located ${locatedIssue?.severity ?? "error"}` : ""} ${editorMode === "board" ? "board-reference-part" : ""} ${selectedSet.has(part.id) ? "selected" : ""} ${part.hidden ? "hidden" : ""} ${dimmed ? "dimmed" : ""} ${isolationLocked ? "isolation-locked" : ""}`}
+                className={`circuit-part ${testing && part.kind === "pushbutton" && closedSwitches.has(part.id) ? "test-switch-closed" : ""} ${testResult?.leds.get(part.id)?.on ? "test-led-on" : ""} ${locatedPartSet.has(part.id) ? `check-located ${locatedIssue?.severity ?? "error"}` : ""} ${editorMode === "board" ? "board-reference-part" : ""} ${selectedSet.has(part.id) ? "selected" : ""} ${part.hidden ? "hidden" : ""} ${dimmed ? "dimmed" : ""} ${isolationLocked ? "isolation-locked" : ""}`}
+                data-led-state={testing && part.kind === "led" ? !testResult?.ok ? "unavailable" : testResult.leds.get(part.id)?.on ? "on" : "off" : undefined}
                 key={part.id}
                 style={{
                   left: part.x,
                   top: part.y,
                   "--part-width": `${layout.width}px`,
                   "--part-height": `${layout.height}px`,
+                  "--test-led-color": TEST_LED_COLORS.get(part.value.trim().toLowerCase()) ?? "#ffffff",
                 } as CSSProperties}
-                role={partInteractive ? "button" : "presentation"}
-                tabIndex={partInteractive ? 0 : -1}
+                role={testing ? part.kind === "pushbutton" ? "button" : "img" : partInteractive ? "button" : "presentation"}
+                tabIndex={testing ? part.kind === "pushbutton" ? 0 : -1 : partInteractive ? 0 : -1}
+                aria-pressed={testing && part.kind === "pushbutton" ? closedSwitches.has(part.id) : undefined}
                 aria-disabled={isolationLocked || undefined}
-                aria-label={`${part.reference} ${definition.label}`}
-                onPointerDown={partInteractive ? (event) => handlePartPointerDown(event, part) : undefined}
+                aria-label={`${part.reference} ${definition.label}${testing && part.kind === "led" ? `: ${!testResult?.ok ? "not simulated" : testResult.leds.get(part.id)?.on ? "ON" : "OFF"}` : ""}`}
+                onClick={testing && part.kind === "pushbutton" ? () => toggleTestSwitch(part.id) : undefined}
+                onKeyDown={testing && part.kind === "pushbutton" ? (event) => { if (event.key === "Enter" || event.key === " ") { event.preventDefault(); event.stopPropagation(); toggleTestSwitch(part.id); } } : undefined}
+                onPointerDown={testing ? (event) => event.stopPropagation() : partInteractive ? (event) => handlePartPointerDown(event, part) : undefined}
                 onPointerMove={partInteractive ? handlePartPointerMove : undefined}
                 onPointerUp={partInteractive ? handlePartPointerUp : undefined}
                 onPointerCancel={partInteractive ? handlePartPointerUp : undefined}
@@ -6111,7 +6153,7 @@ export function FunctionalCircuitEditor({ toolbarHost, initialScene = EMPTY_SCEN
                       top: layout.height / 2 + pinOffset.y,
                     }}
                     type="button"
-                    disabled={isolationLocked}
+                    disabled={isolationLocked || testing}
                     data-part-id={part.id}
                     data-pin-id={pin.id}
                     aria-label={`Connect ${pin.label} of ${part.reference}`}
@@ -6122,6 +6164,7 @@ export function FunctionalCircuitEditor({ toolbarHost, initialScene = EMPTY_SCEN
                   />
                   );
                 }) : null}
+                {testing && (part.kind === "led" || part.kind === "pushbutton") ? <span className="pcb-test-badge">{part.reference}: {part.kind === "pushbutton" ? closedSwitches.has(part.id) ? "closed" : "open" : !testResult?.ok ? "not simulated" : testResult.leds.get(part.id)?.on ? "ON" : "OFF"}</span> : null}
               </div>
             );
           })}
@@ -6212,7 +6255,7 @@ export function FunctionalCircuitEditor({ toolbarHost, initialScene = EMPTY_SCEN
             onConnect={connectSelectedHoles}
             onClose={() => replaceConnectionSelection([])}
           />
-        ) : selectedPart && selectedDefinition ? (
+        ) : !testing && selectedPart && selectedDefinition ? (
           <ComponentInspector
             key={selectedPart.id}
             part={selectedPart}
@@ -6224,7 +6267,7 @@ export function FunctionalCircuitEditor({ toolbarHost, initialScene = EMPTY_SCEN
             onUpdate={(patch) => updatePart(selectedPart.id, patch)}
             onClose={() => setSelectedIds([])}
           />
-        ) : selectedWire ? (
+        ) : !testing && selectedWire ? (
           <WireInspector
             wire={selectedWire}
             onColorChange={changeWireColor}
@@ -6240,6 +6283,7 @@ export function FunctionalCircuitEditor({ toolbarHost, initialScene = EMPTY_SCEN
         {toast ? <div className="editor-toast" role="status">{toast}</div> : null}
       </div>
 
+      {testing && testResult ? <PcbTestPanel scene={scene} result={testResult} closedSwitches={closedSwitches} onToggle={toggleTestSwitch} onStop={stopTesting} /> : null}
       {libraryOpen ? <PartLibraryPanel left={libraryLeft} onChoose={addPart} onClose={() => setLibraryOpen(false)} /> : null}
 
       {arrangePanel ? (

@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, type ReactNode } from "react";
+import { THEME_PRESET_OPTIONS } from "@/lib/themes";
 
 type EditorMode = "circuit" | "board";
 type SettingsSection = "appearance" | "snapping" | "workspace" | "history";
@@ -8,6 +9,8 @@ type GridChoice = { label: string; millimeters: number };
 type TraceWidthChoice = { label: string; millimeters: number; description: string };
 
 type PCBWorkspaceSettingsModalProps = {
+  themeId: string;
+  onThemeChange: (id: string) => void;
   managedHistory?: boolean;
   showGrid: boolean;
   showBoardReference: boolean;
@@ -63,12 +66,14 @@ function SettingSelect({ label, description, value, onChange, children }: { labe
   return (
     <label className="pcb-workspace-select">
       <span><strong>{label}</strong>{description ? <small>{description}</small> : null}</span>
-      <select value={value} onChange={(event) => onChange(event.currentTarget.value)}>{children}</select>
+      <select aria-label={label} value={value} onChange={(event) => onChange(event.currentTarget.value)}>{children}</select>
     </label>
   );
 }
 
 export function PCBWorkspaceSettingsModal({
+  themeId,
+  onThemeChange,
   managedHistory,
   showGrid,
   showBoardReference,
@@ -123,6 +128,9 @@ export function PCBWorkspaceSettingsModal({
               {activeSection === "appearance" ? (
                 <>
                   <div className="pcb-workspace-section-heading"><strong>Appearance</strong><span>Choose what stays visible while you design the PCB.</span></div>
+                  <SettingSelect label="Theme preset" description="Shared with Geometry and Drawing and saved with this project. Custom colours can be edited in Geometry's workspace settings." value={themeId} onChange={onThemeChange}>
+                    {THEME_PRESET_OPTIONS.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
+                  </SettingSelect>
                   <SettingToggle label="Show grid" description="Display the active snap grid behind the circuit and board." checked={showGrid} onChange={onShowGridChange} />
                   <SettingToggle label="Show board outline in Circuit view" description="Keep the board boundary visible as a light reference while placing components." checked={showBoardReference} onChange={onShowBoardReferenceChange} />
                   <SettingSelect label="Wire thickness" description={selectedTraceWidth?.description ?? "Controls how wide routed copper appears in Circuit and 3D views."} value={String(traceWidthMm)} onChange={(value) => onTraceWidthChange(Number(value))}>
