@@ -30,7 +30,7 @@ test("exports a compatible editable Layerling project", async ({ page }) => {
   await page.getByRole("button", { name: "Add shape", exact: true }).click();
   await page.getByRole("button", { name: "Box", exact: true }).click();
   await page.getByRole("button", { name: "Add note", exact: true }).click();
-  await page.locator(".three-workplane-host").click({ position: { x: 250, y: 350 } });
+  await page.locator(".three-workplane-host").click({ position: { x: 200, y: 240 } });
   await page.getByPlaceholder("Write a note...").fill("Check this face");
   await page.getByRole("button", { name: "Export", exact: true }).click();
   await page.getByRole("radio", { name: "LYL: Layerling project", exact: true }).click();
@@ -82,6 +82,7 @@ test("splits disconnected bodies from the Combine toolbar and undoes as one acti
   await page.locator('input[type="file"][accept^=".3mf"]').setInputFiles({ name: "disconnected.3mf", mimeType: "model/3mf", buffer: Buffer.from(archive) });
   await expect.poll(async () => (await scene(page)).shapeCount).toBe(1);
   await expect(page.locator('[data-tool-group="combine"]').getByRole("button", { name: "Split by plane", exact: true })).toBeVisible();
+  await page.getByRole("treeitem").filter({ hasText: "disconnected" }).first().click();
   const splitBodies = page.getByRole("button", { name: "Bodies split", exact: true });
   await expect(splitBodies).toBeEnabled();
   await splitBodies.click();

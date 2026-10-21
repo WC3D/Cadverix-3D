@@ -9,6 +9,7 @@ import { importedShapeFromStl } from "@/lib/stlImport";
 import { importedShapeFromSvg } from "@/lib/svgImport";
 import { normalizeSnapGrid, normalizeWorkspaceSettings } from "@/lib/workplaneSettings";
 import { parseDrawingSheet } from "@/lib/drawingSheet";
+import { parseElectronics, type ElectronicsDocument } from "@/pcb/pcbDocument";
 import type { CadDisplayEdge, GridSize, ProjectAsset, ProjectAssetSourceFormat, SketchOperation, SketchRevolveSettings, WorkplaneNote, WorkplaneShape, WorkplaneWorkspaceSettings } from "@/types/sketchforge";
 
 export const SKF_SCHEMA_ID = "com.sketchforge.project";
@@ -19,6 +20,7 @@ export const SKF_FORMAT_VERSION = 2;
 // Only projects with drawings require the extended reader. Plain modeling
 // projects remain format 2 so existing readers can still exchange them.
 export const SKF_DRAWING_FORMAT_VERSION = 3;
+export const SKF_HYBRID_FORMAT_VERSION = 4;
 export const SKF_MINIMUM_READER_VERSION = 2;
 export const SKF_OLDEST_READABLE_FORMAT_VERSION = 1;
 export const SKF_CREATED_WITH_VERSION = "1.0.14";
@@ -120,6 +122,7 @@ export type SkfShapeNodeV1 = {
 };
 
 export type SkfStateV1 = {
+  electronics?: ElectronicsDocument;
   id: string;
   rootNodeIds: string[];
   nodes: SkfShapeNodeV1[];
@@ -139,7 +142,7 @@ export type SkfFeatureV1 = {
 // from inline definitions to assets; keep the exported type name for callers.
 export type SkfProjectDocumentV1 = {
   schema: typeof SKF_SCHEMA_ID | typeof LYL_SCHEMA_ID;
-  formatVersion: 1 | 2 | 3;
+  formatVersion: 1 | 2 | 3 | 4;
   minimumReaderVersion: number;
   createdWithVersion: string;
   metadata: {
@@ -887,6 +890,7 @@ const LYL_SHAPE_KINDS = new Set([
 ]);
 
 function assertLylShapeCompatible(shape: WorkplaneShape) {
+  if (shape.pcbInstance) throw new Error("Linked PCB references require a combined SKF project");
   if (!LYL_SHAPE_KINDS.has(shape.kind)) {
     throw new Error(`Layerling export does not support '${shape.name}' (${shape.kind}). Export SKF to preserve it.`);
   }
@@ -915,6 +919,7 @@ function assertLylShapeCompatible(shape: WorkplaneShape) {
 }
 
 function assertLylProjectCompatible(input: SkfProjectExportInput, entries: EditorHistoryEntry[]) {
+  if (entries.some((entry) => entry.electronics?.boards.length)) throw new Error("Combined PCB projects require SKF format 4. Export individual boards from PCB, or an independent mechanical-only project for Layerling.");
   if (input.workspace.drawing !== undefined) {
     throw new Error("Layerling export does not support Cadverix drawing sheets. Export SKF instead.");
   }
@@ -949,8 +954,11 @@ async function exportProjectPackage(input: SkfProjectExportInput, flavor: Projec
   if (hydrated.entries.length > SKF_LIMITS.states) throw new Error(`Project has too many undo states for the .${flavor} format`);
   const exportEntries = hydrated.entries.map((entry) => {
     const shapes = repairDuplicateGroupedObjectIds(entry.shapes);
-    return shapes === entry.shapes ? entry : editorHistoryEntry(shapes, entry.selectedIds, normalizeNotes(entry.notes));
+    return shapes === entry.shapes ? entry : editorHistoryEntry(shapes, entry.selectedIds, normalizeNotes(entry.notes), entry.electronics);
   });
+  for (const entry of exportEntries) {
+    for (const shape of entry.shapes) if (shape.pcbInstance && !entry.electronics?.boards.some((board) => board.id === shape.pcbInstance!.boardId)) throw new Error("PCB instance is missing its board document; use Save combined SKF");
+  }
   const builder = new SkfArchiveBuilder(flavor);
   const stateShapes = exportEntries.map((entry) => entry.shapes);
   await builder.addSources(input.assets, referencedSourceAssetIds(stateShapes));
@@ -963,7 +971,9 @@ async function exportProjectPackage(input: SkfProjectExportInput, flavor: Projec
     let stateId = stateIdByFingerprint.get(entry.fingerprint);
     if (!stateId) {
       stateId = `state-${states.length + 1}`;
-      states.push(await serializeState(stateId, entry.shapes, builder, sourceAssetsByArchiveId, normalizeNotes(entry.notes)));
+      const state = await serializeState(stateId, entry.shapes, builder, sourceAssetsByArchiveId, normalizeNotes(entry.notes));
+      if (entry.electronics?.boards.length) state.electronics = parseElectronics(entry.electronics);
+      states.push(state);
       stateIdByFingerprint.set(entry.fingerprint, stateId);
     }
     historyEntries.push({ stateId, selectedObjectIds: [...entry.selectedIds] });
@@ -980,10 +990,11 @@ async function exportProjectPackage(input: SkfProjectExportInput, flavor: Projec
   const selectedWorkplaneId = placementWorkplaneIsBase(placementWorkplane) ? "workplane-base" : "workplane-active";
   const workspace = normalizeWorkspaceSettings(input.workspace);
   if (input.workspace.drawing !== undefined) workspace.drawing = parseDrawingSheet(input.workspace.drawing);
+  const hybrid = states.some((state) => state.electronics?.boards.length);
   const document: SkfProjectDocumentV1 = {
     schema: PROJECT_PACKAGE_FLAVORS[flavor].schema,
-    formatVersion: flavor === "skf" && workspace.drawing ? SKF_DRAWING_FORMAT_VERSION : SKF_FORMAT_VERSION,
-    minimumReaderVersion: flavor === "skf" && workspace.drawing ? SKF_DRAWING_FORMAT_VERSION : SKF_MINIMUM_READER_VERSION,
+    formatVersion: hybrid ? SKF_HYBRID_FORMAT_VERSION : flavor === "skf" && workspace.drawing ? SKF_DRAWING_FORMAT_VERSION : SKF_FORMAT_VERSION,
+    minimumReaderVersion: hybrid ? SKF_HYBRID_FORMAT_VERSION : flavor === "skf" && workspace.drawing ? SKF_DRAWING_FORMAT_VERSION : SKF_MINIMUM_READER_VERSION,
     createdWithVersion: SKF_CREATED_WITH_VERSION,
     metadata: {
       ...(input.projectId ? { projectId: input.projectId } : {}),
@@ -1381,13 +1392,13 @@ async function validateDocumentAndAssets(raw: unknown, files: ArchiveFiles) {
   if (document.schema !== SKF_SCHEMA_ID && document.schema !== LYL_SCHEMA_ID) throw new Error("This file is not a supported Cadverix 3D (.skf) or Layerling project");
   const layerlingProject = document.schema === LYL_SCHEMA_ID;
   if (!Number.isInteger(document.formatVersion)) throw new Error("Cadverix 3D project formatVersion is missing");
-  if (document.formatVersion > SKF_DRAWING_FORMAT_VERSION) {
+  if (document.formatVersion > (layerlingProject ? SKF_DRAWING_FORMAT_VERSION : SKF_HYBRID_FORMAT_VERSION)) {
     throw new Error(`This project uses .skf format ${document.formatVersion}, which requires a newer Cadverix 3D version`);
   }
   if (document.formatVersion < SKF_OLDEST_READABLE_FORMAT_VERSION) {
     throw new Error(`Packaged .skf format ${document.formatVersion} requires migration support that is not available`);
   }
-  if (!Number.isInteger(document.minimumReaderVersion) || document.minimumReaderVersion > SKF_DRAWING_FORMAT_VERSION) {
+  if (!Number.isInteger(document.minimumReaderVersion) || document.minimumReaderVersion > (layerlingProject ? SKF_DRAWING_FORMAT_VERSION : SKF_HYBRID_FORMAT_VERSION)) {
     throw new Error("This project requires a newer Cadverix 3D reader and was not opened");
   }
   const metadata = objectRecord(document.metadata, "metadata");
@@ -1423,6 +1434,10 @@ async function validateDocumentAndAssets(raw: unknown, files: ArchiveFiles) {
   const activeObjectIds = new Set<string>();
   for (let stateIndex = 0; stateIndex < document.states.length; stateIndex += 1) {
     const state = document.states[stateIndex];
+    if (state.electronics !== undefined) {
+      if (layerlingProject || document.formatVersion < SKF_HYBRID_FORMAT_VERSION || document.minimumReaderVersion < SKF_HYBRID_FORMAT_VERSION) throw new Error("PCB data requires SKF format and reader version 4");
+      state.electronics = parseElectronics(state.electronics);
+    }
     const stateId = stringValue(state?.id, `states[${stateIndex}].id`);
     if (stateById.has(stateId)) throw new Error(`Duplicate state ID '${stateId}'`);
     if (!Array.isArray(state.nodes) || state.nodes.length > SKF_LIMITS.objectsPerState) throw new Error(`State '${stateId}' has too many objects`);
@@ -1431,6 +1446,14 @@ async function validateDocumentAndAssets(raw: unknown, files: ArchiveFiles) {
       const nodeId = stringValue(node?.nodeId, `states[${stateIndex}].nodes[${nodeIndex}].nodeId`);
       if (nodeById.has(nodeId)) throw new Error(`State '${stateId}' contains duplicate node ID '${nodeId}'`);
       const definition = objectRecord(node.definition, `node '${nodeId}'.definition`);
+      if (definition.pcbInstance !== undefined) {
+        const link = objectRecord(definition.pcbInstance, "PCB instance");
+        if (!state.electronics?.boards.some((board) => board.id === link.boardId)) throw new Error("PCB instance references a missing board design");
+        stringValue(link.revision, "PCB instance revision");
+        if (!Array.isArray(link.originOffset) || link.originOffset.length !== 3) throw new Error("Invalid PCB instance origin");
+        link.originOffset.forEach((value, index) => finiteNumber(value, `PCB origin ${index}`));
+        if (link.unmodeledComponents !== undefined && (!Number.isInteger(link.unmodeledComponents) || Number(link.unmodeledComponents) < 0 || Number(link.unmodeledComponents) > 2000)) throw new Error("Invalid PCB model-availability count");
+      }
       if (layerlingProject) {
         const unsupportedFields = [
           "extrudeTwist", "extrudeTopOffsetX", "extrudeTopOffsetZ",
@@ -1458,6 +1481,8 @@ async function validateDocumentAndAssets(raw: unknown, files: ArchiveFiles) {
       nodeById.set(nodeId, node);
     });
     const roots = stringArray(state.rootNodeIds, `state '${stateId}'.rootNodeIds`);
+    const pcbNodes = state.nodes.filter((node) => node.definition.pcbInstance !== undefined);
+    if (pcbNodes.length > 128 || pcbNodes.some((node) => !roots.includes(node.nodeId))) throw new Error("PCB references must be root instances, with at most 128 per project state");
     const visiting = new Set<string>();
     const visited = new Set<string>();
     const primaryObjectIds = new Set<string>();
@@ -1719,6 +1744,7 @@ async function restoreV1(document: SkfProjectDocumentV1, assetById: Map<string, 
     restoredStates.get(entry.stateId) ?? [],
     entry.selectedObjectIds,
     restoredNotes.get(entry.stateId) ?? [],
+    stateById.get(entry.stateId)?.electronics,
   ));
   const shapes = restoredStates.get(document.sceneStateId) ?? [];
   const notes = restoredNotes.get(document.sceneStateId) ?? [];
@@ -1847,7 +1873,7 @@ export async function importSkfProject(input: ArrayBuffer | Uint8Array, options:
     const document = objectRecord(raw, "Legacy .skf project");
     if (document.schema !== SKF_SCHEMA_ID && document.schema !== LYL_SCHEMA_ID) throw new Error("This file is not a supported Cadverix 3D (.skf) or Layerling project");
     if (document.formatVersion === 0) return migrateV0(document);
-    if (typeof document.formatVersion === "number" && document.formatVersion > SKF_DRAWING_FORMAT_VERSION) {
+    if (typeof document.formatVersion === "number" && document.formatVersion > SKF_HYBRID_FORMAT_VERSION) {
       throw new Error(`This project uses .skf format ${document.formatVersion}, which requires a newer Cadverix 3D version`);
     }
     throw new Error("This legacy .skf version is not supported");

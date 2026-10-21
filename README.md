@@ -118,7 +118,7 @@ The **Scene** sidebar provides a searchable object/group overview. Selected obje
 
 Private projects autosave in IndexedDB for the browser and site address you use. Export a **`.skf`** package to back up an editable project or move it between browsers, computers, and mobile devices. Opening a package creates a new local project. Geometry exports such as STL and 3MF are separate from editable project backups.
 
-Modeling-only saves use **SKF format 2**, with deduplicated mesh/B-Rep/image assets and compact binary CAD display edges shared across history states. Projects containing a drawing sheet use **format 3 / minimum reader 3**, preserving sheet templates, view definitions, and measurements. The reader accepts formats 1, 2, and 3, legacy JSON projects, and earlier JSON display-edge assets; drawing projects require a drawing-capable reader.
+Modeling-only saves use **SKF format 2**, with deduplicated mesh/B-Rep/image assets and compact binary CAD display edges shared across history states. Drawing projects use **format 3 / minimum reader 3**. Combined PCB/mechanical projects use **format 4 / minimum reader 4**, preserving independent circuits, linked board instances and project history. The reader accepts formats 1–4, legacy JSON projects, and earlier JSON display-edge assets.
 
 See the [SKF project format documentation](docs/SKF_PROJECT_FORMAT.md) for package structure, history options, and compatibility details.
 
@@ -514,6 +514,7 @@ npm run desktop:dist
 
 ## Documentation
 
+- [Combined PCB and mechanical projects](docs/PCB_WORKSPACE.md) — independent circuits, multiple boards and linked assembly instances in one SKF project.
 - [Installable offline app](docs/OFFLINE_APP.md) — install the static/Cloudflare version, cache the CAD runtime, and update safely.
 - [Drawing workspace](docs/DRAWING_WORKSPACE.md) — ISO/ANSI sheets, model views, measurements, and SVG/PDF output.
 - [User manual](docs/CADVERIX_USER_MANUAL.md) — modeling, sketch tools, import/export, and shortcuts.

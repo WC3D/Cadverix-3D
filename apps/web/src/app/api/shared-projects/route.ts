@@ -1,9 +1,10 @@
 import { randomUUID, createHash } from "crypto";
-import { promises as fs } from "fs";
+import { constants, createWriteStream, promises as fs } from "fs";
 import path from "path";
+import { pipeline } from "node:stream/promises";
 import { NextResponse } from "next/server";
 import { inspectSkfProjectPackage, SKF_LIMITS, SKF_MEDIA_TYPE } from "@/lib/skfProject";
-import { resolveSharedPath, sharedRelativePath } from "@/lib/sharedStoragePaths";
+import { resolveContainedPath, resolveSharedPath, sharedRelativePath } from "@/lib/sharedStoragePaths";
 
 export const runtime = "nodejs";
 export const revalidate = false;
@@ -54,12 +55,25 @@ function sharedThumbnailPath(root: string, fileName: string, revision: string) {
 }
 
 const STORAGE_CAPABILITIES = { folders: true, versions: true };
-function versionDirectory(root: string, fileName: string) { return path.join(root, ".backups", createHash("sha256").update(fileName).digest("hex")); }
-async function backupSharedProject(root: string, fileName: string, filePath: string) {
-  const directory = versionDirectory(root, fileName);
+async function versionDirectory(root: string, fileName: string) {
+  return resolveContainedPath(root, `.backups/${createHash("sha256").update(sharedRelativePath(fileName)).digest("hex")}`, true);
+}
+async function backupSharedProject(root: string, fileName: string) {
+  const filePath = await resolveSharedPath(root, fileName);
+  const backupsRoot = await resolveContainedPath(root, ".backups", true);
+  await fs.mkdir(backupsRoot, { recursive: true });
+  const directory = await versionDirectory(root, fileName);
   await fs.mkdir(directory, { recursive: true });
-  await fs.writeFile(path.join(directory, "project.json"), JSON.stringify({ fileName }));
-  await fs.copyFile(filePath, path.join(directory, `${Date.now()}-${randomUUID()}.skf`), 1);
+  const metadataPath = await resolveContainedPath(directory, "project.json", true);
+  const source = await fs.open(filePath, constants.O_RDONLY | constants.O_NOFOLLOW);
+  try {
+    const stat = await source.stat();
+    if (!stat.isFile() || stat.size > SKF_LIMITS.archiveBytes) throw new Error("Invalid shared project file");
+    await fs.writeFile(metadataPath, JSON.stringify({ fileName }), { flag: constants.O_WRONLY | constants.O_CREAT | constants.O_TRUNC | constants.O_NOFOLLOW });
+    await pipeline(source.createReadStream({ autoClose: false }), createWriteStream(path.join(directory, `${Date.now()}-${randomUUID()}.skf`), { flags: "wx" }));
+  } finally {
+    await source.close();
+  }
   const versions = (await fs.readdir(directory)).filter((file) => file.endsWith(".skf")).sort().reverse();
   await Promise.all(versions.slice(10).map((file) => fs.unlink(path.join(directory, file))));
 }
@@ -150,24 +164,25 @@ export async function GET(request: Request) {
     const requestUrl = new URL(request.url);
     const requestedFile = requestUrl.searchParams.get("fileName");
     if (requestUrl.searchParams.has("archives")) {
-      const directories = await fs.readdir(path.join(root, ".backups"), { withFileTypes: true }).catch((error) => { if (error.code === "ENOENT") return []; throw error; });
+      const directories = await resolveContainedPath(root, ".backups").then((directory) => fs.readdir(directory, { withFileTypes: true })).catch((error) => { if (error.code === "ENOENT") return []; throw error; });
       const archives: string[] = [];
       for (const directory of directories.filter((entry) => entry.isDirectory() && /^[a-f0-9]{64}$/.test(entry.name)).slice(0, 5000)) {
-        const metadata = JSON.parse(await fs.readFile(path.join(root, ".backups", directory.name, "project.json"), "utf8"));
+        const metadata = JSON.parse(await fs.readFile(await resolveContainedPath(root, `.backups/${directory.name}/project.json`), "utf8"));
         if (typeof metadata.fileName === "string") archives.push(sharedRelativePath(metadata.fileName));
       }
       return NextResponse.json({ archives: archives.sort() }, { headers: { "Cache-Control": "no-store" } });
     }
     if (requestedFile && requestUrl.searchParams.has("versions")) {
       sharedRelativePath(requestedFile);
-      const versions = await fs.readdir(versionDirectory(root, requestedFile)).catch((error) => { if (error.code === "ENOENT") return []; throw error; });
+      const versions = await versionDirectory(root, requestedFile).then((directory) => fs.readdir(directory)).catch((error) => { if (error.code === "ENOENT") return []; throw error; });
       return NextResponse.json({ versions: versions.filter((file) => /^\d+-[\da-f-]+\.skf$/.test(file)).sort().reverse() }, { headers: { "Cache-Control": "no-store" } });
     }
     if (requestedFile && requestUrl.searchParams.has("backup")) {
       sharedRelativePath(requestedFile);
       const version = requestUrl.searchParams.get("backup")!;
       if (!/^\d+-[\da-f-]+\.skf$/.test(version)) throw new Error("Invalid backup name");
-      const bytes = await fs.readFile(path.join(versionDirectory(root, requestedFile), version));
+      const directory = await versionDirectory(root, requestedFile);
+      const bytes = await fs.readFile(await resolveContainedPath(directory, version));
       return new Response(bytes, { headers: { "Content-Type": SKF_MEDIA_TYPE, "Cache-Control": "no-store" } });
     }
     if (requestedFile) {
@@ -275,7 +290,7 @@ export async function DELETE(request: Request) {
     }
 
     const thumbnailPath = sharedThumbnailPath(root, fileName, currentRevision);
-    await backupSharedProject(root, fileName, filePath);
+    await backupSharedProject(root, fileName);
     await fs.unlink(filePath);
     await fs.unlink(thumbnailPath).catch((error) => {
       if ((error as NodeJS.ErrnoException).code !== "ENOENT") throw error;
@@ -367,7 +382,7 @@ export async function POST(request: Request) {
       await fs.rename(temporaryThumbnailPath, savedThumbnailPath);
       temporaryThumbnailPath = "";
     }
-    if (currentStat) await backupSharedProject(root, fileName, filePath);
+    if (currentStat) await backupSharedProject(root, fileName);
     await fs.rename(temporaryPath, filePath);
     temporaryPath = "";
     const savedStat = await fs.stat(filePath);
@@ -413,7 +428,7 @@ export async function PATCH(request: Request) {
     if (!stat || unquoteEtag(request.headers.get("if-match")) !== revisionForStat(stat)) return NextResponse.json({ error: "Project changed; refresh before moving or copying" }, { status: 409 });
     await fs.copyFile(sourcePath, destinationPath, 1);
     if (body.action === "move") {
-      await backupSharedProject(root, relative, sourcePath);
+      await backupSharedProject(root, relative);
       await fs.unlink(sourcePath);
     }
     return NextResponse.json({ fileName: destination });
