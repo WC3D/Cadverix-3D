@@ -30,7 +30,7 @@ test("exports a compatible editable Layerling project", async ({ page }) => {
   await page.getByRole("button", { name: "Add shape", exact: true }).click();
   await page.getByRole("button", { name: "Box", exact: true }).click();
   await page.getByRole("button", { name: "Add note", exact: true }).click();
-  await page.locator(".three-workplane-host").click({ position: { x: 80, y: 80 } });
+  await page.locator(".three-workplane-host").click({ position: { x: 250, y: 350 } });
   await page.getByPlaceholder("Write a note...").fill("Check this face");
   await page.getByRole("button", { name: "Export", exact: true }).click();
   await page.getByRole("radio", { name: "LYL: Layerling project", exact: true }).click();
@@ -63,7 +63,7 @@ test("imports nested cross-file 3MF components with local ID collisions", async 
     "3D/3dmodel.model": strToU8(`<model ${ns} unit="millimeter" requiredextensions="p"><resources><object id="1"><components><component objectid="1" p:path="/3D/Objects/part.model" transform="1 0 0 0 1 0 0 0 1 10 0 0"/></components></object></resources><build><item objectid="1"/></build></model>`),
     "3D/Objects/part.model": strToU8(`<model ${ns} unit="millimeter"><resources><object id="1"><mesh><vertices><vertex x="0" y="0" z="0"/><vertex x="20" y="0" z="0"/><vertex x="0" y="20" z="0"/><vertex x="0" y="0" z="20"/></vertices><triangles><triangle v1="0" v2="2" v3="1"/><triangle v1="0" v2="1" v3="3"/><triangle v1="0" v2="3" v3="2"/><triangle v1="1" v2="2" v3="3"/></triangles></mesh></object></resources></model>`),
   });
-  await page.locator('input[type="file"]').filter({ hasNot: page.locator("[accept*=image]") }).first().setInputFiles({ name: "assembly.3mf", mimeType: "model/3mf", buffer: Buffer.from(archive) });
+  await page.locator('input[type="file"][accept^=".3mf"]').setInputFiles({ name: "assembly.3mf", mimeType: "model/3mf", buffer: Buffer.from(archive) });
   await expect.poll(async () => (await scene(page)).shapeCount).toBe(1);
   expect((await scene(page)).shapes[0].width).toBeCloseTo(20);
 });
@@ -79,7 +79,7 @@ test("splits disconnected bodies from the Combine toolbar and undoes as one acti
     "_rels/.rels": strToU8('<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Target="/3D/3dmodel.model" Id="rel0" Type="http://schemas.microsoft.com/3dmanufacturing/2013/01/3dmodel"/></Relationships>'),
     "3D/3dmodel.model": strToU8(`<model ${ns} unit="millimeter"><resources><object id="1" type="model"><mesh><vertices>${vertices}</vertices><triangles>${triangles}</triangles></mesh></object></resources><build><item objectid="1"/></build></model>`),
   });
-  await page.locator('input[type="file"]').filter({ hasNot: page.locator("[accept*=image]") }).first().setInputFiles({ name: "disconnected.3mf", mimeType: "model/3mf", buffer: Buffer.from(archive) });
+  await page.locator('input[type="file"][accept^=".3mf"]').setInputFiles({ name: "disconnected.3mf", mimeType: "model/3mf", buffer: Buffer.from(archive) });
   await expect.poll(async () => (await scene(page)).shapeCount).toBe(1);
   await expect(page.locator('[data-tool-group="combine"]').getByRole("button", { name: "Split by plane", exact: true })).toBeVisible();
   const splitBodies = page.getByRole("button", { name: "Bodies split", exact: true });

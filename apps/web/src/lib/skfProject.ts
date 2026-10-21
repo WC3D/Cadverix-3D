@@ -1220,6 +1220,7 @@ function validateSketchProfile(value: unknown, label: string) {
 
 function validateShapeDefinition(definition: Record<string, unknown>, label: string) {
   const id = stringValue(definition.id, `${label}.id`);
+  if (definition.rotationPivot !== undefined) finiteTuple(definition.rotationPivot, 3, `${label}.rotationPivot`);
   stringValue(definition.name, `${label}.name`);
   const kind = stringValue(definition.kind, `${label}.kind`);
   if (!SHAPE_KINDS.has(kind)) throw new Error(`${label} has unknown shape type '${kind}'`);

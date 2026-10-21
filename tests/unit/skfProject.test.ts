@@ -82,6 +82,16 @@ function mutateProject(bytes: Uint8Array, mutate: (document: SkfProjectDocumentV
 }
 
 describe("SketchForge .skf project packages", () => {
+  it.each([exportSkfProject, exportLylProject])("round-trips saved pivots through native and compatible project packages", async (exportPackage) => {
+    const source = shape("box", "pivoted", { rotationPivot: [.1, .2, -.3] });
+    const bytes = await exportPackage(input([source]));
+    expect((await importSkfProject(bytes)).shapes[0].rotationPivot).toEqual(source.rotationPivot);
+  });
+  it("rejects malformed saved pivots", async () => {
+    const bytes = await exportSkfProject(input([shape("box")]));
+    const bad = mutateProject(bytes, (document) => { Object.values(document.states[0].nodes)[0].definition.rotationPivot = [0, "bad", 0]; });
+    await expect(importSkfProject(bad)).rejects.toThrow();
+  });
   afterEach(() => {
     vi.unstubAllGlobals();
     vi.restoreAllMocks();

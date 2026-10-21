@@ -321,6 +321,8 @@ export type CadPrimitiveFrame = {
 };
 
 export type WorkplaneShape = {
+  /** Pivot in the body's normalized local frame; follows transforms and resizes. */
+  rotationPivot?: [number, number, number];
   id: string;
   name: string;
   kind: ShapeKind;

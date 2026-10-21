@@ -49,7 +49,7 @@ No login. Private projects autosave locally in your browser, with optional share
 - **Faceted mesh rim treatments** - dedicated chamfer and rounded Fillet paths for supported complete, convex, horizontal outer rims on imported meshes, with CAD validation and retained B-Rep geometry.
 - **Rotated solid edge treatment** - chamfer and fillet preserve analytic box topology after one-, two-, or three-axis rotations.
 - **Mesh sculpting** - Add, Subtract, and Smooth brushes with adjustable radius and strength, local remeshing, and undoable strokes processed in a background worker.
-- **2D CAD drawings** - a Drawing tab beside Sculpt, with ISO A0–A4 and ANSI A–E sheets, movable orthographic/isometric model views, custom rotations and scales, dimensions, paper geometry, notes, SVG export, and Print/PDF.
+- **2D CAD drawings** - a Drawing workspace with ISO A0–A4 and ANSI A–E sheets, movable orthographic/isometric model views, custom rotations and scales, dimensions, paper geometry, notes, SVG export, and Print/PDF.
 - **Scene overview** - search shapes and features, inspect groups, control visibility, locking, and hole state, and toggle or remove supported features.
 - **Placement and navigation tools** - align, mirror, center selections on the workplane, focus the camera on a selection, and move objects using the snap grid.
 - **3MF, STL, STEP, and SVG import** - bring outside models and vector profiles into the same workspace as primitives.
@@ -72,11 +72,18 @@ geometry, retention limits, and deployment-specific capabilities.
 
 ### 2D CAD drawing sheets
 
-Open **Drawing** beside **Sculpt**, choose an ISO or ANSI paper template, and add views of individual objects, a selection, or the visible assembly. Use **3 views** for a first-/third-angle layout, or place and rotate views individually. Add horizontal, vertical, aligned, angular, radius, and diameter measurements, plus lines, rectangles, circles, and notes.
+Open **Drawing**, choose an ISO or ANSI paper template, and add views of individual objects, a selection, or the visible assembly. Use **3 views** for a first-/third-angle layout, or place and rotate views individually. Add horizontal, vertical, aligned, angular, radius, and diameter measurements, plus lines, rectangles, circles, and notes.
 
 Sheets autosave with the project and can be exported as SVG or printed to PDF at physical paper size. See the [Drawing workspace guide](docs/DRAWING_WORKSPACE.md) for measurement behavior, source-model updates, and file compatibility.
 
 ### Color-coded tools and the Shapes palette
+
+**Ctrl/Cmd+K** searches Geometry tools and shapes. Object dragging now has alignment
+snapping and guides (hold Alt to bypass). **Modeling tools** adds section viewing,
+overhang highlighting, saved pivots, face-based hole patterns, and a reusable-shape
+library. Storage gains safe list replacement, separate thumbnail storage, and
+missing-design recovery. See [Selected Layerling improvements](docs/LAYERLING_INTEGRATION.md)
+for controls, provenance, and limits.
 
 Toolbar groups use distinct colored outlines for Clipboard, History, Shapes, Generators, Visibility, Combine, Modify, Arrange, Manage, and Home. Labels and tooltips remain visible alongside the colors.
 

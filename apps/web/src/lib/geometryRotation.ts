@@ -35,7 +35,7 @@ export function geometryRotationDelta(workplane: PlacementWorkplane, degrees: nu
   return new THREE.Quaternion().setFromAxisAngle(axis, THREE.MathUtils.degToRad(Number.isFinite(degrees) ? degrees : 0));
 }
 
-function quaternionForShape(shape: WorkplaneShape) {
+export function quaternionForShape(shape: WorkplaneShape) {
   return new THREE.Quaternion().setFromEuler(
     new THREE.Euler(
       THREE.MathUtils.degToRad(shape.rotationX ?? 0),

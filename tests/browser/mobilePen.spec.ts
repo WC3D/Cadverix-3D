@@ -25,6 +25,7 @@ test("native pen edits, interruption cleanup, and palm rejection", async ({ page
   });
 
   await page.goto("/?editor=1");
+  await expect(page.getByRole("tab", { name: "Sculpt", exact: true })).toHaveCount(0);
   await expect(page.locator(".touch-controls")).toBeVisible();
   await tap(page.getByRole("button", { name: "Add shape", exact: true }));
   await tap(page.getByRole("button", { name: "Box", exact: true }));
@@ -46,15 +47,6 @@ test("native pen edits, interruption cleanup, and palm rejection", async ({ page
   await page.evaluate(() => window.dispatchEvent(new Event("blur")));
   await pen("mouseReleased", point.x + 30, point.y + 15);
   expect((await state()).shapes[0].x).toBe(0);
-
-  await tap(page.getByRole("tab", { name: "Sculpt", exact: true }));
-  const triangles = (await state()).shapes[0].importedTriangles;
-  await pen("mousePressed", point.x, point.y);
-  await pen("mouseReleased", point.x, point.y);
-  await expect.poll(async () => (await state()).shapes[0].importedTriangles).toBeGreaterThan(triangles);
-  await expect(page.getByRole("button", { name: "Undo", exact: true })).toBeEnabled();
-  await tap(page.getByRole("button", { name: "Undo", exact: true }));
-  expect((await state()).shapes[0].importedTriangles).toBe(triangles);
 
   await tap(page.getByRole("tab", { name: "Sketch", exact: true }));
   await tap(page.getByRole("button", { name: "Sketch to 3D options" }));

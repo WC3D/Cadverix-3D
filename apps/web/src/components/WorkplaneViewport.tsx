@@ -1,4 +1,7 @@
 "use client";
+import { objectSnapOffset, type SnapBox } from "@/lib/objectSnap";
+import { DEFAULT_SECTION, overhangPositions, sectionPlane, type SectionSettings } from "@/lib/viewportInspection";
+import { overlayMaterial } from "@/lib/overlayMaterials";
 
 import { ChevronLeft, ChevronRight, Crosshair, Home, Minus, MousePointer2, PanelsTopLeft, Plus, Ruler, X } from "lucide-react";
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type Dispatch, type DragEvent, type MutableRefObject, type PointerEvent as ReactPointerEvent, type SetStateAction } from "react";
@@ -226,6 +229,8 @@ function parseDroppedShapeAsset(raw: string): ShapeAsset | null {
 }
 
 type WorkplaneViewportProps = {
+  section?: SectionSettings;
+  overhangAngle?: number | null;
   shapes: WorkplaneShape[];
   selectedIds: string[];
   alignMode: boolean;
@@ -238,7 +243,7 @@ type WorkplaneViewportProps = {
   splitPlane: ModelSplitPlane | null;
   placementWorkplane: PlacementWorkplane;
   workplaneMode: boolean;
-  faceTool?: "flat" | "pivot" | null;
+  faceTool?: "flat" | "pivot" | "holes" | null;
   facePivot?: THREE.Vector3 | null;
   theme?: AppTheme;
   externalWorkspace?: WorkplaneWorkspaceSettings;
@@ -337,6 +342,8 @@ type ShapeRenderRecord = {
 };
 
 type ThreeState = {
+  overlayMaterials: Map<string, THREE.Material>;
+  inspection?: { section: SectionSettings; overhangAngle: number | null };
   measurementWorkspace?: WorkplaneWorkspaceSettings;
   renderer: THREE.WebGLRenderer;
   scene: THREE.Scene;
@@ -389,6 +396,8 @@ declare global {
 }
 
 type DragState = {
+  snapBox?: SnapBox;
+  snapTargets?: SnapBox[];
   primaryId: string;
   offsetX: number;
   offsetZ: number;
@@ -893,7 +902,7 @@ function syncMoveDimensionWorldLines(
     }
     const geometry = new LineSegmentsGeometry();
     geometry.setPositions(points);
-    const material = new LineMaterial({
+    const material = overlayMaterial(state.overlayMaterials, `move:${color}:${linewidth}:${opacity}`, () => new LineMaterial({
       color,
       linewidth,
       worldUnits: false,
@@ -902,7 +911,7 @@ function syncMoveDimensionWorldLines(
       depthTest: false,
       depthWrite: false,
       alphaToCoverage: false,
-    });
+    }));
     material.toneMapped = false;
     const rect = state.renderer.domElement.getBoundingClientRect();
     material.resolution.set(Math.max(1, rect.width), Math.max(1, rect.height));
@@ -927,14 +936,14 @@ function syncMoveDimensionWorldLines(
         base.x - perpendicular.x, base.y, base.z - perpendicular.z,
       ], 3),
     );
-    const arrowMaterial = new THREE.MeshBasicMaterial({
+    const arrowMaterial = overlayMaterial(state.overlayMaterials, `move-arrow:${solidColor}`, () => new THREE.MeshBasicMaterial({
       color: solidColor,
       side: THREE.DoubleSide,
       transparent: true,
       opacity: 1,
       depthTest: false,
       depthWrite: false,
-    });
+    }));
     arrowMaterial.toneMapped = false;
     const arrow = new THREE.Mesh(geometry, arrowMaterial);
     arrow.renderOrder = 1002;
@@ -2728,6 +2737,8 @@ export function WorkplaneViewport({
   workplaneMode,
   faceTool,
   facePivot,
+  section = DEFAULT_SECTION,
+  overhangAngle = null,
   theme = defaultThemes.light,
   externalWorkspace,
   initialSnap,
@@ -2775,6 +2786,8 @@ export function WorkplaneViewport({
   resolvedTheme = "light",
 }: WorkplaneViewportProps) {
   const [snapOpen, setSnapOpen] = useState(false);
+  const inspectionRef = useRef({ section, overhangAngle }); inspectionRef.current = { section, overhangAngle };
+  useEffect(() => { syncViewportInspection(threeRef.current, section, overhangAngle); }, [section, overhangAngle, shapes]);
   const [snap, setSnap] = useState<GridSize>(() => normalizeSnapGrid(initialSnap, DEFAULT_SNAP_GRID));
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [workspace, setWorkspace] = useState<WorkspaceSettings>(() => normalizeWorkspaceSettings(initialWorkspace ?? externalWorkspace));
@@ -2824,6 +2837,7 @@ export function WorkplaneViewport({
   const mirrorReferenceShapesRef = useRef(mirrorReferenceShapes);
   const selectedIdsRef = useRef(interactiveSelectedIds);
   const dragRef = useRef<DragState | null>(null);
+  const [objectGuides, setObjectGuides] = useState<Array<{ x1: number; y1: number; x2: number; y2: number }>>([]);
   const moveDimensionSessionRef = useRef<MoveDimensionSession | null>(null);
   const moveDimensionOverlayRef = useRef<MoveDimensionOverlayState | null>(null);
   const moveDimensionsEnabledRef = useRef(true);
@@ -2932,6 +2946,7 @@ export function WorkplaneViewport({
   resolvedThemeRef.current = resolvedTheme;
 
   const clearMoveDimensions = useCallback(() => {
+    setObjectGuides([]);
     moveDimensionSessionRef.current = null;
     moveDimensionOverlayRef.current = null;
     setMoveDimensionOverlay(null);
@@ -3462,6 +3477,7 @@ export function WorkplaneViewport({
     perfRef.current.lastSample = performance.now();
     resetCamera(state);
     rebuildShapes(state, shapesRef.current, renderSelectionIds(), true, false, placementWorkplaneRef.current);
+    syncViewportInspection(state, inspectionRef.current.section, inspectionRef.current.overhangAngle);
     syncSplitPlane(state, splitPlaneRef.current);
 
     const animate = () => {
@@ -3553,6 +3569,10 @@ export function WorkplaneViewport({
       disposeChildren(state.transformGuideLayer);
       disposeChildren(state.moveDimensionLayer);
       disposeChildren(state.modifierLayer);
+      const inspection = state.scene.getObjectByName("cadverix-overhangs");
+      if (inspection instanceof THREE.Group) disposeChildren(inspection);
+      for (const material of state.overlayMaterials.values()) material.dispose();
+      state.overlayMaterials.clear();
       state.renderer.dispose();
       host.replaceChildren();
       if (window.sketchforgeCaptureCanvas) {
@@ -5301,6 +5321,16 @@ export function WorkplaneViewport({
         primaryStartZ: shape.z,
         items,
       };
+      // shortcut: object snapping uses world-horizontal bounds; extend this for tilted workplanes when needed.
+      if (Math.abs(activeWorkplane.normal.y - 1) < 1e-6) {
+        const bounds = (ids: string[]) => {
+          const box = new THREE.Box3();
+          for (const itemId of ids) { const object = findShapeObject(state, itemId); if (object) box.union(new THREE.Box3().setFromObject(object)); }
+          return box.isEmpty() ? undefined : { minX: box.min.x, maxX: box.max.x, minZ: box.min.z, maxZ: box.max.z };
+        };
+        dragRef.current.snapBox = bounds(items.map((item) => item.id));
+        dragRef.current.snapTargets = shapesRef.current.filter((entry) => !entry.hidden && !entry.hole && entry.kind !== "constructionPlane" && !items.some((item) => item.id === entry.id)).flatMap((entry) => { const box = bounds([entry.id]); return box ? [box] : []; });
+      }
       const usesWorldHorizontalAxes = Math.abs(activeWorkplane.normal.y - 1) < 1e-6
         && Math.abs(activeWorkplane.xAxis.x - 1) < 1e-6
         && Math.abs(activeWorkplane.zAxis.z - 1) < 1e-6;
@@ -5443,9 +5473,27 @@ export function WorkplaneViewport({
         return;
       }
 
-      const deltaX = point.x - drag.startPoint.x;
+      let deltaX = point.x - drag.startPoint.x;
       const deltaY = point.y - drag.startPoint.y;
-      const deltaZ = point.z - drag.startPoint.z;
+      let deltaZ = point.z - drag.startPoint.z;
+      const constrained = event.shiftKey ? Math.abs(deltaX) >= Math.abs(deltaZ) ? "x" : "z" : null;
+      if (constrained === "x") deltaZ = 0;
+      if (constrained === "z") deltaX = 0;
+      const snapState = threeRef.current;
+      if (!event.altKey && drag.snapBox && snapState) {
+        const camera = snapState.camera;
+        const worldHeight = camera instanceof THREE.OrthographicCamera ? (camera.top - camera.bottom) / camera.zoom : 2 * camera.position.distanceTo(snapState.controls.target) * Math.tan(THREE.MathUtils.degToRad(camera.fov / 2));
+        const threshold = worldHeight / Math.max(1, snapState.renderer.domElement.clientHeight) * 8;
+        const box = drag.snapBox;
+        const snapped = objectSnapOffset({ minX: box.minX + deltaX, maxX: box.maxX + deltaX, minZ: box.minZ + deltaZ, maxZ: box.maxZ + deltaZ }, drag.snapTargets ?? [], threshold);
+        if (constrained !== "z") deltaX += snapped.x ?? 0;
+        if (constrained !== "x") deltaZ += snapped.z ?? 0;
+        setObjectGuides(snapped.guides.filter((guide) => !constrained || guide.axis === constrained).map((guide) => {
+          const from = projectToScreen(new THREE.Vector3(guide.axis === "x" ? guide.value : guide.from, drag.planeY + 0.1, guide.axis === "x" ? guide.from : guide.value), snapState);
+          const to = projectToScreen(new THREE.Vector3(guide.axis === "x" ? guide.value : guide.to, drag.planeY + 0.1, guide.axis === "x" ? guide.to : guide.value), snapState);
+          return { x1: from.x, y1: from.y, x2: to.x, y2: to.y };
+        }));
+      } else setObjectGuides([]);
       const moveDimensionSession = moveDimensionSessionRef.current;
       if (moveDimensionSession) {
         moveDimensionSession.deltaX = deltaX;
@@ -5500,6 +5548,7 @@ export function WorkplaneViewport({
 
   const finishDrag = useCallback(
     (event: ReactPointerEvent<HTMLDivElement>) => {
+      setObjectGuides([]);
       const state = threeRef.current;
       const sculptDrag = sculptDragRef.current;
       if (sculptDrag) {
@@ -6135,6 +6184,7 @@ export function WorkplaneViewport({
             onPointerCancel={cancelTouchInteraction}
             onPointerLeave={handlePointerLeave}
           />
+          {objectGuides.length ? <svg className="object-snap-guides" aria-hidden="true">{objectGuides.map((guide, index) => <line key={index} {...guide} />)}</svg> : null}
           {rendererError ? (
             <div className="workplane-renderer-error" role="alert">
               <strong>3D viewport unavailable</strong>
@@ -6399,6 +6449,7 @@ function createThreeScene(host: HTMLDivElement): ThreeState {
   };
 
   const state: ThreeState = {
+    overlayMaterials: new Map(),
     renderer,
     scene,
     camera,
@@ -6528,6 +6579,46 @@ function syncSplitPlane(state: ThreeState | null, plane: ModelSplitPlane | null)
   root.traverse((child) => child.layers.set(RENDER_LAYER_PREVIEWS));
   state.splitLayer.add(root);
   state.splitLayer.visible = true;
+  state.needsRender = true;
+}
+
+function syncViewportInspection(state: ThreeState | null, section: SectionSettings, angle: number | null) {
+  if (!state) return;
+  state.inspection = { section, overhangAngle: angle };
+  let overlay = state.scene.getObjectByName("cadverix-overhangs") as THREE.Group | undefined;
+  const plane = sectionPlane(section), planes = plane ? [plane] : null;
+  state.renderer.localClippingEnabled = true;
+  state.shapeLayer.traverse((object) => {
+    if (!(object instanceof THREE.Mesh || object instanceof THREE.Line)) return;
+    for (const material of Array.isArray(object.material) ? object.material : [object.material]) {
+      const changed = Boolean(material.clippingPlanes?.length) !== Boolean(planes);
+      material.clippingPlanes = planes;
+      if (changed) material.needsUpdate = true;
+    }
+  });
+  if (angle === null) {
+    if (overlay) { disposeChildren(overlay); state.scene.remove(overlay); }
+    state.needsRender = true; return;
+  }
+  if (!overlay) { overlay = new THREE.Group(); overlay.name = "cadverix-overhangs"; state.scene.add(overlay); }
+  const sources = [...state.shapeRecords.values()].filter((record) => !record.shape.hidden && !record.shape.hole && record.shape.kind !== "constructionPlane");
+  const previous = overlay.userData.sources as WorkplaneShape[] | undefined;
+  if (overlay.userData.angle === angle && previous?.length === sources.length && sources.every((record, index) => record.shape === previous[index])) {
+    overlay.traverse((object) => { if (object instanceof THREE.Mesh) (object.material as THREE.Material).clippingPlanes = planes; });
+    state.needsRender = true; return;
+  }
+  disposeChildren(overlay);
+  overlay.userData.angle = angle; overlay.userData.sources = sources.map((record) => record.shape);
+  const positions: number[] = [];
+  state.shapeLayer.updateMatrixWorld(true);
+  for (const record of sources) record.object.traverse((object) => {
+    if (!(object instanceof THREE.Mesh) || !object.visible) return;
+    const triangles = overhangPositions(object.geometry, object.matrixWorld, angle);
+    for (const value of triangles) positions.push(value);
+  });
+  const geometry = new THREE.BufferGeometry(); geometry.setAttribute("position", new THREE.Float32BufferAttribute(positions, 3));
+  const material = new THREE.MeshBasicMaterial({ color: "#f97316", transparent: true, opacity: .8, side: THREE.DoubleSide, depthWrite: false, polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -2, clippingPlanes: planes });
+  overlay.add(new THREE.Mesh(geometry, material));
   state.needsRender = true;
 }
 
@@ -7404,6 +7495,7 @@ function rebuildShapes(
   }
 
   rebuildSelectionHelpers(state, shapes, selectedIds, workplane);
+  if (state.inspection) syncViewportInspection(state, state.inspection.section, state.inspection.overhangAngle);
   state.needsRender = true;
 }
 
@@ -7427,14 +7519,14 @@ function rebuildModifierEdges(state: ThreeState | null, edges: CadModifierEdge[]
     const active = selected.has(edge.id);
     const hovered = hoverId === edge.id;
     const style = modifierEdgeMaterialStyle(active, hovered, previewActive);
-    const material = new THREE.LineBasicMaterial({
+    const material = overlayMaterial(state.overlayMaterials, `modifier:${style.color}:${style.opacity}:${style.linewidth}`, () => new THREE.LineBasicMaterial({
       color: style.color,
       depthTest: false,
       depthWrite: false,
       transparent: true,
       opacity: style.opacity,
       linewidth: style.linewidth,
-    });
+    }));
     const line = new THREE.Line(geometry, material);
     line.userData.modifierEdgeId = edge.id;
     line.renderOrder = hovered ? 1003 : active ? 1002 : 1001;

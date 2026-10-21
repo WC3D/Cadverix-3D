@@ -9,9 +9,10 @@ function download(name: string, bytes: Uint8Array) {
   const anchor = document.createElement("a"); anchor.href = url; anchor.download = name; anchor.hidden = true; document.body.appendChild(anchor); anchor.click(); anchor.remove();
   window.setTimeout(() => URL.revokeObjectURL(url), 30000);
 }
-export function ProjectStorageManager({ projects, onClose, onRestore, onOpenShared }: {
+export function ProjectStorageManager({ projects, onClose, onRestore, onOpenShared, onRecover }: {
   projects: Array<{ id: string; name: string }>; onClose: () => void;
   onRestore: (file: File) => Promise<unknown>; onOpenShared: (project: SharedFile) => Promise<unknown>;
+  onRecover: () => Promise<string>;
 }) {
   const [capabilities, setCapabilities] = useState(BROWSER_STORAGE_CAPABILITIES);
   const [backups, setBackups] = useState<ProjectBackup[]>([]);
@@ -54,6 +55,7 @@ export function ProjectStorageManager({ projects, onClose, onRestore, onOpenShar
     <header><h2>Project storage & backups</h2><button type="button" onClick={onClose}>Close</button></header>
     <p>Modeling runs in your browser. Storage options below reflect this installation's capabilities.</p>
     <fieldset disabled={busy}><legend>Browser projects</legend>
+      <button type="button" onClick={() => void run(async () => { const message = await onRecover(); setNotice(message); })}>Recover missing designs</button>
       <p>Recovery snapshots: at most five per project, twenty total, 64 MB total. Automatic snapshots are spaced two minutes apart while editing. Download an SKF for an independent backup.</p>
       {projects.map((project) => <div className="storage-row" key={project.id}><span>{project.name}</span>
         <button type="button" onClick={() => void run(async () => download(`${project.name}.skf`, await currentProjectPackage(project.id)))}>Download backup</button>

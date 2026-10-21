@@ -1,5 +1,6 @@
 "use client";
 import { saveProjectBackup } from "@/lib/projectBackups";
+import { deleteProjectPicture, loadProjectPictures, projectListWithoutPictures, storeProjectPictures, writeProjectList } from "@/lib/projectListStorage";
 import { ProjectStorageManager } from "@/components/ProjectStorageManager";
 import { OfflineAppBanner, useOfflineApp } from "@/components/OfflineApp";
 
@@ -390,6 +391,7 @@ async function deleteProjectShapes(projectId: string) {
     transaction.objectStore(PROJECT_SHAPES_STORE_NAME).delete(projectId);
     transaction.oncomplete = () => {
       database.close();
+      void deleteProjectPicture(projectId).catch((error) => console.warn("Project picture cleanup failed", error));
       resolve();
     };
     transaction.onerror = () => {
@@ -442,6 +444,35 @@ function readStoredProjects() {
 
 function readProjects() {
   return readStoredProjects().projects;
+}
+
+async function recoverProjectCards(listedIds: Set<string>) {
+  const database = await openProjectShapesDb();
+  const recovered: DashboardProject[] = [];
+  let failed = 0;
+  try {
+    const keys = await new Promise<IDBValidKey[]>((resolve, reject) => {
+      const request = database.transaction(PROJECT_SHAPES_STORE_NAME, "readonly").objectStore(PROJECT_SHAPES_STORE_NAME).getAllKeys();
+      request.onsuccess = () => resolve(request.result);
+      request.onerror = () => reject(request.error);
+    });
+    for (const key of keys) {
+      if (typeof key !== "string" || listedIds.has(key)) continue;
+      try {
+        const record = await new Promise<ProjectShapeRecord>((resolve, reject) => {
+          const request = database.transaction(PROJECT_SHAPES_STORE_NAME, "readonly").objectStore(PROJECT_SHAPES_STORE_NAME).get(key);
+          request.onsuccess = () => resolve(request.result);
+          request.onerror = () => reject(request.error);
+        });
+        const restored = record.skfPackage ? await importSkfProject(record.skfPackage) : null;
+        const entry = restored ?? await loadProjectShapes(key);
+        if (!entry) continue;
+        recovered.push({ id: key, name: restored?.projectName ?? "Recovered project", createdAt: restored?.createdAt ?? record.updatedAt, updatedAt: record.updatedAt, revision: record.revision, shapes: entry.shapes.length, accent: "cyan", ...(restored ? { workspace: restored.workspace, snapGrid: restored.snapGrid, placementElevation: restored.placementElevation, placementWorkplane: restored.placementWorkplane, sketchPlacementWorkplane: restored.sketchPlacementWorkplane } : {}) });
+      } catch { failed++; }
+    }
+    const pictures = await loadProjectPictures(recovered.map((project) => project.id)).catch(() => new Map<string, string>());
+    return { recovered: recovered.map((project) => ({ ...project, thumbnailUrl: pictures.get(project.id) ?? null })), failed };
+  } finally { database.close(); }
 }
 
 function mergeProjectForStorage(project: DashboardProject, storedProject?: DashboardProject) {
@@ -583,6 +614,9 @@ export default function Home() {
     applyAppTheme(storedTheme, systemPrefersDark);
     const { projects: storedProjects, legacyShapes } = readStoredProjects();
     setProjects(storedProjects);
+    void loadProjectPictures(storedProjects.map((project) => project.id)).then((pictures) => {
+      setProjects((current) => current.map((project) => project.thumbnailUrl ? project : { ...project, thumbnailUrl: pictures.get(project.id) ?? null }));
+    }).catch((error) => console.warn("Stored project pictures unavailable", error));
     if (Object.keys(legacyShapes).length > 0) {
       setProjectShapesById(legacyShapes);
       Object.entries(legacyShapes).forEach(([projectId, entry]) => {
@@ -639,25 +673,26 @@ export default function Home() {
 
   useEffect(() => {
     if (!mounted) return;
-    const localSerialized = JSON.stringify(projects);
     const storageProjects = mergeProjectsForStorage(projects);
-    const serialized = JSON.stringify(storageProjects);
+    const serialized = JSON.stringify(projectListWithoutPictures(storageProjects));
     if (projectsJsonRef.current === serialized) return;
-    try {
-      window.localStorage.setItem(PROJECTS_STORAGE_KEY, serialized);
-    } catch (error) {
-      try {
-        window.localStorage.removeItem(PROJECTS_STORAGE_KEY);
-        window.localStorage.setItem(PROJECTS_STORAGE_KEY, serialized);
-      } catch {
-        setDashboardNotice(error instanceof Error ? error.message : "Could not save project list");
+    let previousList: string | null;
+    try { previousList = window.localStorage.getItem(PROJECTS_STORAGE_KEY); }
+    catch { setDashboardNotice("Project list storage is unavailable; previous list retained"); return; }
+    let active = true;
+    void storeProjectPictures(storageProjects).then(() => {
+      if (!active) return;
+      if (window.localStorage.getItem(PROJECTS_STORAGE_KEY) !== previousList) {
+        setDashboardNotice("The project list changed in another tab while saving; previous list retained. Reload to synchronize.");
         return;
       }
-    }
-    projectsJsonRef.current = serialized;
-    if (serialized !== localSerialized) {
-      setProjects(storageProjects);
-    }
+      writeProjectList(window.localStorage, PROJECTS_STORAGE_KEY, serialized);
+      projectsJsonRef.current = serialized;
+      if (JSON.stringify(storageProjects) !== JSON.stringify(projects)) setProjects(storageProjects);
+    }).catch((error) => {
+      if (active) setDashboardNotice(error instanceof Error ? error.message : "Could not save project list; previous list retained");
+    });
+    return () => { active = false; };
   }, [mounted, projects]);
 
   useEffect(() => {
@@ -968,15 +1003,7 @@ export default function Home() {
         };
       });
       if (!changed) return current;
-      try {
-        const storageProjects = mergeProjectsForStorage(next);
-        const serialized = JSON.stringify(storageProjects);
-        window.localStorage.setItem(PROJECTS_STORAGE_KEY, serialized);
-        projectsJsonRef.current = serialized;
-        return next;
-      } catch {
-        return next;
-      }
+      return next;
     });
   }, []);
 
@@ -1274,7 +1301,11 @@ export default function Home() {
         }}
       />
       {view === "dashboard" ? <button className="storage-launch" type="button" onClick={() => setStorageManagerOpen(true)}>Storage & backups</button> : null}
-      {storageManagerOpen ? <ProjectStorageManager projects={projects} onClose={() => setStorageManagerOpen(false)} onRestore={openSkfProjectFromFile} onOpenShared={openSharedProject} /> : null}
+      {storageManagerOpen ? <ProjectStorageManager projects={projects} onClose={() => setStorageManagerOpen(false)} onRestore={openSkfProjectFromFile} onOpenShared={openSharedProject} onRecover={async () => {
+        const result = await recoverProjectCards(new Set(projects.map((project) => project.id)));
+        setProjects((current) => [...current, ...result.recovered.filter((project) => !current.some((existing) => existing.id === project.id))]);
+        return `Recovered ${result.recovered.length} missing designs.${result.failed ? ` ${result.failed} unreadable records were left untouched.` : ""}`;
+      }} /> : null}
       {view === "dashboard" ? (
         <Dashboard
           offlineBanner={<OfflineAppBanner app={offlineApp} />}

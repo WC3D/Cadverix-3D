@@ -257,6 +257,7 @@ export function workplaneShapesEqual(a: WorkplaneShape, b: WorkplaneShape) {
     a.rotation === b.rotation &&
     a.rotationX === b.rotationX &&
     a.rotationZ === b.rotationZ &&
+    (a.rotationPivot === b.rotationPivot || Boolean(a.rotationPivot && b.rotationPivot && a.rotationPivot.every((value, index) => value === b.rotationPivot![index]))) &&
     a.mirrorX === b.mirrorX &&
     a.mirrorY === b.mirrorY &&
     a.mirrorZ === b.mirrorZ &&

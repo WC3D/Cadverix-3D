@@ -34,3 +34,18 @@
   .workspace-workplane-settings input,.workspace-workplane-settings select { min-width:0; max-width:100%; }
   .workspace-workplane-settings .workspace-dimensions input { width:100%; }
 }
+.command-search-trigger { display:grid; place-items:center; flex:none; width:34px; height:32px; color:var(--foreground); background:transparent; cursor:pointer; }
+.command-palette { position:fixed; inset:10vh 0 auto; margin:0 auto; width:min(560px, calc(100vw - 24px)); max-height:75dvh; padding:16px; border:1px solid var(--border); border-radius:12px; color:var(--foreground); background:var(--panel); box-shadow:var(--shadow); }
+.command-palette::backdrop { background:#0006; }
+.command-palette header { display:flex; align-items:center; justify-content:space-between; gap:12px; margin-bottom:12px; }
+.command-palette input { width:100%; padding:10px; border:1px solid var(--border); border-radius:6px; color:var(--foreground); background:var(--tile); }
+.command-palette button { padding:8px; color:var(--foreground); background:var(--tile); border-radius:6px; cursor:pointer; }
+.command-results { display:grid; gap:4px; overflow:auto; max-height:50dvh; margin-top:12px; }
+.command-results button { display:flex; justify-content:space-between; gap:12px; text-align:left; }
+.command-results button:disabled { opacity:.45; cursor:default; }
+.command-results small { opacity:.7; }
+.command-palette :focus-visible { outline:2px solid var(--primary); outline-offset:-2px; }
+.object-snap-guides { position:absolute; inset:0; width:100%; height:100%; pointer-events:none; z-index:4; overflow:visible; }
+.object-snap-guides line { stroke:var(--primary); stroke-width:1.5; stroke-dasharray:6 3; }
+.custom-shape-row { display:flex; flex-wrap:wrap; align-items:center; gap:4px; }
+.custom-shape-row span { flex:1; min-width:100px; overflow-wrap:anywhere; }

@@ -67,6 +67,12 @@ import {
 import { WorkplaneViewport } from "./WorkplaneViewport";
 import { DrawingWorkspace } from "./DrawingWorkspace";
 import { ModelingTools } from "./ModelingTools";
+import { CommandPalette } from "./CommandPalette";
+import { requireUnlockedObjects } from "@/lib/mcpEditSafety";
+import { carryShapePivot, shapePivotFromWorld, shapePivotWorld } from "@/lib/shapePivot";
+import { DEFAULT_SECTION } from "@/lib/viewportInspection";
+import { DEFAULT_HOLE_PATTERN, faceHolePattern } from "@/lib/holePattern";
+import { independentLibraryShape } from "@/lib/customShapeCopies";
 import { modelingPatternSteps, type PatternOptions } from "@/lib/modelingPatterns";
 import { PRINTER_PRESETS } from "@/lib/printerPresets";
 import { copySketchSelection, pasteSketchSelection } from "@/lib/sketchClipboard";
@@ -158,7 +164,7 @@ import { cadSketchProfileForRegions, cadSketchRegions, cadSketchSelectableRegion
 import { sketchDimensionAnchorKey, sketchDistanceDimensionValue } from "@/lib/sketchDimensions";
 import { addLineIntersectionPoints, splitSketchSegment } from "@/lib/sketchPointRefinement";
 import { buildSketchRevolveMesh, DEFAULT_SKETCH_REVOLVE_SETTINGS, normalizeSketchRevolveSettings, type SketchRevolveMesh } from "@/lib/sketchRevolve";
-import { exportLylProject, exportSkfProject, LYL_MEDIA_TYPE, SKF_MEDIA_TYPE } from "@/lib/skfProject";
+import { exportLylProject, exportSkfProject, importSkfProject, LYL_MEDIA_TYPE, SKF_MEDIA_TYPE } from "@/lib/skfProject";
 import { makeShapeFromAsset, sceneShape, toolbarBasicShapeAssets, toolbarGeneratorAssets, type ToolbarShapeAsset } from "@/lib/shapeCatalog";
 import { importExtensionSupported } from "@/lib/importExtensions";
 import { editableProjectFileName } from "@/lib/projectFileTypes";
@@ -1806,7 +1812,7 @@ function shapeFromCadMesh(
   const width = cleanModelDimension(rawWidth);
   const height = cleanModelDimension(rawHeight);
   const depth = cleanModelDimension(rawDepth);
-  return canonicalizeShape({
+  return carryShapePivot(source, canonicalizeShape({
     ...source,
     kind: "mesh",
     x: cleanNearZero(centerX, 0.0005),
@@ -1852,7 +1858,7 @@ function shapeFromCadMesh(
       height,
     } : undefined,
     cadPrimitiveFrame: undefined,
-  });
+  }));
 }
 
 function cadEdgeEndpoint(edge: CadModifierEdge, end: "start" | "end") {
@@ -2996,7 +3002,7 @@ function bakeShapeTransformIntoMesh(shape: WorkplaneShape, force = false): Workp
     });
   });
 
-  return {
+  const baked: WorkplaneShape = {
     ...shape,
     kind: "mesh",
     x: cleanNearZero(centerX, 0.0005),
@@ -3033,6 +3039,7 @@ function bakeShapeTransformIntoMesh(shape: WorkplaneShape, force = false): Workp
     groupedBaseDepth: undefined,
     groupedBaseHeight: undefined,
   };
+  return carryShapePivot(shape, baked);
 }
 
 function readFileAsDataUrl(file: File) {
@@ -3804,11 +3811,16 @@ function cadModifierSourceParts(shape: WorkplaneShape) {
   return glyphParts.length > 1 ? glyphParts : [shape];
 }
 
-function separablePartCount(shape: WorkplaneShape) {
+const importedPartCounts = new WeakMap<number[], number>();
+export function separablePartCount(shape: WorkplaneShape) {
   if (shape.locked || shape.hole) return 0;
   if (shape.groupedShapes?.length && !shape.importedMesh) return shape.groupedShapes.length;
+  const positions = shape.importedMesh?.positions;
+  if (positions && importedPartCounts.has(positions)) return importedPartCounts.get(positions)!;
   const mesh = meshForShape(shape);
-  return meshFaceComponents(mesh).length;
+  const count = meshFaceComponents(mesh).length;
+  if (positions) importedPartCounts.set(positions, count);
+  return count;
 }
 
 function separateShapeParts(shape: WorkplaneShape) {
@@ -5975,6 +5987,7 @@ function debugShapeSummary(shape: WorkplaneShape): Record<string, unknown> {
     rotation: Number(shape.rotation.toFixed(3)),
     rotationX: Number((shape.rotationX ?? 0).toFixed(3)),
     rotationZ: Number((shape.rotationZ ?? 0).toFixed(3)),
+    rotationPivot: shape.rotationPivot ?? null,
     mirrorX: Boolean(shape.mirrorX),
     mirrorY: Boolean(shape.mirrorY),
     mirrorZ: Boolean(shape.mirrorZ),
@@ -6235,16 +6248,22 @@ export function CadverixEditor({
     if (workplaneMode) setNoteMode(false);
   }, [workplaneMode]);
   const [modelingToolsOpen, setModelingToolsOpen] = useState(false);
+  const [holeSettings, setHoleSettings] = useState(DEFAULT_HOLE_PATTERN);
+  const [holeDraft, setHoleDraft] = useState<{ sourceId: string; fingerprint: string; projectId: string | null | undefined; cutters: WorkplaneShape[] } | null>(null);
+  const [holeBusy, setHoleBusy] = useState(false);
+  const holeRunRef = useRef(0);
+  const [section, setSection] = useState(DEFAULT_SECTION);
+  const [overhangAngle, setOverhangAngle] = useState<number | null>(null);
   const [patternPreview, setPatternPreview] = useState<WorkplaneShape[]>([]);
-  const [faceAction, setFaceAction] = useState<"flat" | "pivot" | null>(null);
-  const [facePivot, setFacePivot] = useState<THREE.Vector3 | null>(null);
+  const [faceAction, setFaceAction] = useState<"flat" | "pivot" | "holes" | null>(null);
+  const [sessionFacePivot, setFacePivot] = useState<THREE.Vector3 | null>(null);
   const [patternCenter, setPatternCenter] = useState<THREE.Vector3 | null>(null);
   const [pickingPatternCenter, setPickingPatternCenter] = useState(false);
   useEffect(() => { setPatternCenter(null); setPickingPatternCenter(false); setWorkplaneMode(false); }, [projectId]);
   const [shellBusy, setShellBusy] = useState(false);
   const shellWorkerRef = useRef<Worker | null>(null);
   const cancelShellRef = useRef<(() => void) | null>(null);
-  useEffect(() => { setFacePivot(null); setPatternPreview([]); }, [selectedIds.join("|")]);
+  useEffect(() => { setFacePivot(null); setPatternPreview([]); setHoleDraft(null); holeRunRef.current++; }, [selectedIds.join("|")]);
   useEffect(() => () => { cancelShellRef.current?.(); shellWorkerRef.current?.terminate(); }, []);
   const [menuOpen, setMenuOpen] = useState(false);
   const [topPanel, setTopPanel] = useState<TopPanel>(null);
@@ -6774,6 +6793,7 @@ export function CadverixEditor({
 
   const selectedShapes = useMemo(() => shapes.filter((shape) => selectedIds.includes(shape.id)), [selectedIds, shapes]);
   const selectedShape = selectedShapes.at(-1) ?? null;
+  const facePivot = selectedShapes.length === 1 ? shapePivotWorld(selectedShapes[0]) ?? sessionFacePivot : sessionFacePivot;
   const hasSelection = selectedShapes.length > 0;
   const canSplitSelection = useMemo(
     () => selectedShapes.length > 0 && selectedShapes.every((shape) => !shape.locked && !shape.hole && !shape.hidden && shape.kind !== "constructionPlane"),
@@ -6803,6 +6823,8 @@ export function CadverixEditor({
     () => edgeModifier ? edgeModifier.edges.filter((edge) => selectableCadModifierEdge(edge, edgeModifier.sharpAngle)).map((edge) => edge.id) : [],
     [edgeModifier?.edges, edgeModifier?.sharpAngle],
   );
+  const viewportModifierEdges = useMemo(() => edgeModifier?.edges.filter((edge) => modifierAvailableEdgeIds.includes(edge.id)) ?? [], [edgeModifier?.edges, modifierAvailableEdgeIds]);
+  const viewportSelectedEdgeIds = useMemo(() => edgeModifier?.selectedEdgeIds ?? [], [edgeModifier?.selectedEdgeIds]);
   const edgeModifierMaxAmount = useMemo(() => {
     const source = cadModifierBaseShapeRef.current ?? selectedShape;
     if (!source) return 10;
@@ -10113,6 +10135,7 @@ export function CadverixEditor({
         const ids = requestedIds.length ? new Set(requestedIds) : new Set(selectedIdsRef.current);
         const deleted = currentShapes().filter((shape) => ids.has(shape.id));
         if (deleted.length === 0) throw new Error("No matching objects to delete");
+        requireUnlockedObjects(deleted);
         commitShapes(currentShapes().filter((shape) => !ids.has(shape.id)), [], `MCP deleted ${deleted.length} object${deleted.length === 1 ? "" : "s"}`);
         selectedIdsRef.current = [];
         return { deletedIds: deleted.map((shape) => shape.id), deletedCount: deleted.length };
@@ -10322,6 +10345,7 @@ export function CadverixEditor({
         const ids = requestedIds.length ? new Set(requestedIds) : new Set(selectedIdsRef.current);
         const groups = currentShapes().filter((shape) => ids.has(shape.id) && shape.groupedShapes?.length);
         if (groups.length === 0) throw new Error("Select at least one group to ungroup");
+        requireUnlockedObjects(groups);
         const groupIds = new Set(groups.map((shape) => shape.id));
         const restored = groups.flatMap(restoreGroupedChildren);
         commitShapes([...currentShapes().filter((shape) => !groupIds.has(shape.id)), ...restored], restored.map((shape) => shape.id), `MCP ungrouped ${groups.length} group${groups.length === 1 ? "" : "s"}`);
@@ -10383,6 +10407,7 @@ export function CadverixEditor({
       if (command.action === "apply_edge_treatment") {
         const target = findShape(params.id);
         if (!target) throw new Error("Object not found");
+        requireUnlockedObjects([target]);
         return applyCadModifierForMcp(target, params, command.expiresAt);
       }
 
@@ -11049,6 +11074,7 @@ export function CadverixEditor({
   }, [commitShapes, hasSelection, placementWorkplane, selectedIds, selectedShapes, shapes, facePivot]);
 
   const createModelingPattern = (options: PatternOptions, preview: boolean) => {
+    setHoleDraft(null);
     try {
       if (selectedShapes.some((shape) => shape.locked || shape.kind === "constructionPlane")) throw new Error("Select unlocked model objects");
       const steps = modelingPatternSteps(options, selectedShapes.length);
@@ -11075,7 +11101,23 @@ export function CadverixEditor({
     if (!faceAction) { setViewportPlacementWorkplane(plane, source); return; }
     if (source !== "shape") { setNotice("No face selected"); setFaceAction(null); return; }
     const pivot = new THREE.Vector3(plane.origin.x, plane.origin.y, plane.origin.z);
-    if (faceAction === "pivot") { setFacePivot(pivot); setNotice("Face pivot set. Use Rotate selection or R / Shift+R."); }
+    if (faceAction === "holes") {
+      try {
+        const target = selectedShapes.length === 1 ? selectedShapes[0] : null;
+        if (!target || target.locked || target.hole || target.kind === "constructionPlane") throw new Error("Select one unlocked solid first");
+        const result = faceHolePattern(meshForShape(target), plane, holeSettings);
+        const cutters = result.cutters.map((mesh, index) => meshComponentShape({ ...target, hole: true, name: `Pattern hole ${index + 1}` }, { ...mesh, name: "Pattern hole" }, mesh.faces.map((_, index) => index), 0, 1)).filter((shape): shape is WorkplaneShape => Boolean(shape));
+        setHoleDraft({ sourceId: target.id, fingerprint: projectShapesFingerprint([target]), projectId, cutters });
+        setPatternPreview(cutters.map((shape) => ({ ...shape, locked: true })));
+        setModelingToolsOpen(true); setNotice(`Previewing ${cutters.length} holes. Create hole pattern to cut the selected body.`);
+      } catch (error) { setHoleDraft(null); setPatternPreview([]); setNotice(error instanceof Error ? error.message : "Could not preview hole pattern"); }
+    } else if (faceAction === "pivot") {
+      if (selectedShapes.length === 1) {
+        const target = selectedShapes[0];
+        commitShapes(shapes.map((shape) => shape.id === target.id ? { ...shape, rotationPivot: shapePivotFromWorld(shape, pivot) } : shape), selectedIds, "Saved object pivot");
+      } else setFacePivot(pivot);
+      setNotice("Face pivot set. A single object's pivot saves with the design.");
+    }
     else {
       const normal = new THREE.Vector3(plane.normal.x, plane.normal.y, plane.normal.z).normalize();
       const targetNormal = new THREE.Vector3(placementWorkplane.normal.x, placementWorkplane.normal.y, placementWorkplane.normal.z).normalize();
@@ -11090,6 +11132,26 @@ export function CadverixEditor({
       }
     }
     setFaceAction(null);
+  };
+
+  const applyHolePattern = async () => {
+    if (!holeDraft || holeBusy) return;
+    const draft = holeDraft;
+    const run = ++holeRunRef.current;
+    setHoleBusy(true);
+    try {
+      const current = () => shapesRef.current.find((shape) => shape.id === draft.sourceId);
+      const source = current();
+      const unchanged = () => holeRunRef.current === run && !projectInteractionActiveRef.current && !edgeModifierRef.current && projectInfoRef.current.projectId === draft.projectId && Boolean(current() && !current()!.locked && projectShapesFingerprint([current()!]) === draft.fingerprint);
+      if (!source || !unchanged()) throw new Error("The source changed. Pick the face again before cutting.");
+      const result = await buildGroupedShapeFromSelection([source, ...draft.cutters]);
+      if (!unchanged()) throw new Error("Hole pattern cancelled or source changed during cutting; original retained");
+      if (!result.group) throw new Error(result.failureNotice ?? "The pattern produced no usable solid; original retained");
+      const group = carryShapePivot(source, result.group);
+      commitShapes(shapesRef.current.map((shape) => shape.id === source.id ? group : shape), [group.id], `Cut ${draft.cutters.length} holes in ${source.name}`);
+      setHoleDraft(null); setPatternPreview([]);
+    } catch (error) { setNotice(error instanceof Error ? error.message : "Hole pattern failed; original retained"); }
+    finally { setHoleBusy(false); }
   };
 
   const applyShell = async (thickness: number, opening: "top" | "bottom" | "both" | "closed") => {
@@ -11659,6 +11721,8 @@ export function CadverixEditor({
           workplaneMode={workplaneMode}
           faceTool={faceAction}
           facePivot={facePivot}
+          section={section}
+          overhangAngle={overhangAngle}
           initialSnap={snapGrid}
           initialWorkspace={workspaceSettings}
           workspaceSettingsKey={projectId ?? "local-workplane"}
@@ -11699,8 +11763,8 @@ export function CadverixEditor({
           onWorkplaneModeChange={(active) => { closeViewportWorkplaneMode(active); if (!active) { setFaceAction(null); setPickingPatternCenter(false); } }}
           modifierActive={Boolean(edgeModifier)}
           modifierPreviewActive={Boolean(edgeModifier?.preview)}
-          modifierEdges={edgeModifier?.edges.filter((edge) => modifierAvailableEdgeIds.includes(edge.id)) ?? []}
-          selectedModifierEdgeIds={edgeModifier?.selectedEdgeIds ?? []}
+           modifierEdges={viewportModifierEdges}
+           selectedModifierEdgeIds={viewportSelectedEdgeIds}
           onModifierEdgeToggle={toggleModifierEdge}
           challengeTutorial={challengeTutorial}
           onChallengeTutorialFinish={onChallengeTutorialFinish}
@@ -11708,9 +11772,33 @@ export function CadverixEditor({
           />
         )}
         {toolbarMode === "geometry" && modelingToolsOpen ? <ModelingTools
-          disabled={!selectedShapes.length || selectedShapes.some((shape) => shape.locked) || Boolean(edgeModifier || splitSession) || shellBusy || projectInteractionActive}
-          onClose={() => { cancelShellRef.current?.(); setModelingToolsOpen(false); setPatternPreview([]); }}
-          onPattern={createModelingPattern} hasPivot={Boolean(facePivot)} onClearPivot={() => setFacePivot(null)}
+          holeSettings={holeSettings} onHoleSettings={(settings) => { setHoleSettings(settings); setHoleDraft(null); setPatternPreview([]); }}
+          holeCount={holeDraft?.cutters.length ?? 0} holeBusy={holeBusy} onApplyHoles={applyHolePattern}
+          onClearHoles={() => { setHoleDraft(null); setPatternPreview([]); }}
+          onPickHoles={() => { setPatternPreview([]); setHoleDraft(null); setFaceAction("holes"); setWorkplaneMode(true); setModelingToolsOpen(false); setNotice("Click a flat face of the selected body for a hole pattern"); }}
+          onSaveCustomShape={async (name) => {
+            const selection = shapesRef.current.filter((shape) => selectedIdsRef.current.includes(shape.id));
+            if (!selection.length || selection.some((shape) => shape.locked || shape.kind === "constructionPlane")) throw new Error("Select unlocked model objects first");
+            return exportSkfProject({ projectName: name, createdAt: Date.now(), modifiedAt: Date.now(), shapes: selection, history: [editorHistoryEntry(selection, selection.map((shape) => shape.id))], historyIndex: 0, assets: projectAssetsRef.current, workspace: { ...workspaceSettingsRef.current, drawing: undefined }, snapGrid, placementElevation, placementWorkplane });
+          }}
+          onInsertCustomShape={async (bytes) => {
+            if (projectInteractionActiveRef.current || edgeModifierRef.current || splitSession) throw new Error("Finish the active operation before inserting a shape");
+            const targetProject = projectInfoRef.current.projectId;
+            const fingerprint = projectShapesFingerprint(shapesRef.current);
+            const restored = await importSkfProject(bytes);
+            if (projectInfoRef.current.projectId !== targetProject || projectInteractionActiveRef.current || edgeModifierRef.current || projectShapesFingerprint(shapesRef.current) !== fingerprint) throw new Error("The active project changed; insert the shape again");
+            const copies = restored.shapes.map(independentLibraryShape);
+            const nextAssets = dedupeProjectAssets([...projectAssetsRef.current, ...restored.assets]);
+            projectAssetsRef.current = nextAssets; setProjectAssets(nextAssets);
+            commitShapes([...shapesRef.current, ...copies], copies.map((shape) => shape.id), `Inserted ${restored.projectName} from the reusable-shape library`);
+          }}
+          section={section} onSection={setSection} overhangAngle={overhangAngle} onOverhangAngle={setOverhangAngle}
+          disabled={!selectedShapes.length || selectedShapes.some((shape) => shape.locked) || Boolean(edgeModifier || splitSession) || shellBusy || holeBusy || projectInteractionActive}
+          onClose={() => { cancelShellRef.current?.(); holeRunRef.current++; setHoleDraft(null); setModelingToolsOpen(false); setPatternPreview([]); }}
+          onPattern={createModelingPattern} hasPivot={Boolean(facePivot)} onClearPivot={() => {
+            setFacePivot(null);
+            if (selectedShapes.some((shape) => shape.rotationPivot)) commitShapes(shapes.map((shape) => selectedIds.includes(shape.id) && !shape.locked ? { ...shape, rotationPivot: undefined } : shape), selectedIds, "Cleared saved pivot");
+          }}
           patternCenter={patternCenter} pickingCenter={pickingPatternCenter}
           onPickCenter={() => { setPatternPreview([]); setFaceAction(null); setPickingPatternCenter(true); setWorkplaneMode(true); setNotice("Click the active workplane for the circular pattern center"); }}
           onClearCenter={() => { setPatternCenter(null); setPatternPreview([]); }}
@@ -13041,6 +13129,11 @@ function SecondaryToolbar({
         )}
       </div>
       <div className="toolbar-title-row">
+        <CommandPalette commands={[
+          ...[["Clipboard", leftTools], ["Visibility", visibilityTools], ["Combine", combineTools], ["Modify", modifyTools], ["Arrange", arrangeTools]].flatMap(([group, tools]) => (tools as typeof leftTools).map((tool) => ({ id: `tool-${tool.label}`, label: tool.label, group: group as string, enabled: tool.enabled && toolbarMode === "geometry", action: tool.action, keywords: tool.label === "Modeling tools" ? "patterns shell hollow section overhang pivots holes custom shapes" : tool.label === "Fillet" ? "round edges" : "" }))),
+          ...[...toolbarBasicShapeAssets, ...toolbarGeneratorAssets].map((shape) => ({ id: `shape-${shape.id}`, label: `Add ${shape.name}`, group: "Shapes", enabled: toolbarMode === "geometry" && geometryActionsEnabled, action: () => addShapeFromMenu(shape) })),
+          ...(["geometry", "sketch", "drawing"] as const).map((mode) => ({ id: `mode-${mode}`, label: `${mode[0].toUpperCase()}${mode.slice(1)} workspace`, group: "Workspaces", enabled: !sketchActive, action: () => selectToolbarMode(mode) })),
+        ]} />
         <div className="toolbar-workspace-tabs" role="tablist" aria-label="Editor mode">
           <button
             className={toolbarMode === "geometry" ? "active" : ""}
@@ -13059,15 +13152,6 @@ function SecondaryToolbar({
             onClick={() => selectToolbarMode("sketch")}
           >
             Sketch
-          </button>
-          <button
-            className={toolbarMode === "sculpt" ? "active" : ""}
-            type="button"
-            role="tab"
-            aria-selected={toolbarMode === "sculpt"}
-            onClick={() => selectToolbarMode("sculpt")}
-          >
-            Sculpt
           </button>
           <button
             className={toolbarMode === "drawing" ? "active" : ""}

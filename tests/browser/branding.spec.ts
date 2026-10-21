@@ -15,6 +15,7 @@ test("Cadverix branding and legacy project loading", async ({ page, browserName 
   }
   await page.goto("/?editor=1");
   await expect(page.locator(".cadverix-editor")).toBeVisible();
+  await expect(page.getByRole("tab", { name: "Sculpt", exact: true })).toHaveCount(0);
   expect(await page.locator("body").innerText()).not.toContain("SketchForge");
   await page.getByRole("button", { name: "Add shape", exact: true }).tap();
   await page.getByRole("button", { name: "Box", exact: true }).tap();
