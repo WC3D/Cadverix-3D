@@ -1,0 +1,40 @@
+.pcb-workspace { --editor-ribbon-height:0px; position:relative; display:flex; flex:1; min-width:0; min-height:0; flex-direction:column; height:100%; width:100%; background:var(--background); color:var(--foreground); overflow:hidden; }
+.toolbar-mode-content.pcb { overflow-x:auto; overflow-y:hidden; overscroll-behavior-x:contain; scrollbar-width:none; }
+.toolbar-mode-content.pcb::-webkit-scrollbar { display:none; }
+.pcb-toolbar-host { height:100%; min-width:max-content; }
+.pcb-workspace.pcb-toolbar { position:static; flex-direction:row; flex:none; width:max-content; min-width:max-content; overflow:visible; }
+.pcb-project-tools,.pcb-circuit-tools-host { display:flex; height:100%; flex:none; align-items:stretch; }
+.pcb-project-tools select { width:160px; }
+.pcb-toolbar button,.pcb-toolbar select,.pcb-workspace .pcb-project-manager button,.pcb-workspace .pcb-project-manager input,.pcb-workspace .pcb-project-manager select { flex-shrink:0; border:1px solid var(--border); border-radius:5px; background:var(--tile); color:var(--foreground); padding:6px; font-size:12px; white-space:nowrap; }
+.pcb-toolbar button { display:inline-flex; align-items:center; justify-content:center; min-width:36px; min-height:36px; cursor:pointer; }
+.pcb-toolbar button:disabled { opacity:.4; cursor:default; }
+.pcb-toolbar button:hover:not(:disabled) { background:var(--tile-hover); }
+.pcb-toolbar button:focus-visible,.pcb-toolbar select:focus-visible { outline:2px solid var(--tool-accent, var(--primary)); outline-offset:-3px; }
+.pcb-toolbar button[aria-pressed="true"],.pcb-toolbar button[aria-expanded="true"],.pcb-toolbar .ribbon-tool.active { color:var(--foreground); background:color-mix(in srgb, var(--tool-accent) 20%, var(--tile)); border-color:var(--tool-accent); box-shadow:none; }
+.pcb-toolbar .toolbar-section-tools { gap:3px; }
+.pcb-workspace.pcb-toolbar .editor-ribbon { position:static; display:flex; height:100%; color:var(--foreground); background:transparent; border:0; box-shadow:none; }
+.pcb-toolbar .editor-tool-groups { width:auto; height:100%; overflow:visible; background:transparent; }
+.pcb-toolbar .ribbon-group-tools { align-items:center; }
+.pcb-toolbar .ribbon-tool { width:52px; height:100%; min-height:0; flex:0 0 52px; flex-direction:column; gap:0; padding:0 2px; border:0; color:var(--foreground); background:transparent; box-shadow:none; }
+.pcb-toolbar .ribbon-tool-art { width:30px; height:30px; flex:0 0 30px; }
+.pcb-toolbar .ribbon-tool-art :is(svg,img,.toolbar-command-icon,.toolbar-user-art-icon) { width:30px; height:30px; transform:none; }
+.pcb-toolbar .ribbon-tool-label { color:inherit; font-size:10px; line-height:12px; text-shadow:none; }
+.pcb-editor-host { position:relative; flex:1; min-height:0; transform:translateZ(0); overflow:hidden; }
+.pcb-workspace .sketchforge-editor { position:relative; width:100%; height:100%; min-width:0; }
+.pcb-project-manager { position:absolute; z-index:100; right:8px; top:8px; width:320px; max-width:calc(100% - 16px); max-height:calc(100% - 48px); overflow:auto; padding:12px; background:var(--panel); color:var(--foreground); border:1px solid var(--border); border-radius:8px; box-shadow:var(--shadow); }
+.pcb-project-manager label { display:grid; gap:5px; margin:10px 0; }
+.pcb-project-manager button { margin:3px 0; }
+.pcb-project-manager h3 { margin-top:12px; }
+.pcb-project-status { flex-shrink:0; padding:5px 10px; font-size:12px; background:var(--panel); color:var(--foreground); max-height:70px; overflow:auto; }
+.pcb-empty { padding:25px; }
+.pcb-empty button { margin-top:15px; padding:12px; background:var(--primary); color:white; border-radius:6px; }
+.pcb-workspace .pcb-board-3d-overlay { z-index:90; }
+.pcb-workspace .pcb-workspace-modal-card { height:100%; max-height:100%; }
+.pcb-workspace .part-library-panel { height:min(650px, calc(100% - var(--editor-ribbon-height) - 8px)); }
+.pcb-workspace .part-library-panel button:focus-visible,.pcb-workspace .part-library-search input:focus-visible { outline:2px solid var(--primary); outline-offset:-2px; }
+.pcb-reference-actions { position:absolute; left:12px; bottom:90px; z-index:20; display:flex; flex-wrap:wrap; gap:6px; max-width:calc(100% - 24px); background:var(--panel); color:var(--foreground); padding:8px; border:1px solid var(--border); border-radius:6px; }
+.pcb-reference-actions button { background:var(--tile); color:var(--foreground); padding:6px; border-radius:4px; }
+@media(max-width:700px) {
+  .pcb-project-manager { top:auto; bottom:35px; max-height:60%; }
+  .pcb-workspace .component-inspector { top:auto; bottom:0; left:0; right:0; width:100%; max-height:44%; border-top:1px solid #cfd9e2; }
+}

@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Added a PCB workspace adapted from SketchForge-PCB, with multiple independent board designs and linked 3D instances inside one mechanical project. Combined projects use SKF format/minimum reader 4 and participate in autosave, backups, shared storage and project history.
+- Added per-board SFPCB/KiCad/Gerber/SVG/BOM exports, all-board export packages, mechanical/PCB/assembly geometry export scopes, source-edit protection for linked references, and independently editable CAD copies.
 - Changed the icon monogram from C3D to WC3D and regenerated the desktop, favicon, Apple touch, and PWA icons.
 ## 1.0.14
 

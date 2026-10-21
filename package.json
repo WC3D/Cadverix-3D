@@ -58,6 +58,7 @@
     "next": "^16.4.1",
     "node-gyp": "^12.4.0",
     "occt-wasm": "^3.6.1",
+    "polygon-clipping": "^0.15.7",
     "react": "^19.1.0",
     "react-colorful": "^5.8.0",
     "react-dom": "^19.1.0",

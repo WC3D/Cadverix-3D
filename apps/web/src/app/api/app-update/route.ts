@@ -1,11 +1,12 @@
 import { timingSafeEqual } from "node:crypto";
 import { execFile, spawn } from "node:child_process";
-import { existsSync, readFileSync } from "node:fs";
+import { existsSync, promises as fs } from "node:fs";
 import path from "node:path";
 import { promisify } from "node:util";
 import { NextResponse } from "next/server";
 import { appUpdateIsAvailable, OFFICIAL_UPDATE_GUIDE_URL, type AppUpdateStatus } from "@/lib/appUpdates";
 import { SKF_CREATED_WITH_VERSION } from "@/lib/skfProject";
+import { resolveContainedPath } from "@/lib/sharedStoragePaths";
 
 export const runtime = "nodejs";
 export const revalidate = false;
@@ -63,10 +64,12 @@ function findParentRoot(requireGit: boolean) {
   return null;
 }
 
-function packageVersion(root: string | null) {
+async function packageVersion(root: string | null) {
   if (!root) return null;
   try {
-    const payload = JSON.parse(readFileSync(path.join(root, "package.json"), "utf8")) as { version?: unknown };
+    if (root !== findParentRoot(false) && root !== findParentRoot(true)) return null;
+    const packagePath = await resolveContainedPath(root, "package.json");
+    const payload = JSON.parse(await fs.readFile(packagePath, "utf8")) as { version?: unknown };
     const version = typeof payload.version === "string" ? payload.version.trim() : "";
     return VERSION_PATTERN.test(version) ? version : null;
   } catch {
@@ -74,10 +77,10 @@ function packageVersion(root: string | null) {
   }
 }
 
-function currentAppVersion() {
+async function currentAppVersion() {
   const configured = (process.env.CADVERIX_APP_VERSION ?? process.env.SKETCHFORGE_APP_VERSION)?.trim();
   if (configured && VERSION_PATTERN.test(configured)) return configured;
-  return packageVersion(findParentRoot(false)) || SKF_CREATED_WITH_VERSION;
+  return await packageVersion(findParentRoot(false)) || SKF_CREATED_WITH_VERSION;
 }
 
 function localRepoForRequest(request: Request) {
@@ -127,7 +130,7 @@ async function statusResponse(request: Request, force = false): Promise<AppUpdat
   const trigger = updateTriggerUrl();
   const adminKeyConfigured = Boolean((process.env.CADVERIX_UPDATE_ADMIN_KEY ?? process.env.SKETCHFORGE_UPDATE_ADMIN_KEY)?.trim());
   const localRepo = localRepoForRequest(request);
-  const currentVersion = currentAppVersion();
+  const currentVersion = await currentAppVersion();
   try {
     const latestVersion = await latestOfficialVersion(force);
     return {
@@ -156,6 +159,7 @@ async function statusResponse(request: Request, force = false): Promise<AppUpdat
 }
 
 async function runLocalUpdate(repoRoot: string, expectedVersion: string) {
+  if (repoRoot !== findParentRoot(true)) throw new Error("Invalid local update repository");
   const gitOptions = { cwd: repoRoot, timeout: 120_000, maxBuffer: 2 * 1024 * 1024 };
   const { stdout: dirtyOutput } = await execFileAsync("git", ["status", "--porcelain", "--untracked-files=no"], gitOptions);
   if (dirtyOutput.trim()) {
@@ -165,7 +169,7 @@ async function runLocalUpdate(repoRoot: string, expectedVersion: string) {
   await execFileAsync("git", ["fetch", "--no-tags", OFFICIAL_REPO_URL, "main"], gitOptions);
   await execFileAsync("git", ["merge", "--ff-only", "FETCH_HEAD"], gitOptions);
 
-  const installedVersion = packageVersion(repoRoot);
+  const installedVersion = await packageVersion(repoRoot);
   if (installedVersion && appUpdateIsAvailable(installedVersion, expectedVersion)) {
     throw new Error(`The local checkout updated to ${installedVersion}, but ${expectedVersion} was expected.`);
   }
@@ -178,8 +182,11 @@ async function runLocalUpdate(repoRoot: string, expectedVersion: string) {
     windowsHide: true,
   });
 
-  const restartScript = path.join(repoRoot, "scripts", "restart-local-dev.mjs");
-  if (existsSync(restartScript)) {
+  const restartScript = await resolveContainedPath(repoRoot, "scripts/restart-local-dev.mjs").catch((error) => {
+    if ((error as NodeJS.ErrnoException).code === "ENOENT") return null;
+    throw error;
+  });
+  if (restartScript) {
     const child = spawn(process.execPath, [restartScript, String(process.pid), repoRoot], {
       cwd: repoRoot,
       detached: true,
