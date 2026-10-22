@@ -8,7 +8,7 @@
 .pcb-toolbar button,.pcb-toolbar select,.pcb-workspace .pcb-project-manager button,.pcb-workspace .pcb-project-manager input,.pcb-workspace .pcb-project-manager select { flex-shrink:0; border:1px solid var(--border); border-radius:5px; background:var(--tile); color:var(--foreground); padding:6px; font-size:12px; white-space:nowrap; }
 .pcb-toolbar button { display:inline-flex; align-items:center; justify-content:center; min-width:36px; min-height:36px; cursor:pointer; }
 .pcb-toolbar button:disabled { opacity:.4; cursor:default; }
-.pcb-toolbar button:hover:not(:disabled) { background:var(--tile-hover); }
+.pcb-toolbar button:hover:not(:disabled) { color:var(--foreground); background:var(--panel); }
 .pcb-toolbar button:focus-visible,.pcb-toolbar select:focus-visible { outline:2px solid var(--tool-accent, var(--primary)); outline-offset:-3px; }
 .pcb-toolbar button[aria-pressed="true"],.pcb-toolbar button[aria-expanded="true"],.pcb-toolbar .ribbon-tool.active { color:var(--foreground); background:color-mix(in srgb, var(--tool-accent) 20%, var(--tile)); border-color:var(--tool-accent); box-shadow:none; }
 .pcb-toolbar .toolbar-section-tools { gap:3px; }
@@ -39,14 +39,35 @@
 .pcb-workspace .board-3d-preview { background:var(--background); }
 .pcb-workspace .sketchforge-editor :is(.component-inspector,.pcb-workspace-modal-card,.pcb-transfer-panel,.pcb-export-dialog,.arrange-panel,.design-check-panel,.design-check-loading-panel,.board-3d-header,.board-3d-settings,.snap-menu,.pcb-test-panel) { color:var(--foreground); background:var(--panel); border-color:var(--border); box-shadow:var(--shadow); }
 .pcb-workspace .sketchforge-editor :is(.component-inspector,.pcb-workspace-modal-card,.pcb-transfer-panel,.pcb-export-dialog,.arrange-panel,.design-check-panel,.design-check-loading-panel,.board-3d-header,.board-3d-settings,.snap-menu) :is(strong,h2,h3,span,small,label,p,b) { color:inherit; border-color:var(--border); text-shadow:none; }
-.pcb-workspace .sketchforge-editor :is(.component-inspector-header,.component-summary-card,.component-property-card,.connection-selection-card,.pcb-workspace-settings-nav,.pcb-workspace-modal-footer,.pcb-export-format-summary,.pcb-export-file-section,.design-check-section,.arrange-action-grid button) { background:var(--tile); border-color:var(--border); }
+.pcb-workspace .sketchforge-editor :is(.component-inspector-header,.component-summary-card,.component-property-card,.connection-selection-card,.pcb-workspace-settings-nav,.pcb-workspace-modal-footer,.pcb-transfer-panel > header,.pcb-transfer-body,.pcb-transfer-support-note,.pcb-export-dialog-body,.pcb-export-setting-section,.pcb-export-format-summary,.pcb-export-file-section,.pcb-export-file-input-wrap,.pcb-export-format-slider,.design-check-header,.design-check-status,.design-check-metrics > div,.design-check-section,.design-check-footer,.arrange-panel > header,.arrange-action-grid button) { color:var(--foreground); background:var(--tile); border-color:var(--border); }
 .pcb-workspace .sketchforge-editor :is(.component-inspector,.pcb-workspace-modal-card,.pcb-transfer-panel,.pcb-export-dialog,.arrange-panel,.design-check-panel,.board-3d-header,.board-3d-settings,.snap-menu) :is(button,input,select) { color:var(--foreground); background:var(--tile); border-color:var(--border); accent-color:var(--primary); }
-.pcb-workspace .sketchforge-editor :is(.component-inspector,.pcb-workspace-modal-card,.pcb-transfer-panel,.pcb-export-dialog,.arrange-panel,.design-check-panel,.board-3d-header,.board-3d-settings,.snap-menu) button:hover:not(:disabled) { background:var(--tile-hover); color:var(--foreground); }
+.pcb-workspace .sketchforge-editor :is(.component-inspector,.pcb-workspace-modal-card,.pcb-transfer-panel,.pcb-export-dialog,.arrange-panel,.design-check-panel,.board-3d-header,.board-3d-settings,.snap-menu) button:hover:not(:disabled) { background:var(--panel); color:var(--foreground); }
 .pcb-workspace .sketchforge-editor :is(.pcb-workspace-settings-nav,.board-3d-view-buttons,.board-3d-header-actions) button.active { background:color-mix(in srgb,var(--primary) 15%,var(--tile)); border-color:var(--primary); color:var(--foreground); }
 .pcb-workspace .sketchforge-editor :is(input,select,button,[role="button"]):focus-visible { outline:2px solid var(--primary); outline-offset:-2px; }
 .pcb-workspace .sketchforge-editor :is(.circuit-empty-state,.board-empty-prompt,.board-3d-help,.grid-settings,.snap-button,.editor-toast) { color:var(--foreground); background:var(--panel); border-color:var(--border); }
 .pcb-workspace .sketchforge-editor :is(.snap-row,.snap-select) { color:var(--foreground); border-color:var(--border); }
 .pcb-workspace .sketchforge-editor :is(.snap-select,.inspector-snap-dock) { background:var(--tile); }
+/* Keep status copy readable on themed cards; badges retain explicit semantic colour pairs. */
+.pcb-workspace .sketchforge-editor .design-check-panel :is(.design-check-status,.design-check-metrics,.design-check-updated,.design-check-clear-row,.design-check-progress) { color:var(--foreground); }
+.pcb-workspace .sketchforge-editor .design-check-panel :is(.design-check-status,.design-check-metrics,.design-check-clear-row) :is(strong,span,p) { color:inherit; }
+.pcb-workspace .sketchforge-editor .design-check-panel :is(.design-check-shield,.design-check-category-icon).passed { color:#146c43; background:#e4f5ec; }
+.pcb-workspace .sketchforge-editor .design-check-panel :is(.design-check-shield,.design-check-category-icon).failed,
+.pcb-workspace .sketchforge-editor .design-check-panel .design-check-issue.error .design-check-severity { color:#9f241c; background:#fbe6e4; }
+.pcb-workspace .sketchforge-editor .design-check-panel .design-check-category-icon.warning,
+.pcb-workspace .sketchforge-editor .design-check-panel .design-check-issue.warning .design-check-severity { color:#754900; background:#fff1d7; }
+.pcb-workspace .sketchforge-editor .design-check-panel .design-check-shield.running { color:#155e75; background:#e3f3f9; }
+.pcb-workspace .sketchforge-editor .design-check-panel .design-check-issue:disabled:hover { background:var(--tile); }
+.pcb-workspace .design-check-metrics > .errors { border-top:3px solid #c23a34; }
+.pcb-workspace .design-check-metrics > .warnings { border-top:3px solid #b57009; }
+.pcb-workspace .design-check-metrics > .passed { border-top:3px solid #258451; }
+.pcb-workspace .sketchforge-editor .pcb-export-format-slider::before { background:var(--panel); border-color:var(--border-strong); }
+.pcb-workspace .sketchforge-editor .pcb-export-format-slider button { background:transparent; }
+.pcb-workspace .sketchforge-editor .pcb-export-format-slider button[aria-checked="true"] { background:var(--panel); color:var(--foreground); box-shadow:inset 0 -2px 0 var(--primary); }
+.pcb-workspace .sketchforge-editor input::placeholder { color:var(--foreground); opacity:1; }
+.pcb-workspace :is(.part-library-copy small,.part-library-results-header span) { opacity:1; }
+.pcb-workspace :is(.part-library-item,.part-library-categories button,.part-library-panel > header button,.part-library-search button):hover { background:var(--panel); }
+.pcb-workspace .arrange-action-grid svg { fill:var(--panel); }
+.pcb-workspace .sketchforge-editor .arrange-panel > section.focused h3 { color:var(--foreground); }
 .pcb-workspace .sketchforge-editor :is(.circuit-empty-state,.board-empty-prompt) span { color:var(--foreground); opacity:.75; }
 .pcb-workspace .board-dimension-bubble rect { fill:var(--panel); stroke:var(--border); }
 .pcb-workspace .board-dimension-bubble text { fill:var(--foreground); }
