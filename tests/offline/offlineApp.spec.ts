@@ -79,7 +79,7 @@ test("multi-board PCB models and combined SKF saves work without the app server"
     return value.pcbBoards?.[0]?.parts === 1 && value.shapes[0]?.pcbInstance?.revision === value.pcbBoards[0].revision;
   }).toBe(true);
   const downloaded = page.waitForEvent("download");
-  await page.getByRole("button", { name: "Save combined SKF", exact: true }).click();
+  await page.keyboard.press("ControlOrMeta+s");
   const files = unzipSync(await readFile((await (await downloaded).path())!));
   expect(new TextDecoder().decode(files["project.json"])).toContain('"formatVersion":4');
 });

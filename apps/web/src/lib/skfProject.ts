@@ -23,7 +23,7 @@ export const SKF_DRAWING_FORMAT_VERSION = 3;
 export const SKF_HYBRID_FORMAT_VERSION = 4;
 export const SKF_MINIMUM_READER_VERSION = 2;
 export const SKF_OLDEST_READABLE_FORMAT_VERSION = 1;
-export const SKF_CREATED_WITH_VERSION = "1.0.14";
+export const SKF_CREATED_WITH_VERSION = "1.0.15";
 export const SKF_MEDIA_TYPE = "application/vnd.sketchforge.project+zip";
 export const LYL_MEDIA_TYPE = "application/vnd.layerling.project+zip";
 
@@ -957,7 +957,7 @@ async function exportProjectPackage(input: SkfProjectExportInput, flavor: Projec
     return shapes === entry.shapes ? entry : editorHistoryEntry(shapes, entry.selectedIds, normalizeNotes(entry.notes), entry.electronics);
   });
   for (const entry of exportEntries) {
-    for (const shape of entry.shapes) if (shape.pcbInstance && !entry.electronics?.boards.some((board) => board.id === shape.pcbInstance!.boardId)) throw new Error("PCB instance is missing its board document; use Save combined SKF");
+    for (const shape of entry.shapes) if (shape.pcbInstance && !entry.electronics?.boards.some((board) => board.id === shape.pcbInstance!.boardId)) throw new Error("PCB instance is missing its board document; use Ctrl/Cmd+S in the PCB workspace to save a combined SKF");
   }
   const builder = new SkfArchiveBuilder(flavor);
   const stateShapes = exportEntries.map((entry) => entry.shapes);

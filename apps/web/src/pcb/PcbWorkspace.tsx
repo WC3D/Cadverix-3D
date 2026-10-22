@@ -1,7 +1,7 @@
 "use client";
 import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
-import { Box, FolderInput, Plus, Redo2, Save, Settings2, Undo2 } from "lucide-react";
+import { Box, FolderInput, Plus, Redo2, Settings2, Undo2 } from "lucide-react";
 import { zipSync } from "fflate";
 import { createLocalId } from "@/lib/localIds";
 import { createPcbDesign, parseCircuitScene, type ElectronicsDocument, type PcbDesign } from "./pcbDocument";
@@ -83,7 +83,6 @@ export function PcbWorkspace({ toolbarHost, document, shapes, projectId, reset, 
           <button type="button" aria-label="Add board" title="Add board" onClick={add}><Plus size={20} /></button><button type="button" aria-label="Import PCB" title="Import PCB" onClick={() => inputRef.current?.click()}><FolderInput size={20} /></button>
           <button type="button" aria-label="Manage boards / exports" title="Manage boards / exports" aria-expanded={managerOpen} aria-controls="pcb-board-manager" disabled={!current} onClick={() => setManagerOpen(!managerOpen)}><Settings2 size={20} /></button>
         </div></div>
-        <div className="toolbar-section" data-tool-group="manage"><div className="toolbar-section-label">Project</div><div className="toolbar-section-tools"><button type="button" aria-label="Save combined SKF" title="Save combined SKF" onClick={onSave}><Save size={20} /></button></div></div>
       </div>
       <div className="pcb-circuit-tools-host" ref={setCircuitToolbarHost} />
     </div>, toolbarHost) : null}

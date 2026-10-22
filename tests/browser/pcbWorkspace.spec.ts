@@ -11,6 +11,8 @@ test("multiple independent PCB circuits and linked instances save with mechanica
   await page.getByRole("button", { name: "Add shape", exact: true }).click();
   await page.getByRole("button", { name: "Box", exact: true }).click();
   await page.getByRole("tab", { name: "PCB", exact: true }).click();
+  await expect(page.getByRole("button", { name: "Save combined SKF", exact: true })).toHaveCount(0);
+  await expect(page.locator('.pcb-project-tools [data-tool-group="manage"]')).toHaveCount(0);
   await page.getByRole("button", { name: "Create first PCB board", exact: true }).click();
   await expect.poll(async () => (await state(page)).pcbBoards.length).toBe(1);
   await expect.poll(async () => (await state(page)).shapes.filter((shape: any) => shape.pcbInstance && shape.pcbInstance.revision !== "pending").length).toBe(1);
@@ -31,7 +33,7 @@ test("multiple independent PCB circuits and linked instances save with mechanica
   await page.getByRole("button", { name: "Project redo", exact: true }).click();
   await expect.poll(async () => (await state(page)).shapeCount).toBe(4);
   const downloadPromise = page.waitForEvent("download");
-  await page.getByRole("button", { name: "Save combined SKF", exact: true }).click();
+  await page.keyboard.press("ControlOrMeta+s");
   const download = await downloadPromise, file = (await download.path())!;
   const manifest = JSON.parse(strFromU8(unzipSync(await readFile(file))["project.json"]));
   expect(manifest.formatVersion).toBe(4); expect(manifest.minimumReaderVersion).toBe(4);

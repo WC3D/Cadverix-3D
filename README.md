@@ -19,7 +19,7 @@
     <a href="https://github.com/WC3D/Cadverix-3D/stargazers"><img alt="Star Cadverix 3D on GitHub" src="https://img.shields.io/github/stars/WC3D/Cadverix-3D?style=flat&logo=github"></a>
     <a href="https://github.com/sponsors/Formsmith746"><img alt="Sponsor upstream contributors on GitHub" src="https://img.shields.io/badge/GitHub-Sponsor-ea4aaa?logo=githubsponsors&logoColor=white"></a>
     <img alt="Local first" src="https://img.shields.io/badge/local--first-no%20account-0ea5e9">
-    <img alt="Version v1.0.14" src="https://img.shields.io/badge/version-v1.0.14-2563eb">
+    <img alt="Version v1.0.15" src="https://img.shields.io/badge/version-v1.0.15-2563eb">
     <a href="docs/MOBILE_ALPHA.md"><img alt="Mobile support: alpha" src="https://img.shields.io/badge/mobile-alpha-f59e0b"></a>
   </p>
 </div>
@@ -50,6 +50,7 @@ No login. Private projects autosave locally in your browser, with optional share
 - **Rotated solid edge treatment** - chamfer and fillet preserve analytic box topology after one-, two-, or three-axis rotations.
 - **Mesh sculpting** - Add, Subtract, and Smooth brushes with adjustable radius and strength, local remeshing, and undoable strokes processed in a background worker.
 - **2D CAD drawings** - a Drawing workspace with ISO A0–A4 and ANSI A–E sheets, movable orthographic/isometric model views, custom rotations and scales, dimensions, paper geometry, notes, SVG export, and Print/PDF.
+- **PCB and mechanical assemblies** - independent board designs, linked 3D references, per-board fabrication exports, shared project themes, and bounded interactive DC switch/LED tests.
 - **Scene overview** - search shapes and features, inspect groups, control visibility, locking, and hole state, and toggle or remove supported features.
 - **Placement and navigation tools** - align, mirror, center selections on the workplane, focus the camera on a selection, and move objects using the snap grid.
 - **3MF, STL, STEP, and SVG import** - bring outside models and vector profiles into the same workspace as primitives.
@@ -75,6 +76,17 @@ geometry, retention limits, and deployment-specific capabilities.
 Open **Drawing**, choose an ISO or ANSI paper template, and add views of individual objects, a selection, or the visible assembly. Use **3 views** for a first-/third-angle layout, or place and rotate views individually. Add horizontal, vertical, aligned, angular, radius, and diameter measurements, plus lines, rectangles, circles, and notes.
 
 Sheets autosave with the project and can be exported as SVG or printed to PDF at physical paper size. See the [Drawing workspace guide](docs/DRAWING_WORKSPACE.md) for measurement behavior, source-model updates, and file compatibility.
+
+### PCB workspace
+
+Open **PCB** beside Drawing to create independent circuits and linked board
+instances in the same mechanical project. PCB edits autosave; **Ctrl/Cmd+S**
+downloads a combined SKF backup. The redundant PCB **Project → Save** button
+has been removed. Touch users can download SKF from **Geometry → Export**.
+
+Project themes apply to the PCB editor, panels, and preview. **Test circuit**
+provides basic DC switch/LED checks, not SPICE or fabrication validation.
+See [PCB workspace](docs/PCB_WORKSPACE.md) for controls, limits, and an example.
 
 ### Color-coded tools and the Shapes palette
 
@@ -182,6 +194,10 @@ Cadverix 3D is local-first. Private projects stay in each user's browser storage
 ## Desktop Releases
 
 Desktop packaging supports a Windows x64 installer, macOS Intel/Apple Silicon DMGs, and Linux AppImages. Download the matching asset from [GitHub Releases](https://github.com/WC3D/Cadverix-3D/releases).
+
+The **1.0.15** packages are available on [GitHub Releases](https://github.com/WC3D/Cadverix-3D/releases/tag/v1.0.15), with local build copies in `dist/desktop/`; see the
+[build notes](docs/RELEASE_1.0.15.md) for filenames, checksums, signing status,
+and verification. Building locally does not automatically publish a release.
 
 - **Windows:** run the `Cadverix-3D-Setup-…-x64.exe` installer.
 - **Linux:** mark the `.AppImage` executable in your file manager's permissions, then launch it.
@@ -584,7 +600,7 @@ per-launch credential. Typical executable paths are:
 ```text
 Windows: C:\Program Files\Cadverix 3D\Cadverix 3D.exe
 macOS:   /Applications/Cadverix 3D.app/Contents/MacOS/Cadverix 3D
-Linux:   /path/to/Cadverix-3D-1.0.14-x86_64.AppImage
+Linux:   /path/to/Cadverix-3D-1.0.15-x86_64.AppImage
 ```
 
 ### Codex

@@ -4,6 +4,18 @@
 
 For ISO/ANSI technical sheets, model views, and drawing dimensions, open the **Drawing** tab beside Sculpt and see the [Drawing workspace guide](DRAWING_WORKSPACE.md).
 
+For independent circuits, linked mechanical board instances, fabrication exports,
+project themes, and basic interactive DC switch/LED tests, open **PCB** beside
+Drawing and see the [PCB workspace guide](PCB_WORKSPACE.md). PCB edits autosave;
+**Ctrl/Cmd+S** downloads the combined SKF project. There is no separate PCB Save
+button; touch users can use **Geometry → Export → SKF**. PCB-bearing packages
+require an SKF format-4 reader.
+
+For command search, alignment snapping, section/overhang inspection, saved pivots,
+face hole patterns, reusable shapes, and storage recovery, see
+[Selected Layerling improvements](LAYERLING_INTEGRATION.md) and
+[Modeling and storage](MODELING_AND_STORAGE.md).
+
 Browser-based 3D modeling, 2D sketching, and fabrication export
 
 See the [changelog](CHANGELOG.md) for release-specific additions and fixes.
@@ -72,7 +84,7 @@ Projects autosave geometry, history, imported assets, workspace settings, and th
 - **Top toolbar:** project, clipboard, history, shape, visibility, combine, modify, arrange, and output commands.
 - **3D viewport:** selection, camera navigation, object transforms, workplane placement, and ruler tools.
 - **Shape Inspector:** object type, dimensions, position, rotation, color, solid/hole state, sketch settings, and special properties.
-- **Workspace tabs:** switch between Geometry and Sketch workflows.
+- **Workspace tabs:** switch between Geometry, Sketch, Drawing, and PCB workflows; Sculpt is a Geometry tool.
 - **Snap Grid:** sets movement and sketch precision.
 - **Status message:** reports completed actions, requirements, and errors.
 
@@ -241,6 +253,15 @@ Press `S` to change selected unlocked holes back to solids. Standalone holes are
 Intersection requires at least one unlocked solid and one unlocked hole. The result keeps their overlapping volume.
 
 If the intersection is empty, the selected operands may be removed. Use Undo if this was not intended.
+
+## Split By Plane
+
+Select the mechanical bodies to cut and open **Geometry → Combine → Split by plane**.
+Choose an X, Y, or Z plane orientation, adjust its two rotation controls for an
+angled cut, and set **Plane position** using the slider or measurement field.
+Review the translucent plane, then choose **Split model**. Intersected objects
+become closed meshes; combined selections are supported. Use Undo to restore
+the originals. Linked PCB references must first become independent CAD copies.
 
 ## Align
 

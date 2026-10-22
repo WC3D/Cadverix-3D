@@ -138,11 +138,15 @@ Use the resulting geometry as a reference for those mechanical operations.
 
 ## Save, undo, backups, and shared storage
 
-**Save combined SKF**, or Ctrl/Cmd+S inside the PCB editor, saves the complete
+**Ctrl/Cmd+S** inside the PCB editor downloads an SKF backup of the complete
 project: mechanical shapes, PCB designs, linked instances, notes, drawing
 sheets, assets, and retained history. PCB edits participate in project history;
 Undo restores their source data and matching geometry, regenerating a cached
 reference when necessary.
+
+PCB edits autosave with the project. The PCB toolbar no longer has a separate
+**Project → Save** button; the keyboard shortcut remains available. For a
+touch-friendly SKF download, return to **Geometry → Export → SKF**.
 
 Projects containing PCB data in the active state or retained history use
 **SKF format 4 / minimum reader 4**. Older readers reject these packages rather
@@ -192,7 +196,7 @@ bridge is disabled in the managed workspace; PCB-specific Cadverix MCP tools
 are not included in this integration.
 
 The vendor stylesheet is scoped to `.pcb-workspace`; the circuit workspace
-uses its light drafting palette. Board-management and component panels fit
+follows the selected project theme. Board-management and component panels fit
 within the available workspace on phones. Runtime model assets retain their
 upstream paths so the existing offline-cache generator can include them.
 

@@ -1,10 +1,18 @@
 # Changelog
 
-## Unreleased
+## 1.0.15
 
 - Added a PCB workspace adapted from SketchForge-PCB, with multiple independent board designs and linked 3D instances inside one mechanical project. Combined projects use SKF format/minimum reader 4 and participate in autosave, backups, shared storage and project history.
 - Added per-board SFPCB/KiCad/Gerber/SVG/BOM exports, all-board export packages, mechanical/PCB/assembly geometry export scopes, source-edit protection for linked references, and independently editable CAD copies.
 - Changed the icon monogram from C3D to WC3D and regenerated the desktop, favicon, Apple touch, and PWA icons.
+- Added shared project themes throughout the PCB circuit workspace, settings, panels, and 3D preview, with improved grid, component, and toolbar contrast.
+- Added bounded interactive DC testing for batteries, resistors, switches, LEDs, and passive headers, including keyboard switch control, explicit unsupported-circuit errors, and current/safety warnings. Test state is temporary and does not modify saved designs. See [PCB workspace](PCB_WORKSPACE.md).
+- Removed the redundant PCB **Project → Save** toolbar group. Autosave and Ctrl/Cmd+S combined SKF downloads remain available; touch users can use Geometry's SKF export.
+- Added command search, object alignment snapping/guides, section and overhang inspection, saved face pivots, face hole patterns, and reusable shapes. Hardened project-list writes, thumbnail storage, missing-design recovery, and locked-object MCP operations; reduced repeated viewport geometry work. See [Selected Layerling improvements](LAYERLING_INTEGRATION.md).
+- Added dual-axis split-plane rotation and splitting across combined model selections.
+- Updated dependencies, including the Next.js 16.4 and Electron 43 release lines.
+- Updated the application version, README badge, and SKF `createdWithVersion` metadata to 1.0.15 for fresh desktop packages. PCB-bearing projects require an SKF format-4 reader; older readers reject them instead of dropping circuits.
+
 ## 1.0.14
 
 - Upgraded Next.js to 16.3.8 and added defense-in-depth containment for shared-project thumbnail paths.

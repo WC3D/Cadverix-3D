@@ -45,7 +45,7 @@ test("clicking and keyboard-toggling a switch lights the wired LED without editi
   await expect(page.locator(".circuit-part")).toHaveCount(4);
   await expect.poll(async () => (await state(page)).shapes.some((shape: any) => shape.pcbInstance?.revision && shape.pcbInstance.revision !== "pending")).toBe(true);
   const downloaded = page.waitForEvent("download");
-  await page.getByRole("button", { name: "Save combined SKF", exact: true }).click();
+  await page.keyboard.press("ControlOrMeta+s");
   const saved = await readFile((await (await downloaded).path())!);
   const manifest = JSON.parse(strFromU8(unzipSync(saved)["project.json"]));
   const active = manifest.states.find((entry: any) => entry.id === manifest.sceneStateId);

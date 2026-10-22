@@ -27,7 +27,7 @@ export const PCB_EXPORT_DETAILS: Record<PCBExportFormat, { label: string; format
     buttonLabel: "Download project",
     extension: "sfpcb",
     description: "Export this PCB design as an editable SFPCB file.",
-    note: "Keeps this board's components, values, outline, wires and junctions. Use Save combined SKF to include all boards, instances and mechanical geometry."
+    note: "Keeps this board's components, values, outline, wires and junctions. Use Ctrl/Cmd+S to save a combined SKF with all boards, instances and mechanical geometry."
   },
   kicad_pcb: {
     label: "KiCad",
