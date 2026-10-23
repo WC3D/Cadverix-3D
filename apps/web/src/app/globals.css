@@ -4330,6 +4330,46 @@ button {
   pointer-events: none;
 }
 
+.sketch-repair-panel {
+  position: absolute;
+  top: 70px;
+  left: 12px;
+  z-index: 10;
+  width: 300px;
+  max-width: calc(100% - 84px);
+  max-height: calc(100% - 150px);
+  overflow: auto;
+  padding: 10px;
+  color: var(--foreground);
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  box-shadow: var(--shadow);
+  font-size: 12px;
+}
+
+.sketch-repair-panel p { margin: 6px 0; }
+.sketch-repair-panel ul { margin: 8px 0 0; padding: 0; list-style: none; }
+.sketch-repair-panel button {
+  min-height: 36px;
+  margin-top: 4px;
+  padding: 6px 10px;
+  color: var(--foreground);
+  background: var(--tile);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  cursor: pointer;
+}
+
+.sketch-repair-markers circle,
+.sketch-repair-markers line {
+  fill: none;
+  stroke: #d45c00;
+  stroke-width: 2;
+  vector-effect: non-scaling-stroke;
+}
+.sketch-repair-markers line { stroke-dasharray: 4 3; }
+
 .sketch-revolve-preview {
   position: absolute;
   top: 18px;

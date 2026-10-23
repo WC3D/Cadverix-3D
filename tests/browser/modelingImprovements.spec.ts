@@ -162,6 +162,85 @@ test("sketch clipboard and corner fillet preserve connected geometry and undo", 
   await expect(page.locator(".sketch-segments path")).toHaveCount(3);
 });
 
+test("sketch Trim/Extend reaches a boundary and supports undo and redo", async ({ page }) => {
+  await page.getByRole("tab", { name: "Sketch", exact: true }).click();
+  await page.getByRole("button", { name: "Sketch to 3D options" }).click();
+  await page.getByRole("menuitem", { name: /^Extrude sketch/ }).click();
+  const clickPoint = async (x: number, z: number) => {
+    const screen = await page.locator("svg.sketch-plate").evaluate((svg: SVGSVGElement, point) => {
+      const position = svg.createSVGPoint();
+      position.x = point.x; position.y = point.z;
+      const screen = position.matrixTransform(svg.getScreenCTM()!);
+      return { x: screen.x, y: screen.y };
+    }, { x, z });
+    await page.mouse.click(screen.x, screen.y);
+  };
+  await clickPoint(-40, 0); await clickPoint(0, 0);
+  await page.getByRole("button", { name: "Line", exact: true }).click();
+  await clickPoint(20, -20); await clickPoint(20, 20);
+  const segments = page.locator(".sketch-segments path");
+  await expect(segments).toHaveCount(2);
+  await page.getByRole("button", { name: "Extend Entities", exact: true }).click();
+  await expect(page.getByRole("button", { name: "Extend Entities", exact: true })).toHaveAttribute("aria-pressed", "true");
+  await clickPoint(-5, 0);
+  await expect(page.locator(".editor-toast")).toContainText("Line extended");
+  await expect(segments).toHaveCount(3);
+  const extended = await segments.evaluateAll((paths) => paths.map((path) => path.getAttribute("d")));
+  await expect(segments.first()).toHaveAttribute("d", /20 0/);
+  await page.getByRole("button", { name: "Sketch undo", exact: true }).click();
+  await expect(segments).toHaveCount(2);
+  await page.getByRole("button", { name: "Sketch redo", exact: true }).click();
+  await expect.poll(() => segments.evaluateAll((paths) => paths.map((path) => path.getAttribute("d")))).toEqual(extended);
+  await page.getByRole("button", { name: "Trim Entities", exact: true }).click();
+  await clickPoint(-20, 0);
+  await expect(page.locator(".editor-toast")).toContainText("Line trimmed");
+  await expect(segments).toHaveCount(2);
+  await page.getByRole("button", { name: "Sketch undo", exact: true }).click();
+  await expect.poll(() => segments.evaluateAll((paths) => paths.map((path) => path.getAttribute("d")))).toEqual(extended);
+});
+
+test("Repair Sketch highlights and locates endpoints without editing geometry", async ({ page }) => {
+  await page.getByRole("tab", { name: "Sketch", exact: true }).click();
+  await page.getByRole("button", { name: "Sketch to 3D options" }).click();
+  await page.getByRole("menuitem", { name: /^Extrude sketch/ }).click();
+  const clickPoint = async (x: number, z: number) => {
+    const screen = await page.locator("svg.sketch-plate").evaluate((svg: SVGSVGElement, point) => {
+      const position = svg.createSVGPoint();
+      position.x = point.x; position.y = point.z;
+      const screen = position.matrixTransform(svg.getScreenCTM()!);
+      return { x: screen.x, y: screen.y };
+    }, { x, z });
+    await page.mouse.click(screen.x, screen.y);
+  };
+  await clickPoint(-40, 0); await clickPoint(0, 0);
+  await page.getByRole("button", { name: "Line", exact: true }).click();
+  await clickPoint(20, -20); await clickPoint(20, 20);
+  const geometry = () => page.locator(".sketch-segments path").evaluateAll((paths) => paths.map((path) => path.getAttribute("d")));
+  const before = await geometry();
+  await page.getByRole("button", { name: "Repair Sketch", exact: true }).click();
+  const panel = page.getByRole("region", { name: "Repair Sketch inspection" });
+  await expect(panel.getByRole("status")).toHaveText("4 open endpoints · 0 possible gaps");
+  await expect(page.locator(".sketch-repair-markers circle")).toHaveCount(4);
+  await panel.getByRole("button", { name: "Locate next open endpoint" }).click();
+  await expect(page.locator(".sketch-points circle.selected")).toHaveCount(1);
+  await page.locator(".sketch-points circle").nth(1).click();
+  await page.locator(".sketch-points circle").first().click();
+  await expect.poll(geometry).toEqual(before);
+  await page.getByRole("button", { name: "Sketch undo", exact: true }).click();
+  await expect(panel.getByRole("status")).toHaveText("2 open endpoints · 0 possible gaps");
+  await expect(page.locator(".sketch-repair-markers circle")).toHaveCount(2);
+  await page.getByRole("button", { name: "Sketch redo", exact: true }).click();
+  await expect(panel.getByRole("status")).toHaveText("4 open endpoints · 0 possible gaps");
+  await expect.poll(geometry).toEqual(before);
+  await page.setViewportSize({ width: 390, height: 844 });
+  const bounds = (await panel.boundingBox())!;
+  expect(bounds.x).toBeGreaterThanOrEqual(0);
+  expect(bounds.x + bounds.width).toBeLessThanOrEqual(390);
+  await page.getByRole("button", { name: "Select", exact: true }).click();
+  await expect(panel).toHaveCount(0);
+  await expect(page.locator(".sketch-repair-markers")).toHaveCount(0);
+});
+
 test("face pivot rotates around the picked face and lay-flat is undoable", async ({ page }) => {
   await page.getByRole("button", { name: "Add shape", exact: true }).click();
   await page.getByRole("button", { name: "Box", exact: true }).click();

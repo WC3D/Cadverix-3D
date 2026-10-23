@@ -1,6 +1,6 @@
 "use client";
 
-import { Check, Circle, Circle as CircleIcon, CircleDot, CircleMinus, CirclePlus, CloudUpload, CopyPlus, Download, Eye, EyeOff, FolderOpen, Grid2X2, Hexagon, Hexagon as HexagonIcon, Paintbrush, Pentagon, RotateCw, Route, Ruler, ScanLine, Sparkles, Square, Square as SquareIcon, Triangle as TriangleIcon, Type, X } from "lucide-react";
+import { Check, Circle, Circle as CircleIcon, CircleDot, CircleMinus, CirclePlus, CloudUpload, CopyPlus, Download, Eye, EyeOff, FolderOpen, Grid2X2, Hexagon, Hexagon as HexagonIcon, MoveRight, Paintbrush, Pentagon, RotateCw, Route, Ruler, ScanLine, Scissors, Sparkles, Square, Square as SquareIcon, Triangle as TriangleIcon, Type, X } from "lucide-react";
 import type manifoldModule from "manifold-3d";
 import dynamic from "next/dynamic";
 import type { ManifoldToplevel } from "manifold-3d";
@@ -138,6 +138,7 @@ import { rectFromPoints, rectangleSketchGeometry } from "@/lib/sketchRectangles"
 import { textSketchGeometry } from "@/lib/sketchTextGeometry";
 import { polygonFromPoints, polygonSketchGeometry } from "@/lib/sketchPolygons";
 import { offsetSketchSegments } from "@/lib/sketchOffset";
+import { trimExtendSketchLine } from "@/lib/sketchTrimExtend";
 import { intersectMeshWithPlane, projectSketchProfileToPlane, type SketchProjectionResult } from "@/lib/sketchProjection";
 import { buildSketchSweepGeometry } from "@/lib/sketchSweep";
 import { reflectionTransform, rotationTransform, transformSketchSelection, translateSketchPoints, translationTransform, type SketchTransformSelection } from "@/lib/sketchTransforms";
@@ -7808,6 +7809,9 @@ export function CadverixEditor({
       select: "Select: edit sketch geometry or place and scale reference images",
       refine: "Refine: click a segment to add a point, or a point to remove it",
       erase: "Erase: click a point or segment to remove it",
+      trim: "Trim: click a straight-line section to remove it between intersections; an unbounded line is removed entirely",
+      extend: "Extend: click near a line endpoint to reach the next straight-line boundary",
+      repair: "Repair Sketch: inspect open endpoints and nearby gaps without changing geometry",
       dimension: "Dimension: choose a line, then type its driving length",
       measure: "Measure: choose two points",
     };
@@ -8148,6 +8152,19 @@ export function CadverixEditor({
     },
     [commitSketchProfile, sketchProfile],
   );
+
+  const trimExtendSketchSegment = useCallback((id: string, point: { x: number; z: number }, mode: "trim" | "extend") => {
+    try {
+      const next = trimExtendSketchLine(sketchProfile, id, point, mode, createLocalId);
+      const removedDimensions = (sketchProfile.dimensions?.length ?? 0) - (next.dimensions?.length ?? 0);
+      commitSketchProfile(next, `${mode === "trim" ? "Line trimmed" : "Line extended"}${removedDimensions > 0 ? "; affected dimensions removed" : ""}`);
+      setSketchSelection(null);
+      setSketchActivePointId(null);
+      setSketchExtrusionRegionIds(null);
+    } catch (error) {
+      setNotice(error instanceof Error ? error.message : "Could not edit the sketch line");
+    }
+  }, [commitSketchProfile, sketchProfile]);
 
   const updateSketchImage = useCallback((id: string, patch: Partial<SketchImage>, message = "Sketch image updated") => {
     const image = (sketchProfile.images ?? []).find((entry) => entry.id === id);
@@ -11788,6 +11805,7 @@ export function CadverixEditor({
             onDeleteImage={deleteSketchImage}
             onDeletePoint={deleteSketchPoint}
             onDeleteSegment={deleteSketchSegment}
+            onTrimExtend={trimExtendSketchSegment}
             onMovePoint={moveSketchPoint}
             onMovePoints={moveSketchPoints}
             onTransformPoints={transformSketchPoints}
@@ -13173,6 +13191,12 @@ function SecondaryToolbar({
                 <div className="toolbar-section sketch-transform-section" data-tool-group="modify">
                   <div className="toolbar-section-label">Create / Transform</div>
                   <div className="toolbar-section-tools">
+                    <button className={`toolbar-icon sketch-tool-icon ${sketchTool === "trim" ? "active" : ""}`} type="button" aria-label="Trim Entities" aria-pressed={sketchTool === "trim"} title="Trim Entities — remove a straight-line section between intersections" onClick={() => onSketchTool("trim")}>
+                      <Scissors aria-hidden="true" />
+                    </button>
+                    <button className={`toolbar-icon sketch-tool-icon ${sketchTool === "extend" ? "active" : ""}`} type="button" aria-label="Extend Entities" aria-pressed={sketchTool === "extend"} title="Extend Entities — click near an endpoint to extend to the next straight-line boundary" onClick={() => onSketchTool("extend")}>
+                      <MoveRight aria-hidden="true" />
+                    </button>
                     <button className={`toolbar-icon sketch-tool-icon ${sketchCanProject ? "" : "disabled"}`} type="button" aria-label="Project previous sketch or shape" title="Project" onClick={onSketchProject} disabled={!sketchCanProject}>
                       <ScanLine aria-hidden="true" />
                     </button>
@@ -13207,6 +13231,9 @@ function SecondaryToolbar({
                 <div className="toolbar-section sketch-measure-section" data-tool-group="visibility">
                   <div className="toolbar-section-label">Inspect</div>
                   <div className="toolbar-section-tools">
+                    <button className={`toolbar-icon sketch-tool-icon ${sketchTool === "repair" ? "active" : ""}`} type="button" aria-label="Repair Sketch" aria-pressed={sketchTool === "repair"} title="Repair Sketch — inspect open endpoints and possible gaps" onClick={() => onSketchTool("repair")}>
+                      <ScanLine aria-hidden="true" />
+                    </button>
                     <button className={`toolbar-icon sketch-tool-icon ${sketchTool === "dimension" ? "active" : ""}`} type="button" aria-label="Dimension" title="Add driving dimension" onClick={() => onSketchTool("dimension")}>
                       <Ruler aria-hidden="true" />
                     </button>

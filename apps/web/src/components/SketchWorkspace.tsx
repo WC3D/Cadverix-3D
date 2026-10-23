@@ -20,11 +20,12 @@ import { cadSketchSelectableRegions } from "@/lib/sketchCadProfile";
 import { sketchDimensionAnchorCandidates, sketchDimensionAnchorKey, sketchDimensionAnchorPoint, sketchDistanceDimensionValue, type SketchDimensionAnchorCandidate } from "@/lib/sketchDimensions";
 import { dedupeSketchSnapCandidates, snapSketchPoint, type SketchSnapCandidate, type SketchSnapResult } from "@/lib/sketchSnapping";
 import { translateSketchPoints } from "@/lib/sketchTransforms";
+import { inspectSketchEndpoints, SKETCH_REPAIR_GAP_LIMIT } from "@/lib/sketchRepair";
 import { DEFAULT_SNAP_GRID, DEFAULT_WORKPLANE_WORKSPACE, normalizeSnapGrid, normalizeWorkspaceSettings } from "@/lib/workplaneSettings";
 import type { GridSize, SketchDimensionAnchor, SketchImage, SketchOperation, SketchPoint, SketchProfile, SketchSegment, WorkplaneShape, WorkplaneWorkspaceSettings } from "@/types/sketchforge";
 
 export type SketchPrimitive = "rectangle" | "circle" | "triangle" | "hexagon";
-export type SketchTool = "line" | "bezier" | "arc-three-point" | "smooth" | "circle-center" | "circle-diameter" | "rect-corner" | "rect-center" | "poly-inscribed" | "poly-circumscribed" | "poly-edge" | "text" | SketchPrimitive | "select" | "refine" | "erase" | "dimension" | "measure";
+export type SketchTool = "line" | "bezier" | "arc-three-point" | "smooth" | "circle-center" | "circle-diameter" | "rect-corner" | "rect-center" | "poly-inscribed" | "poly-circumscribed" | "poly-edge" | "text" | SketchPrimitive | "select" | "refine" | "erase" | "trim" | "extend" | "repair" | "dimension" | "measure";
 export type SketchCircleDraft = {
   tool: "circle-center" | "circle-diameter";
   first: { x: number; z: number };
@@ -85,6 +86,7 @@ type SketchWorkspaceProps = {
   onDeleteImage: (id: string) => void;
   onDeletePoint: (id: string) => void;
   onDeleteSegment: (id: string) => void;
+  onTrimExtend: (id: string, point: { x: number; z: number }, mode: "trim" | "extend") => void;
   onMovePoint: (id: string, point: { x: number; z: number }) => void;
   onMovePoints: (ids: string[], delta: { x: number; z: number }) => void;
   onTransformPoints: (points: SketchPoint[], message?: string) => void;
@@ -547,6 +549,7 @@ export function SketchWorkspace({
   onDeleteImage,
   onDeletePoint,
   onDeleteSegment,
+  onTrimExtend,
   onMovePoint,
   onMovePoints,
   onTransformPoints,
@@ -564,6 +567,13 @@ export function SketchWorkspace({
   onTextCancel,
 }: SketchWorkspaceProps) {
   const [cornerAmount, setCornerAmount] = useState(2);
+  const [repairEndpointIndex, setRepairEndpointIndex] = useState(0);
+  const repair = useMemo(() => tool === "repair" ? inspectSketchEndpoints(profile) : null, [profile, tool]);
+  const locateRepairPoints = (points: SketchPoint[]) => {
+    onSelectMany(points.map((point) => point.id), [], [], []);
+    setPan({ x: points.reduce((sum, point) => sum + point.x, 0) / points.length, z: points.reduce((sum, point) => sum + point.z, 0) / points.length });
+    setZoom((value) => Math.max(value, 2));
+  };
   const formatDimension = (value: number, _accuracy: number) => formatLengthForWorkspace(value, workspace);
   const workspace = useMemo(() => normalizeWorkspaceSettings(initialWorkspace, DEFAULT_WORKPLANE_WORKSPACE), [initialWorkspace]);
   const [snap, setSnap] = useState<GridSize>(() => normalizeSnapGrid(initialSnap, DEFAULT_SNAP_GRID));
@@ -1089,6 +1099,20 @@ export function SketchWorkspace({
         </div>
       ) : null}
       {operation === "revolve" ? <SketchRevolvePreview positions={revolvePreviewPositions} /> : null}
+      {repair ? (
+        <section className="sketch-repair-panel" aria-label="Repair Sketch inspection">
+          <strong>Repair Sketch</strong>
+          <p role="status">{repair.endpoints.length} open endpoints · {repair.gaps.length} possible gaps</p>
+          <p>Endpoint gaps up to {formatDimension(SKETCH_REPAIR_GAP_LIMIT, workspace.accuracy)}. Open paths may be intentional. Geometry is unchanged.</p>
+          {repair.endpoints.length ? <button type="button" onClick={() => {
+            locateRepairPoints([repair.endpoints[repairEndpointIndex % repair.endpoints.length]]);
+            setRepairEndpointIndex((index) => index + 1);
+          }}>Locate next open endpoint</button> : <p>No open endpoints found. This is not a full sketch validity check.</p>}
+          {repair.gaps.length ? <ul aria-label="Possible endpoint gaps">{repair.gaps.map((gap, index) => (
+            <li key={`${gap.start.id}:${gap.end.id}`}><button type="button" onClick={() => locateRepairPoints([gap.start, gap.end])}>Locate gap {index + 1}: {formatDimension(gap.distance, workspace.accuracy)}</button></li>
+          ))}</ul> : null}
+        </section>
+      ) : null}
       <div className="camera-controls sketch-camera-controls" aria-label="Sketch view controls">
         <button aria-label="Reset sketch view" onClick={() => { setZoom(1); setPan({ x: 0, z: 0 }); }}><Home size={28} /></button>
         <button aria-label="Zoom in" onClick={() => setZoom((value) => clamp(value * 1.25, 0.75, 6))}><Plus size={33} /></button>
@@ -1361,6 +1385,7 @@ export function SketchWorkspace({
                   event.stopPropagation();
                   if (isPanGesture(event)) beginPan(event);
                   else if (tool === "erase") onDeleteSegment(segment.id);
+                  else if (event.button === 0 && (tool === "trim" || tool === "extend") && point) onTrimExtend(segment.id, point, tool);
                   else if (event.button === 0 && tool === "refine" && point) {
                     const start = pointById.get(segment.startId);
                     const end = pointById.get(segment.endId);
@@ -1769,7 +1794,7 @@ export function SketchWorkspace({
                 cx={point.x}
                 cy={point.z}
                 r={pointRadius}
-                pointerEvents={point.projectionId ? "none" : undefined}
+                pointerEvents={point.projectionId || tool === "trim" || tool === "extend" ? "none" : undefined}
                 onPointerDown={(event) => {
                   event.preventDefault();
                   event.stopPropagation();
@@ -1777,6 +1802,8 @@ export function SketchWorkspace({
                     beginPan(event);
                   } else if (tool === "erase" || tool === "refine") {
                     onDeletePoint(point.id);
+                  } else if (event.button === 0 && tool === "repair") {
+                    onSelectMany([point.id], [], [], []);
                   } else if (event.button === 0 && tool === "select") {
                     onPointPress(point.id);
                     if (!fixedPointIds.has(point.id)) beginEntityDrag(event, { kind: "move-point", pointerId: event.pointerId, pointId: point.id, current: { x: point.x, z: point.z } });
@@ -1787,6 +1814,10 @@ export function SketchWorkspace({
               />
             ))}
           </g>
+          {repair ? <g className="sketch-repair-markers" pointerEvents="none" aria-hidden="true">
+            {repair.gaps.map((gap) => <line key={`${gap.start.id}:${gap.end.id}`} x1={gap.start.x} y1={gap.start.z} x2={gap.end.x} y2={gap.end.z} />)}
+            {repair.endpoints.map((point) => <circle key={point.id} cx={point.x} cy={point.z} r={pointRadius + 4 * screenUnit} />)}
+          </g> : null}
           {tool === "dimension" ? (
             <g className="sketch-dimension-anchors">
               {dimensionAnchorCandidates.map((candidate) => {
