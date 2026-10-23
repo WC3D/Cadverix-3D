@@ -408,6 +408,44 @@ Select a point to change its mode:
 - **Split:** allows incoming and outgoing handles to move independently.
 - **Fix:** locks the point at its current coordinates.
 
+## Trim And Extend Entities
+
+In an active sketch, use the **Create / Transform** toolbar group:
+
+- **Trim Entities:** click the straight-line section to remove between its nearest intersections or endpoints. Clicking an outer section removes that end; without an interior intersection, the entire clicked segment is removed.
+- **Extend Entities:** click near the endpoint to extend. The tool uses the nearest intersection beyond that endpoint with an existing straight-line boundary. A boundary's imaginary continuation does not count; if no boundary is found, the sketch is unchanged and a notice explains why.
+
+Both operations use sketch **Undo** and **Redo**. Other connected geometry stays
+in place. Release a fixed endpoint before extending it. Affected driving lengths
+and invalidated reference dimensions can be removed; the status message reports
+dimension removal. Review dimensions after editing, or undo to restore them.
+
+This first version supports straight-line targets and boundaries only, not
+arcs, circles, or Bézier curves. Linked projected geometry cannot be edited
+directly; use an editable copy instead.
+
+## Repair Sketch Inspection
+
+1. In an active sketch, choose **Inspect → Repair Sketch**.
+2. Review the counts of **open endpoints** and **possible gaps**. Orange rings mark open endpoints; dashed connectors mark nearby endpoint pairs.
+3. Choose **Locate next open endpoint** to cycle through findings, or **Locate gap** to select both endpoints of a possible gap. Locate controls center and zoom the sketch view.
+4. Switch to **Select**, drawing, or Trim/Extend tools to make a deliberate edit. Reopen Repair Sketch to inspect the result.
+
+An open endpoint belongs to exactly one valid, non-linked sketch segment. The
+inspection supports line and curve endpoints, ignores standalone points and
+linked reference geometry, and flags separate open endpoints within **0.5 mm**
+of each other. Coincident endpoints with different IDs can also be flagged;
+the two ends of the same short segment are not reported as a possible gap.
+
+Inspection and locating findings do not change geometry or add undo steps.
+Results refresh when the profile changes, including sketch undo/redo. Gap
+distances display in the workspace's units, while the search limit remains
+0.5 mm. Choose another tool to hide the panel and markers.
+
+Open paths can be intentional. Repair Sketch does not automatically join points,
+check endpoint-to-segment gaps, detect overlaps or duplicates, or certify that a
+profile can extrude. No reported gaps is not a full sketch-validity check.
+
 ## Snapping
 
 Sketch snapping can use:

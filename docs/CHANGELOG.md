@@ -1,5 +1,12 @@
 # Changelog
 
+## 1.20.1
+
+- Added **Trim Entities** and **Extend Entities** under the active sketch's **Create / Transform** group, with sketch undo/redo. Trim removes the clicked section between straight-line intersections (or the whole line when unbounded); Extend reaches the nearest straight-line boundary beyond the chosen endpoint. Curves are not supported yet. Extending a fixed endpoint is rejected, and affected dimensions are removed with a notice.
+- Added **Inspect → Repair Sketch** to highlight open endpoints and possible endpoint gaps up to 0.5 mm, with selection and view-centering controls. Inspection does not change geometry or automatically repair it; overlaps, duplicates, and full profile validation are outside this first pass. See the [sketch guide](CADVERIX_USER_MANUAL.md#repair-sketch-inspection).
+- Consolidated the transitive `undici` override at **8.12.2** and refreshed the lockfile to address dependency-scan findings against 8.10.2.
+- Updated application/package versions, the README badge, and SKF `createdWithVersion` metadata to **1.20.1**. SKF format and minimum-reader versions are unchanged. This source update does not build or publish desktop installers.
+
 ## 1.0.15
 
 - Added a PCB workspace adapted from SketchForge-PCB, with multiple independent board designs and linked 3D instances inside one mechanical project. Combined projects use SKF format/minimum reader 4 and participate in autosave, backups, shared storage and project history.

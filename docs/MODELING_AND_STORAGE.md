@@ -134,6 +134,16 @@ setback along each adjoining segment for a chamfer, in millimeters. Fillets use
 a cubic Bézier arc approximation. Linked geometry and constrained/measured
 corners must be released first; oversized or collinear corners are rejected.
 
+## Sketch trimming and inspection
+
+Use **Sketch → Create / Transform → Trim Entities / Extend Entities** for
+undoable straight-line edits, or **Sketch → Inspect → Repair Sketch** to locate
+open endpoints and possible endpoint gaps up to 0.5 mm without editing geometry.
+See [Trim and Extend](CADVERIX_USER_MANUAL.md#trim-and-extend-entities) and
+[Repair Sketch](CADVERIX_USER_MANUAL.md#repair-sketch-inspection) for controls,
+dimension handling, and limits. Curved Trim/Extend, automatic repairs, and
+overlap/duplicate detection are not included.
+
 ## Storage & backups
 
 Open **Storage & backups** on the dashboard. The manager enables filesystem
