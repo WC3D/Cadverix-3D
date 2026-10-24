@@ -19,7 +19,7 @@
     <a href="https://github.com/WC3D/Cadverix-3D/stargazers"><img alt="Star Cadverix 3D on GitHub" src="https://img.shields.io/github/stars/WC3D/Cadverix-3D?style=flat&logo=github"></a>
     <a href="https://github.com/sponsors/Formsmith746"><img alt="Sponsor upstream contributors on GitHub" src="https://img.shields.io/badge/GitHub-Sponsor-ea4aaa?logo=githubsponsors&logoColor=white"></a>
     <img alt="Local first" src="https://img.shields.io/badge/local--first-no%20account-0ea5e9">
-    <img alt="Version v1.20.1" src="https://img.shields.io/badge/version-v1.20.1-2563eb">
+    <img alt="Version v1.20.2" src="https://img.shields.io/badge/version-v1.20.2-2563eb">
     <a href="docs/MOBILE_ALPHA.md"><img alt="Mobile support: alpha" src="https://img.shields.io/badge/mobile-alpha-f59e0b"></a>
   </p>
 </div>
@@ -210,7 +210,7 @@ Cadverix 3D is local-first. Private projects stay in each user's browser storage
 
 Desktop packaging supports a Windows x64 installer, macOS Intel/Apple Silicon DMGs, and Linux AppImages. Download the matching asset from [GitHub Releases](https://github.com/WC3D/Cadverix-3D/releases).
 
-The source version is **1.20.1**; updating it does not build or publish desktop
+The source version is **1.20.2**; updating it does not build or publish desktop
 installers. The previously documented **1.0.15** packages are available on [GitHub Releases](https://github.com/WC3D/Cadverix-3D/releases/tag/v1.0.15), with local build copies in `dist/desktop/`; see the
 [build notes](docs/RELEASE_1.0.15.md) for filenames, checksums, signing status,
 and verification. Building locally does not automatically publish a release.

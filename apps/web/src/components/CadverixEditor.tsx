@@ -136,6 +136,7 @@ import { appendSketchArc } from "@/lib/sketchArcs";
 import { moveConstrainedSketchPoint, pruneSketchParameters, setSketchPointFixed, setSketchSegmentConstraint, setSketchSegmentLength, solveSketchProfile } from "@/lib/sketchConstraints";
 import { rectFromPoints, rectangleSketchGeometry } from "@/lib/sketchRectangles";
 import { textSketchGeometry } from "@/lib/sketchTextGeometry";
+import { fitTextGeometry } from "@/lib/textGeometry";
 import { polygonFromPoints, polygonSketchGeometry } from "@/lib/sketchPolygons";
 import { offsetSketchSegments } from "@/lib/sketchOffset";
 import { trimExtendSketchLine } from "@/lib/sketchTrimExtend";
@@ -2576,26 +2577,7 @@ function createBooleanTextGeometry(shape: WorkplaneShape) {
     bevelSegments: Math.max(1, shape.segments ?? 0),
   });
 
-  geometry.computeBoundingBox();
-  const box = geometry.boundingBox;
-  if (box) {
-    const textWidth = Math.max(1, box.max.x - box.min.x);
-    const textDepth = Math.max(1, box.max.y - box.min.y);
-    const scale = Math.min(shapeWidth(shape) / textWidth, shapeDepth(shape) / textDepth);
-    geometry.scale(scale, scale, 1);
-  }
-
-  geometry.rotateX(-Math.PI / 2);
-  geometry.computeBoundingBox();
-  const rotatedBox = geometry.boundingBox;
-  if (rotatedBox) {
-    geometry.translate(
-      -(rotatedBox.min.x + rotatedBox.max.x) / 2,
-      -rotatedBox.min.y,
-      -(rotatedBox.min.z + rotatedBox.max.z) / 2,
-    );
-  }
-  return geometry;
+  return fitTextGeometry(geometry, shape);
 }
 
 function geometryMeshForShape(shape: WorkplaneShape): MeshData | null {

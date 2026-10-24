@@ -73,6 +73,7 @@ import { projectThumbnailDimensions } from "@/lib/projectThumbnail";
 import { canBeginShapeDrag, DEFAULT_SNAP_GRID, DEFAULT_WORKPLANE_WORKSPACE, normalizeSnapGrid, normalizeWorkspaceSettings, shapeDimensionLimit, snapGridStep as snapStep, workplaneSettingsFingerprint } from "@/lib/workplaneSettings";
 import { interiorWorkplaneGridCoordinates, workplaneGridPalette, workplaneLabelLayout, workplaneThemePalette, WORKPLANE_LABEL_ASPECT, WORKPLANE_LABEL_TEXT, WORKPLANE_LINE_ELEVATION, WORKPLANE_MAJOR_GRID_INTERVAL } from "@/lib/workplaneGrid";
 import { cleanNearZero, cleanRotationDegrees, fallbackSolidColor, mirroredAxisCount, mirrorSign, preservesEdgeTreatmentSize, proportionalResizeScale, resizedImportedCoordinates, resizedImportedMeshPositions, resizedShapeSize, shapeDepth, shapeHasTaper, shapeOverallFootprintDimensions, shapeTaperDimensions, shapeTaperScaleAt, shapeWidth } from "@/lib/workplaneShapes";
+import { fitTextGeometry } from "@/lib/textGeometry";
 import { sphereTessellation } from "@/lib/sphereTessellation";
 import type { SketchForgeMcpViewFace } from "@/lib/sketchforgeMcpProtocol";
 import {
@@ -9168,26 +9169,7 @@ function addTextShape(group: THREE.Group, material: THREE.MeshStandardMaterial, 
       bevelSegments: Math.max(1, shape.segments ?? 0),
     });
 
-    next.computeBoundingBox();
-    const box = next.boundingBox;
-    if (box) {
-      const textWidth = Math.max(1, box.max.x - box.min.x);
-      const textDepth = Math.max(1, box.max.y - box.min.y);
-      const scale = Math.min(shapeWidth(shape) / textWidth, shapeDepth(shape) / textDepth);
-      next.scale(scale, scale, 1);
-    }
-
-    next.rotateX(-Math.PI / 2);
-    next.computeBoundingBox();
-    const rotatedBox = next.boundingBox;
-    if (rotatedBox) {
-      next.translate(
-        -(rotatedBox.min.x + rotatedBox.max.x) / 2,
-        -rotatedBox.min.y,
-        -(rotatedBox.min.z + rotatedBox.max.z) / 2,
-      );
-    }
-    return next;
+    return fitTextGeometry(next, shape);
   });
   addMesh(group, geometry, material, shape);
 }

@@ -118,6 +118,7 @@ function formatPropertyNumber(value: number, accuracy: MeasurementAccuracy, step
 }
 
 function propertyUsesLengthUnit(label: string) {
+  if (label === "Depth") return true;
   return ["Radius", "Length", "Width", "Height", "Bevel", "Top Radius", "Base Radius", "Thickness", "Tooth Size", "Tooth Width", "Center Hole", "Top Length", "Top Width", "Bottom Length", "Bottom Width", "Bore Diameter", "Shaft Diameter", "Head Height", "Head Across Flats", "Across Flats", "Thread Pitch", "Thread Depth", "Corner Fillet", "Top/Bottom Fillet", "Inner Size", "Outer Fillet", "Inner Fillet", "Tip Fillet", "Head Depth", "Neck Width", "Clearance", "Wire Diameter", "Cell Size", "Wall Thickness", "Frame Width", "Tube Diameter"].includes(label)
     || /^Segment \d+ (Length|Radius)$/.test(label);
 }
@@ -579,7 +580,9 @@ function getShapePropertiesWithAppLimits(shape: WorkplaneShape, onUpdate: ShapeI
         },
       },
       { type: "select", label: "Font", value: shape.font ?? "Multilanguage", options: TEXT_FONT_OPTIONS, onChange: (font) => onUpdate({ font }) },
-      { label: "Height", value: shape.height, min: MIN_SHAPE_SIZE, max: 40, onChange: setHeight },
+      { label: "Width", value: width, min: MIN_SHAPE_SIZE, max: textWidthMax, onChange: setWidth },
+      { label: "Height", value: depth, min: MIN_SHAPE_SIZE, max: 160, onChange: setDepth },
+      { label: "Depth", value: shape.height, min: MIN_SHAPE_SIZE, max: 40, onChange: setHeight },
       { label: "Bevel", value: shape.bevel ?? 0, min: 0, max: 8, onChange: (bevel) => onUpdate({ bevel }) },
       { label: "Segments", value: shape.segments ?? 0, min: 0, max: 24, step: 1, onChange: (segments) => onUpdate({ segments: Math.round(segments) }) },
     ];

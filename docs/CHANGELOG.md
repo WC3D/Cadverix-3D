@@ -1,5 +1,10 @@
 # Changelog
 
+## 1.20.2
+
+- Added independent text width, letter height, and extrusion depth controls that work at any rotation, with matching viewport and export geometry.
+- Updated package versions, the README badge, and SKF `createdWithVersion` metadata to **1.20.2**. SKF format and minimum-reader versions are unchanged.
+
 ## 1.20.1
 
 - Added **Trim Entities** and **Extend Entities** under the active sketch's **Create / Transform** group, with sketch undo/redo. Trim removes the clicked section between straight-line intersections (or the whole line when unbounded); Extend reaches the nearest straight-line boundary beyond the chosen endpoint. Curves are not supported yet. Extending a fixed endpoint is rejected, and affected dimensions are removed with a notice.

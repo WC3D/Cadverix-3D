@@ -54,3 +54,4 @@ apps/web/public/assets/occt/
 docs/SKETCHFORGE_USER_MANUAL.md
 implementation_plan.md
 scripts/generate-user-manual.py
+/.playwright-mcp
