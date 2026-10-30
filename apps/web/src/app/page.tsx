@@ -559,6 +559,21 @@ function newProject(name: string, index: number, shapeCount = 0): DashboardProje
   };
 }
 
+function buildValidatedThumbnailUrl(baseUrl: string): string {
+  try {
+    const url = new URL(baseUrl);
+    if (url.protocol !== "data:") {
+      throw new Error("Invalid protocol");
+    }
+    if (!/^data:image\/png;base64,/i.test(baseUrl)) {
+      throw new Error("Invalid URL");
+    }
+    return url.href;
+  } catch {
+    throw new Error("Invalid URL");
+  }
+}
+
 function projectNameFromFileName(fileName: string) {
   return fileName.replace(/\.[^.]+$/, "").trim() || "Imported design";
 }
@@ -1116,7 +1131,7 @@ export default function Home() {
     if (saveBackToSource && activeProject.sharedProject) headers["If-Match"] = `"${activeProject.sharedProject.revision}"`;
     else headers["If-None-Match"] = "*";
     const body = bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength) as ArrayBuffer;
-    const thumbnailResponse = await fetch(thumbnailDataUrl);
+    const thumbnailResponse = await fetch(buildValidatedThumbnailUrl(thumbnailDataUrl));
     const thumbnail = await thumbnailResponse.blob();
     if (thumbnail.type !== "image/png" || thumbnail.size === 0) throw new Error("Could not prepare the shared project thumbnail");
     const formData = new FormData();
