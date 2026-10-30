@@ -240,6 +240,10 @@ export function canonicalizeShape(shape: WorkplaneShape): WorkplaneShape {
   return (Object.keys(next) as Array<keyof WorkplaneShape>).every((key) => next[key] === shape[key]) ? shape : next;
 }
 
+export function isReferenceShape(shape: WorkplaneShape) {
+  return shape.kind === "constructionPlane" || shape.kind === "sketchProfile";
+}
+
 export function workplaneShapesEqual(a: WorkplaneShape, b: WorkplaneShape) {
   return (
     a.id === b.id &&

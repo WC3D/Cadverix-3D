@@ -10,6 +10,8 @@ import { importedShapeFromSvg } from "@/lib/svgImport";
 import { normalizeSnapGrid, normalizeWorkspaceSettings } from "@/lib/workplaneSettings";
 import { parseDrawingSheet } from "@/lib/drawingSheet";
 import { parseElectronics, type ElectronicsDocument } from "@/pcb/pcbDocument";
+import { orderedSketchNodes } from "@/lib/parametricSketches";
+import { threePointConstructionPlanePose } from "@/lib/constructionPlanes";
 import type { CadDisplayEdge, GridSize, ProjectAsset, ProjectAssetSourceFormat, SketchOperation, SketchRevolveSettings, WorkplaneNote, WorkplaneShape, WorkplaneWorkspaceSettings } from "@/types/sketchforge";
 
 export const SKF_SCHEMA_ID = "com.sketchforge.project";
@@ -21,9 +23,10 @@ export const SKF_FORMAT_VERSION = 2;
 // projects remain format 2 so existing readers can still exchange them.
 export const SKF_DRAWING_FORMAT_VERSION = 3;
 export const SKF_HYBRID_FORMAT_VERSION = 4;
+export const SKF_PARAMETRIC_FORMAT_VERSION = 5;
 export const SKF_MINIMUM_READER_VERSION = 2;
 export const SKF_OLDEST_READABLE_FORMAT_VERSION = 1;
-export const SKF_CREATED_WITH_VERSION = "1.20.2";
+export const SKF_CREATED_WITH_VERSION = "1.21.0";
 export const SKF_MEDIA_TYPE = "application/vnd.sketchforge.project+zip";
 export const LYL_MEDIA_TYPE = "application/vnd.layerling.project+zip";
 
@@ -68,7 +71,7 @@ const SHAPE_KINDS = new Set([
   "box", "cylinder", "sphere", "sketch", "scribble", "cone", "pyramid", "roof", "text", "roundRoof",
   "halfSphere", "torus", "tube", "gear", "screw", "washer", "nut", "ring", "wedge", "polygon", "icosahedron", "constructionPlane", "mesh",
   "roundedBox", "ellipse", "slot", "star", "heart", "crescent", "teardrop", "counterbore", "countersink", "dovetail", "spring", "honeycomb",
-  "bentTube",
+  "bentTube", "sketchProfile",
 ]);
 
 const FEATURE_TYPES = new Set([
@@ -142,7 +145,7 @@ export type SkfFeatureV1 = {
 // from inline definitions to assets; keep the exported type name for callers.
 export type SkfProjectDocumentV1 = {
   schema: typeof SKF_SCHEMA_ID | typeof LYL_SCHEMA_ID;
-  formatVersion: 1 | 2 | 3 | 4;
+  formatVersion: 1 | 2 | 3 | 4 | 5;
   minimumReaderVersion: number;
   createdWithVersion: string;
   metadata: {
@@ -796,21 +799,24 @@ function activeProjectIndexes(state: SkfStateV1) {
     if (!node) return;
     (node.groupedShapeNodeIds ?? []).forEach(visit);
     let previous: string | undefined;
-    if (node.definition.sketchProfile && (node.definition.sketchFeature as { kind?: unknown } | undefined)?.kind !== "sweep") {
+    if (node.definition.kind === "sketchProfile") {
+      sketches.push({ id: `sketch/${safeNodeToken(node.objectId)}`, nodeId: node.nodeId, objectId: node.objectId, extrusionDepth: 0 });
+    } else if (node.definition.sketchProfile && (node.definition.sketchFeature as { kind?: unknown } | undefined)?.kind !== "sweep") {
       const operation = node.definition.sketchOperation === "revolve" ? "revolve" : "extrude";
       const featureType = operation === "revolve" ? "sketch-revolve" : "sketch-extrusion";
       const featureId = `feature/${safeNodeToken(node.nodeId)}/${featureType}`;
+      const sourceSketchId = (node.definition.sketchFeature as { sketchId?: string } | undefined)?.sketchId;
       features.push({
         id: featureId,
         type: featureType,
         outputObjectId: node.objectId,
-        inputObjectIds: [],
+        inputObjectIds: sourceSketchId ? [sourceSketchId] : [],
         dependsOnFeatureIds: [],
         parameters: operation === "revolve"
           ? { ...(node.definition.sketchRevolve as Record<string, unknown> | undefined), axis: "vertical-sketch-axis", mode: "create" }
-          : { depth: node.definition.height, direction: "positive-y", mode: "create" },
+           : { depth: node.definition.height, direction: (node.definition.sketchFeature as Extract<WorkplaneShape["sketchFeature"], { kind: "extrusion" }> | undefined)?.direction ?? "positive", axis: "sketch-plane-normal", mode: "create" },
       });
-      sketches.push({
+      if (!sourceSketchId) sketches.push({
         id: `sketch/${safeNodeToken(node.objectId)}`,
         nodeId: node.nodeId,
         objectId: node.objectId,
@@ -957,6 +963,7 @@ async function exportProjectPackage(input: SkfProjectExportInput, flavor: Projec
     return shapes === entry.shapes ? entry : editorHistoryEntry(shapes, entry.selectedIds, normalizeNotes(entry.notes), entry.electronics);
   });
   for (const entry of exportEntries) {
+    if (entry.shapes.some((shape) => shape.kind === "sketchProfile" || shape.sketchFeature?.kind === "extrusion" && shape.sketchFeature.sketchId || shape.constructionPlane?.kind === "threePoint")) orderedSketchNodes(entry.shapes);
     for (const shape of entry.shapes) if (shape.pcbInstance && !entry.electronics?.boards.some((board) => board.id === shape.pcbInstance!.boardId)) throw new Error("PCB instance is missing its board document; use Ctrl/Cmd+S in the PCB workspace to save a combined SKF");
   }
   const builder = new SkfArchiveBuilder(flavor);
@@ -991,10 +998,11 @@ async function exportProjectPackage(input: SkfProjectExportInput, flavor: Projec
   const workspace = normalizeWorkspaceSettings(input.workspace);
   if (input.workspace.drawing !== undefined) workspace.drawing = parseDrawingSheet(input.workspace.drawing);
   const hybrid = states.some((state) => state.electronics?.boards.length);
+  const parametric = states.some((state) => state.nodes.some((node) => node.definition.kind === "sketchProfile" || (node.definition.sketchFeature as { sketchId?: string } | undefined)?.sketchId || (node.definition.constructionPlane as { kind?: string } | undefined)?.kind === "threePoint"));
   const document: SkfProjectDocumentV1 = {
     schema: PROJECT_PACKAGE_FLAVORS[flavor].schema,
-    formatVersion: hybrid ? SKF_HYBRID_FORMAT_VERSION : flavor === "skf" && workspace.drawing ? SKF_DRAWING_FORMAT_VERSION : SKF_FORMAT_VERSION,
-    minimumReaderVersion: hybrid ? SKF_HYBRID_FORMAT_VERSION : flavor === "skf" && workspace.drawing ? SKF_DRAWING_FORMAT_VERSION : SKF_MINIMUM_READER_VERSION,
+    formatVersion: parametric ? SKF_PARAMETRIC_FORMAT_VERSION : hybrid ? SKF_HYBRID_FORMAT_VERSION : flavor === "skf" && workspace.drawing ? SKF_DRAWING_FORMAT_VERSION : SKF_FORMAT_VERSION,
+    minimumReaderVersion: parametric ? SKF_PARAMETRIC_FORMAT_VERSION : hybrid ? SKF_HYBRID_FORMAT_VERSION : flavor === "skf" && workspace.drawing ? SKF_DRAWING_FORMAT_VERSION : SKF_MINIMUM_READER_VERSION,
     createdWithVersion: SKF_CREATED_WITH_VERSION,
     metadata: {
       ...(input.projectId ? { projectId: input.projectId } : {}),
@@ -1119,6 +1127,7 @@ function validateConstructionPlanePose(value: unknown, label: string) {
   const pose = objectRecord(value, label);
   finiteTuple(pose.origin, 3, `${label}.origin`);
   finiteTuple(pose.quaternion, 4, `${label}.quaternion`);
+  if (Math.hypot(...pose.quaternion as number[]) < 1e-12) throw new Error(`${label}.quaternion is degenerate`);
 }
 
 function validateSketchProfile(value: unknown, label: string) {
@@ -1132,6 +1141,13 @@ function validateSketchProfile(value: unknown, label: string) {
     pointIds.add(id);
     finiteNumber(point.x, `${label}.points[${index}].x`);
     finiteNumber(point.z, `${label}.points[${index}].z`);
+    for (const key of ["handleIn", "handleOut"]) {
+      if (point[key] !== undefined) {
+        const handle = objectRecord(point[key], `${label}.points[${index}].${key}`);
+        finiteNumber(handle.x, `${label}.points[${index}].${key}.x`);
+        finiteNumber(handle.z, `${label}.points[${index}].${key}.z`);
+      }
+    }
   });
   const segmentIds = new Set<string>();
   profile.segments.forEach((rawSegment, index) => {
@@ -1263,10 +1279,24 @@ function validateShapeDefinition(definition: Record<string, unknown>, label: str
     throw new Error(`${label} contains inline package-only geometry fields`);
   }
   if (definition.sketchProfile) validateSketchProfile(definition.sketchProfile, `${label}.sketchProfile`);
+  if (definition.kind === "sketchProfile" && (!definition.sketchProfile || !definition.sketchPlane)) throw new Error(`${label} is missing its independent sketch geometry or frame`);
+  if (definition.sketchFeature) {
+    const feature = objectRecord(definition.sketchFeature, `${label}.sketchFeature`);
+    if (feature.sketchId !== undefined) {
+      if (feature.kind !== "extrusion") throw new Error(`${label} has an unsupported saved-sketch feature`);
+      stringValue(feature.sketchId, `${label}.sketchFeature.sketchId`);
+    }
+    if (feature.kind === "extrusion" && feature.direction !== undefined && !["positive", "negative", "symmetric"].includes(String(feature.direction))) throw new Error(`${label} has an invalid extrusion direction`);
+    if (feature.kind === "extrusion" && feature.regionIds !== undefined) stringArray(feature.regionIds, `${label}.sketchFeature.regionIds`);
+  }
   if (definition.constructionPlane) {
     const plane = objectRecord(definition.constructionPlane, `${label}.constructionPlane`);
     validateConstructionPlanePose(plane.pose, `${label}.constructionPlane.pose`);
-    if (plane.kind === "principal") {
+    if (plane.kind === "threePoint") {
+      if (!Array.isArray(plane.points) || plane.points.length !== 3) throw new Error(`${label}.constructionPlane requires three points`);
+      plane.points.forEach((point, index) => finiteTuple(point, 3, `${label}.constructionPlane.points[${index}]`));
+      threePointConstructionPlanePose(...plane.points as [[number, number, number], [number, number, number], [number, number, number]]);
+    } else if (plane.kind === "principal") {
       if (plane.principal !== "xy" && plane.principal !== "xz" && plane.principal !== "yz") throw new Error(`${label}.constructionPlane has an unknown principal plane`);
       finiteNumber(plane.offset, `${label}.constructionPlane.offset`);
       if (plane.angle !== undefined) finiteNumber(plane.angle, `${label}.constructionPlane.angle`);
@@ -1392,13 +1422,13 @@ async function validateDocumentAndAssets(raw: unknown, files: ArchiveFiles) {
   if (document.schema !== SKF_SCHEMA_ID && document.schema !== LYL_SCHEMA_ID) throw new Error("This file is not a supported Cadverix 3D (.skf) or Layerling project");
   const layerlingProject = document.schema === LYL_SCHEMA_ID;
   if (!Number.isInteger(document.formatVersion)) throw new Error("Cadverix 3D project formatVersion is missing");
-  if (document.formatVersion > (layerlingProject ? SKF_DRAWING_FORMAT_VERSION : SKF_HYBRID_FORMAT_VERSION)) {
+  if (document.formatVersion > (layerlingProject ? SKF_DRAWING_FORMAT_VERSION : SKF_PARAMETRIC_FORMAT_VERSION)) {
     throw new Error(`This project uses .skf format ${document.formatVersion}, which requires a newer Cadverix 3D version`);
   }
   if (document.formatVersion < SKF_OLDEST_READABLE_FORMAT_VERSION) {
     throw new Error(`Packaged .skf format ${document.formatVersion} requires migration support that is not available`);
   }
-  if (!Number.isInteger(document.minimumReaderVersion) || document.minimumReaderVersion > (layerlingProject ? SKF_DRAWING_FORMAT_VERSION : SKF_HYBRID_FORMAT_VERSION)) {
+  if (!Number.isInteger(document.minimumReaderVersion) || document.minimumReaderVersion > (layerlingProject ? SKF_DRAWING_FORMAT_VERSION : SKF_PARAMETRIC_FORMAT_VERSION)) {
     throw new Error("This project requires a newer Cadverix 3D reader and was not opened");
   }
   const metadata = objectRecord(document.metadata, "metadata");
@@ -1465,6 +1495,10 @@ async function validateDocumentAndAssets(raw: unknown, files: ArchiveFiles) {
         }
       }
       const objectId = validateShapeDefinition(definition, `node '${nodeId}'`);
+      if (definition.kind === "sketchProfile" || (definition.sketchFeature as { sketchId?: unknown } | undefined)?.sketchId || (definition.constructionPlane as { kind?: string } | undefined)?.kind === "threePoint") {
+        if (layerlingProject || document.formatVersion < SKF_PARAMETRIC_FORMAT_VERSION || document.minimumReaderVersion < SKF_PARAMETRIC_FORMAT_VERSION) throw new Error("Independent sketches require SKF format and reader version 5");
+        if (definition.kind === "sketchProfile" && (node.importedMesh || node.cadBrepAssetId || node.groupedShapeNodeIds?.length)) throw new Error("Independent sketches cannot contain solid geometry");
+      }
       if (node.objectId !== objectId) throw new Error(`Node '${nodeId}' objectId does not match its shape definition`);
       if (node.importedMesh) {
         const source = node.importedMesh.sourceAssetId ? assetById.get(node.importedMesh.sourceAssetId) : undefined;
@@ -1503,6 +1537,7 @@ async function validateDocumentAndAssets(raw: unknown, files: ArchiveFiles) {
       visited.add(`${primary ? "primary" : "history"}:${nodeId}`);
     };
     roots.forEach((root) => walk(root, true));
+    if (document.formatVersion >= SKF_PARAMETRIC_FORMAT_VERSION) orderedSketchNodes(roots.map((id) => nodeById.get(id)!.definition as WorkplaneShape));
     if (stateId === document.sceneStateId) primaryObjectIds.forEach((id) => activeObjectIds.add(id));
     stateById.set(stateId, state);
   }
@@ -1873,7 +1908,7 @@ export async function importSkfProject(input: ArrayBuffer | Uint8Array, options:
     const document = objectRecord(raw, "Legacy .skf project");
     if (document.schema !== SKF_SCHEMA_ID && document.schema !== LYL_SCHEMA_ID) throw new Error("This file is not a supported Cadverix 3D (.skf) or Layerling project");
     if (document.formatVersion === 0) return migrateV0(document);
-    if (typeof document.formatVersion === "number" && document.formatVersion > SKF_HYBRID_FORMAT_VERSION) {
+    if (typeof document.formatVersion === "number" && document.formatVersion > SKF_PARAMETRIC_FORMAT_VERSION) {
       throw new Error(`This project uses .skf format ${document.formatVersion}, which requires a newer Cadverix 3D version`);
     }
     throw new Error("This legacy .skf version is not supported");

@@ -1,5 +1,43 @@
 import { expect, test } from "@playwright/test";
 
+test("a dashboard with a saved angled face plane settles instead of repeatedly saving", async ({ page }) => {
+  const errors: string[] = [];
+  page.on("pageerror", (error) => errors.push(error.message));
+  await page.addInitScript(() => {
+    const plane = {
+      origin: { x: 0, y: 0, z: 10 }, normal: { x: 0, y: 0, z: 1 },
+      xAxis: { x: 0.9527478871072962, y: -0.3037621826570634, z: 0 },
+      zAxis: { x: -0.30376218265706334, y: -0.952747887107296, z: 0 },
+    };
+    const key = "sketchForge.projects";
+    if (!localStorage.getItem(key)) localStorage.setItem(key, JSON.stringify([{
+      id: "angled-plane-project", name: "Angled plane", createdAt: 1, updatedAt: 1, revision: 1,
+      shapes: 0, placementWorkplane: plane, sketchPlacementWorkplane: plane,
+    }]));
+    const probe = { writes: 0, ticks: 0 };
+    (window as Window & { dashboardProbe?: typeof probe }).dashboardProbe = probe;
+    const setItem = Storage.prototype.setItem;
+    Storage.prototype.setItem = function (key, value) {
+      if (key === "sketchForge.projects") probe.writes++;
+      return setItem.call(this, key, value);
+    };
+    setInterval(() => probe.ticks++, 50);
+  });
+  for (let load = 0; load < 2; load++) {
+    await page.goto("/");
+    await expect(page.locator(".project-card")).toHaveCount(1);
+    await page.waitForFunction(() => {
+      const probe = (window as Window & { dashboardProbe?: { writes: number; ticks: number } }).dashboardProbe!;
+      return probe.ticks >= 40 || probe.writes >= 20;
+    });
+    const probe = await page.evaluate(() => (window as Window & { dashboardProbe?: { writes: number; ticks: number } }).dashboardProbe!);
+    expect(probe.writes).toBeLessThanOrEqual(3);
+    expect(probe.ticks).toBeGreaterThanOrEqual(40);
+    await expect(page.locator("[data-codex-state]")).toHaveCount(0);
+  }
+  expect(errors).toEqual([]);
+});
+
 test("workspace theme and snap changes settle without an update loop", async ({ page }) => {
   const errors: string[] = [];
   page.on("pageerror", (error) => errors.push(error.message));

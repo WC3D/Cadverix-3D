@@ -83,7 +83,7 @@ The change detector follows geometry rather than object names or colors. Changin
 - **SVG** exports a vector sheet with physical millimeter width/height, title block, model views and dimensions. Selection handles and unfinished previews are removed.
 - **Print / PDF** opens the browser print dialog. Choose the matching paper size and **100% / Actual size**; disable browser headers/footers. Use the dialog's Save as PDF destination to create a PDF.
 
-Projects containing a drawing sheet use **SKF format 3 / minimum reader 3** so older applications reject them instead of silently discarding the drawing. Modeling-only projects continue to use format 2, and the current reader still opens format 1 and 2 projects.
+Drawing projects use at least **SKF format 3 / minimum reader 3** so older applications reject them instead of silently discarding the drawing. PCB data raises the requirement to 4; independent sketches, source-linked extrusions, or three-point planes in retained history raise it to 5. Ordinary modeling-only projects continue to use format 2, and the native reader accepts packaged versions 1–5. See [SKF compatibility](SKF_PROJECT_FORMAT.md#compatibility-and-migrations).
 
 ## Phone and tablet controls
 

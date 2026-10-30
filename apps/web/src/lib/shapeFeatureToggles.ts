@@ -7,6 +7,7 @@ export type ShapeFeatureRemoval =
   | { type: "ungroup" };
 
 export function shapeFeatureKinds(shape: WorkplaneShape): ShapeFeatureKind[] {
+  if (shape.kind === "sketchProfile") return [];
   const kinds: ShapeFeatureKind[] = [];
   if ((shape.edgeTreatmentHistory?.length ?? 0) > 0) kinds.push("edge");
   if (shape.sculpted && shape.sculptSource) kinds.push("sculpt");

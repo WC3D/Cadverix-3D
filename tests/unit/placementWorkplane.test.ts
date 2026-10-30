@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   horizontalPlacementWorkplane,
+  normalizePlacementWorkplane,
   placementPatchForNewShape,
   placementWorkplaneCoordinates,
   placementWorkplaneFromSurface,
@@ -10,6 +11,32 @@ import {
 } from "@/lib/placementWorkplane";
 
 describe("placement workplanes", () => {
+  it("preserves normalized face-plane axes across repeated storage round trips", () => {
+    const plane = {
+      origin: { x: 0, y: 0, z: 10 },
+      normal: { x: 0, y: 0, z: 1 },
+      xAxis: { x: 0.9527478871072962, y: -0.3037621826570634, z: 0 },
+      zAxis: { x: -0.30376218265706334, y: -0.952747887107296, z: 0 },
+    };
+    let normalized = plane;
+    for (let index = 0; index < 100; index++) {
+      normalized = normalizePlacementWorkplane(JSON.parse(JSON.stringify(normalized)));
+      expect(normalized).toEqual(plane);
+    }
+  });
+
+  it("still repairs invalid or non-orthonormal saved axes", () => {
+    const plane = horizontalPlacementWorkplane(3);
+    for (const invalid of [
+      { ...plane, normal: { x: 0, y: 2, z: 0 } },
+      { ...plane, xAxis: { x: 1, y: 1, z: 0 } },
+      { ...plane, zAxis: { x: 0, y: 0, z: -1 } },
+      { ...plane, zAxis: { x: NaN, y: 0, z: 1 } },
+      { ...plane, zAxis: undefined },
+    ]) expect(normalizePlacementWorkplane(invalid)).toEqual(plane);
+    expect(normalizePlacementWorkplane({ ...plane, normal: { x: NaN, y: 1, z: 0 } }, 3)).toEqual(plane);
+  });
+
   it("round-trips coordinates on an oriented surface", () => {
     const plane = placementWorkplaneFromSurface(
       { x: 10, y: 5, z: -4 },

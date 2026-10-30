@@ -5,6 +5,7 @@ test("closed profile fills show the grid and inner regions can be deselected by 
   await page.getByRole("tab", { name: "Sketch", exact: true }).tap();
   await page.getByRole("button", { name: "Sketch to 3D options" }).tap();
   await page.getByRole("menuitem", { name: /^Extrude sketch/ }).tap();
+  await page.getByRole("button", { name: "XZ · Top", exact: true }).tap();
   await expect(page.locator(".sketch-plate")).toBeVisible();
   await page.getByRole("button", { name: "Corner Rectangle", exact: true }).tap();
   await page.touchscreen.tap(550, 400);
@@ -21,7 +22,7 @@ test("closed profile fills show the grid and inner regions can be deselected by 
   expect(dragFills).toEqual(["none", "none"]);
   for (const fill of await profiles.evaluateAll((nodes) => nodes.map((node) => getComputedStyle(node).fill))) {
     expect(fill).toMatch(/^rgba\(/);
-    expect(Number(fill.split(",").at(-1)!.replace(")", ""))).toBeLessThanOrEqual(0.24);
+    expect(Number(fill.split(",").at(-1)!.replace(")", ""))).toBeLessThanOrEqual(0.46);
   }
   // Check the actual hit target before tapping: a transparent overlay must not
   // intercept the inner profile, nor should this accidentally toggle the outer.

@@ -1,5 +1,16 @@
 # Changelog
 
+## 1.21.0
+
+- Added independent named sketches, **Save sketch only**, model-browser edit/extrude actions, and source-linked exact extrusions. Source edits rebuild directly linked extrusions atomically; failed or stale builds retain committed geometry.
+- Added editable reference-plane definitions and three-point planes, dependency/cycle validation, and protection against deleting referenced sketches or planes. Reference helpers are hidden unless selected, with a **Show all reference planes** control.
+- Added explicit extrusion distance and one-sided/reverse/symmetric directions, editable line dimensions, sketch-plane-normal resizing, and restoration of the 3D camera when leaving sketch mode. Fixed double transformation of vertical sketch extrusions.
+- Replaced partial mesh slices and overlapping face-edge outlines with projected silhouettes built by the existing Manifold/Clipper2 engine. Preserve real holes and separate components, distinguish existing bodies from new-feature previews, and keep reference inputs stable to avoid repeated projection work.
+- Fixed invalid SVG coordinates from empty plane references, large-mesh sketch-entry argument overflows, and the dashboard save/render loop caused by repeatedly normalizing face-plane axes.
+- Added blocked-storage recovery messages, visible editor save-failure warnings, and a guard against opening a missing nonempty project as an empty, autosaving replacement. Recovery snapshots remain best-effort; these changes do not reconstruct lost or previously corrupted geometry.
+- Added SKF format/minimum reader **5** for independent sketches, source-linked extrusions, or three-point planes in retained history. Ordinary modeling, drawing, and PCB packages retain their feature-appropriate format versions; native readers accept formats **1–5**.
+- Updated application/package versions, the README badge, and SKF `createdWithVersion` metadata to **1.21.0**. Full constraint solving, loft evaluation, general downstream regeneration, and persistent subshape naming remain outside this increment. This source update does not build or publish desktop installers.
+
 ## 1.20.2
 
 - Added independent text width, letter height, and extrusion depth controls that work at any rotation, with matching viewport and export geometry.

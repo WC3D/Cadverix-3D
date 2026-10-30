@@ -35,6 +35,7 @@ import { displayStepFromMillimeters, displayToMillimeters, formatFractionalInche
 import { snapGridOptionsForUnits } from "@/lib/workplaneSettings";
 import { resizedShapeSize, shapeDepth, shapeHasTaper, shapeOverallFootprintDimensions, shapeTaperDimensions, shapeWidth } from "@/lib/workplaneShapes";
 import { normalizeSketchRevolveSettings } from "@/lib/sketchRevolve";
+import { isSketchExtrusion } from "@/lib/sketchExtrusion";
 import { MAX_HIGH_RESOLUTION_SIDES } from "@/lib/workplaneSettings";
 import { normalizeBentTubeSegments } from "@/lib/bentTubeGeometry";
 import { normalizeHoneycombCellSize, normalizeHoneycombFrameWidth, normalizeHoneycombWallThickness } from "@/lib/honeycombGeometry";
@@ -118,6 +119,7 @@ function formatPropertyNumber(value: number, accuracy: MeasurementAccuracy, step
 }
 
 function propertyUsesLengthUnit(label: string) {
+  if (label === "Extrusion distance") return true;
   if (label === "Depth") return true;
   return ["Radius", "Length", "Width", "Height", "Bevel", "Top Radius", "Base Radius", "Thickness", "Tooth Size", "Tooth Width", "Center Hole", "Top Length", "Top Width", "Bottom Length", "Bottom Width", "Bore Diameter", "Shaft Diameter", "Head Height", "Head Across Flats", "Across Flats", "Thread Pitch", "Thread Depth", "Corner Fillet", "Top/Bottom Fillet", "Inner Size", "Outer Fillet", "Inner Fillet", "Tip Fillet", "Head Depth", "Neck Width", "Clearance", "Wire Diameter", "Cell Size", "Wall Thickness", "Frame Width", "Tube Diameter"].includes(label)
     || /^Segment \d+ (Length|Radius)$/.test(label);
@@ -210,6 +212,10 @@ function getShapePropertiesWithAppLimits(shape: WorkplaneShape, onUpdate: ShapeI
     { type: "select", label: "Handedness", value: shape.threadHandedness === "left" ? "Left" : "Right", options: ["Right", "Left"], onChange: (value) => onUpdate({ threadHandedness: value === "Left" ? "left" : "right" }) },
     { label: "Thread Quality", value: normalizeThreadQuality(shape.threadQuality ?? DEFAULT_THREAD_QUALITY), min: MIN_THREAD_QUALITY, max: MAX_THREAD_QUALITY, step: 1, onChange: (threadQuality) => onUpdate({ threadQuality: Math.round(threadQuality) }) },
   ];
+
+  if (isSketchExtrusion(shape)) {
+    return [{ label: "Extrusion distance", value: shape.height, min: MIN_SHAPE_SIZE, max: 160, onChange: setHeight }];
+  }
 
   if (shape.sketchOperation === "revolve" || shape.sketchRevolve) {
     const settings = normalizeSketchRevolveSettings(shape.sketchRevolve);
@@ -651,7 +657,7 @@ export function ShapeInspector({
     : [];
   const taper = shapeTaperDimensions(shape);
   const taperDimensionMax = workspace.shapeCustomizations[shape.kind]?.maxDimension ?? 480;
-  const supportsTaper = !["gear", "screw", "washer", "nut"].includes(shape.kind) && !(shape.kind === "cylinder" && shape.threadMode !== undefined && shape.threadMode !== "none");
+  const supportsTaper = (!isSketchExtrusion(shape) || shapeHasTaper(shape)) && !["gear", "screw", "washer", "nut"].includes(shape.kind) && !(shape.kind === "cylinder" && shape.threadMode !== undefined && shape.threadMode !== "none");
   const taperProperties: ShapePropertyConfig[] = supportsTaper ? [
     {
       label: "Top Length",
@@ -967,7 +973,7 @@ export function SnapGridControl({
   );
 }
 
-function RangeProperty({
+export function RangeProperty({
   label,
   value,
   min,
@@ -978,7 +984,7 @@ function RangeProperty({
   onChange,
   onInteractionActiveChange,
 }: RangePropertyConfig & { workspace: WorkplaneWorkspaceSettings; disabled?: boolean; onInteractionActiveChange?: (active: boolean) => void }) {
-  const allowsAboveSliderMax = label === "Length" || label === "Width" || label === "Height" || label.endsWith(" Length") || label.endsWith(" Width");
+  const allowsAboveSliderMax = label === "Extrusion distance" || label === "Length" || label === "Width" || label === "Height" || label.endsWith(" Length") || label.endsWith(" Width");
   const isLength = propertyUsesLengthUnit(label);
   const accuracy = workspace.accuracy;
   const actualValue = Math.max(min, Number.isFinite(value) ? value : min);

@@ -144,6 +144,22 @@ See [Trim and Extend](CADVERIX_USER_MANUAL.md#trim-and-extend-entities) and
 dimension handling, and limits. Curved Trim/Extend, automatic repairs, and
 overlap/duplicate detection are not included.
 
+## Independent sketches and reference planes
+
+Source release **1.21.0** adds named independent sketches with **Save sketch only**,
+reusable extrusion inputs, and atomic rebuilds of directly linked exact extrusions.
+Reference-plane definitions can be edited, including three-point planes. Unselected
+plane helpers are hidden by default; **Show all reference planes** displays them
+without changing per-object saved visibility. These features do not include a
+general downstream feature graph or loft evaluator. See the
+[sketch behavior contract](PARAMETRIC_SKETCH_BEHAVIOR.md) and
+[user manual](CADVERIX_USER_MANUAL.md#independent-sketches-and-reusable-inputs).
+
+Sketch background references are orthographic silhouettes calculated with the
+shared Manifold/Clipper2 geometry runtime. They retain visible silhouette holes
+without exposing hidden triangulation boundaries. The separate perspective 3D
+preview remains orbitable; neither reference display changes the saved solid.
+
 ## Storage & backups
 
 Open **Storage & backups** on the dashboard. The manager enables filesystem
@@ -167,6 +183,28 @@ project without overwriting the current project.
 Snapshots live in IndexedDB on the same browser origin as the application.
 Clearing site storage removes them; downloaded SKF files are the independent
 backup option. Snapshot failures do not prevent the main project autosave.
+
+### Save failures, missing records, and browser restarts
+
+- An editor **Project not saved** warning identifies a failed write and asks for
+  an independent SKF export before closing. It clears after that project's latest
+  queued save succeeds. A visible dashboard card is not proof geometry reached disk.
+- When a nonempty project's saved record is missing, opening it returns to the
+  dashboard with a recovery message instead of mounting an empty autosaving editor.
+  The project card is retained; this guard does not reconstruct the missing data.
+- A database upgrade blocked by another tab is reported. Close other Cadverix tabs
+  and retry without clearing browser storage.
+- Browser profiles and site origins have separate storage. Protocol, hostname/IP,
+  and port matter: `http://localhost:3000` and `http://<LAN-IP>:3000` do not share
+  private projects or recovery snapshots, even when they reach the same server.
+- Before restarting a troubled browser, export an SKF and verify it can be opened
+  as a copy whenever possible. Restoring open tabs does not preserve unsaved model
+  or sketch state. Restarting does not intentionally clear saved projects, but
+  recovery of unsaved, missing, or corrupted data is not guaranteed.
+- Check **Local recovery snapshots** and use **Restore as copy**. Also inspect
+  downloaded SKF files and configured shared-storage versions. A snapshot cannot
+  recover an edit that was never saved; do not overwrite the only surviving copy
+  while investigating a failed load.
 
 ### Filesystem folders and versions
 

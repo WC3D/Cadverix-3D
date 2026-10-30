@@ -203,6 +203,20 @@ export function poseFromWorldOriginAndNormal(
 
 export const constructionPlanePoseFromNormal = poseFromWorldOriginAndNormal;
 
+export function threePointConstructionPlanePose(first: Vector3Tuple, second: Vector3Tuple, third: Vector3Tuple): ConstructionPlanePose {
+  if ([...first, ...second, ...third].some((value) => !Number.isFinite(value))) throw new Error("Plane points must be finite");
+  const xAxis: Vector3Tuple = [second[0] - first[0], second[1] - first[1], second[2] - first[2]];
+  const diagonal: Vector3Tuple = [third[0] - first[0], third[1] - first[1], third[2] - first[2]];
+  const xLength = Math.hypot(...xAxis);
+  const diagonalLength = Math.hypot(...diagonal);
+  if (!Number.isFinite(xLength) || !Number.isFinite(diagonalLength) || xLength === 0 || diagonalLength === 0) throw new Error("Choose three distinct, non-collinear plane points");
+  const unitX = xAxis.map((value) => value / xLength) as Vector3Tuple;
+  const unitDiagonal = diagonal.map((value) => value / diagonalLength) as Vector3Tuple;
+  const normal = cross(unitX, unitDiagonal);
+  if (Math.hypot(...normal) <= 1e-10) throw new Error("Choose three distinct, non-collinear plane points");
+  return poseFromWorldOriginAndNormal(first, normal, unitX);
+}
+
 export function angledConstructionPlanePose(
   basePose: ConstructionPlanePose,
   angleDegrees: number,

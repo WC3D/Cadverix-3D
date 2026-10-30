@@ -210,6 +210,11 @@ function openProjectShapesDb() {
     }
 
     const request = window.indexedDB.open(PROJECT_SHAPES_DB_NAME, 3);
+    let blocked = false;
+    request.onblocked = () => {
+      blocked = true;
+      reject(new Error("Project storage is blocked by another tab. Close other Cadverix tabs, then reopen your project. Your saved design has not been changed."));
+    };
     request.onupgradeneeded = () => {
       const database = request.result;
       if (!database.objectStoreNames.contains(PROJECT_SHAPES_STORE_NAME)) {
@@ -220,7 +225,12 @@ function openProjectShapesDb() {
       }
     };
     request.onerror = () => reject(request.error ?? new Error("Could not open project shape storage"));
-    request.onsuccess = () => resolve(request.result);
+    request.onsuccess = () => {
+      const database = request.result;
+      database.onversionchange = () => database.close();
+      if (blocked) database.close();
+      else resolve(database);
+    };
   });
 }
 
@@ -572,6 +582,7 @@ export default function Home() {
   const [downloadFolder, setDownloadFolder] = useState("");
   const [showProjectNameInToolbar, setShowProjectNameInToolbar] = useState(true);
   const [dashboardNotice, setDashboardNotice] = useState("");
+  const [projectSaveErrors, setProjectSaveErrors] = useState<Record<string, string>>({});
   const [sharedProjects, setSharedProjects] = useState<SharedProject[]>([]);
   const [storageManagerOpen, setStorageManagerOpen] = useState(false);
   const [sharedProjectsEnabled, setSharedProjectsEnabled] = useState(false);
@@ -727,6 +738,9 @@ export default function Home() {
     void loadProjectShapes(activeProjectId)
       .then((record) => {
         if (canceled) return;
+        if (!record && activeProject.shapes > 0) {
+          throw new Error("The saved geometry for this project could not be found. The project entry has been retained; check Storage & backups for a recovery snapshot. No empty replacement was saved.");
+        }
         const loadedRevision = record?.revision ?? 0;
         const revision = Math.max(activeProject.revision ?? 0, loadedRevision, 1);
         const loadedEntry = projectShapeCacheEntry(Math.max(loadedRevision, 1), record?.shapes ?? [], record?.history, record?.historyIndex, record?.assets);
@@ -755,15 +769,12 @@ export default function Home() {
       .catch((error) => {
         if (!canceled) {
           setDashboardNotice(error instanceof Error ? error.message : "Could not load project shapes");
-          setProjectShapesById((current) => {
-            // A failed background read must not erase a project that has already
-            // received live editor changes while the read was pending.
-            if (current[activeProjectId]) return current;
-            return {
-              ...current,
-              [activeProjectId]: projectShapeCacheEntry(activeProject.revision ?? Date.now(), []),
-            };
-          });
+          // Never mount an empty, autosaving editor when the saved design could not be read.
+          setEditorStarted(false);
+          setEditorLoading(false);
+          setActiveProjectId(null);
+          setView("dashboard");
+          window.history.replaceState(null, "", "/");
         }
       });
     return () => {
@@ -941,6 +952,7 @@ export default function Home() {
 
     void queuedSave
       .then(() => {
+        if (projectShapeSaveQueuesRef.current[snapshot.projectId] === queuedSave) setProjectSaveErrors((current) => current[snapshot.projectId] ? { ...current, [snapshot.projectId]: "" } : current);
         setProjects((current) =>
           current.map((project) =>
             project.id === snapshot.projectId && (project.revision ?? 0) <= revision
@@ -951,7 +963,9 @@ export default function Home() {
       })
       .catch((error) => {
         if (projectShapeSaveQueuesRef.current[snapshot.projectId] === queuedSave) {
-          setDashboardNotice(error instanceof Error ? error.message : "Could not save project shapes");
+          const message = error instanceof Error ? error.message : "Could not save project shapes";
+          setDashboardNotice(message);
+          setProjectSaveErrors((current) => ({ ...current, [snapshot.projectId]: message }));
         }
       })
       .finally(() => {
@@ -1270,6 +1284,7 @@ export default function Home() {
 
   const activeProject = activeProjectId ? projects.find((project) => project.id === activeProjectId) ?? null : null;
   const activeProjectShapeEntry = activeProjectId ? projectShapesById[activeProjectId] : null;
+  const projectSaveError = activeProjectId ? projectSaveErrors[activeProjectId] : null;
   const canRenderEditor = !activeProjectId || (Boolean(activeProject) && Boolean(activeProjectShapeEntry));
   const projectDebugSummary = projects.map((project) => ({
     id: project.id,
@@ -1394,6 +1409,7 @@ export default function Home() {
         </div>
       ) : null}
       {view === "editor" && (editorLoading || !canRenderEditor) ? <EditorLoadingSkeleton /> : null}
+      {view === "editor" && projectSaveError ? <div className="project-save-error" role="alert" aria-label="Project save failed">Project not saved: {projectSaveError}. Export an SKF backup before closing this tab.</div> : null}
     </>
   );
 }

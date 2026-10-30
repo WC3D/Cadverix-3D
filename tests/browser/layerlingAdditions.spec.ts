@@ -92,8 +92,11 @@ test("a picked pivot survives saving and reopening", async ({ page }) => {
   await expect.poll(async () => (await scene(page)).shapes[0]?.rotationPivot).toEqual(pivot);
 });
 
-test("face holes preview without committing, cut, and undo", async ({ page }) => {
+test("face holes cut and undo, and an associative face plane preserves the Group", async ({ page }) => {
   test.setTimeout(90000);
+  const errors: string[] = [];
+  page.on("pageerror", (error) => errors.push(error.message));
+  page.on("console", (message) => { if (message.type() === "error") errors.push(message.text()); });
   await addBox(page);
   await page.getByRole("button", { name: "Minimize shape settings", exact: true }).click();
   const point = await surfacePoint(page);
@@ -105,9 +108,22 @@ test("face holes preview without committing, cut, and undo", async ({ page }) =>
   await page.getByRole("button", { name: "Create hole pattern", exact: true }).click();
   await expect.poll(async () => (await scene(page)).shapes[0].groupedCount, { timeout: 60000 }).toBeGreaterThan(1);
   await page.getByRole("button", { name: "Close", exact: true }).click();
+  const group = (await scene(page)).shapes[0];
+  await expect.poll(async () => (await savedState(page))?.nodes.find((node: { objectId: string }) => node.objectId === group.id)?.definition.kind).toBe(group.kind);
+  const definition = (await savedState(page)).nodes.find((node: { objectId: string }) => node.objectId === group.id).definition;
+  const face = await surfacePoint(page);
+  await page.getByRole("button", { name: "Reference planes", exact: true }).click();
+  await page.getByRole("button", { name: "Pick a planar model face", exact: true }).click();
+  await page.mouse.click(face.x + 15, face.y);
+  await expect.poll(async () => (await scene(page)).shapes.filter((shape: { kind: string }) => shape.kind === "constructionPlane").length).toBe(1);
+  expect((await scene(page)).shapes.find((shape: { id: string }) => shape.id === group.id)).toEqual(group);
+  await expect.poll(async () => (await savedState(page))?.nodes.find((node: { objectId: string }) => node.objectId === group.id)?.definition).toEqual(definition);
+  await page.getByRole("button", { name: "Undo", exact: true }).click();
+  await expect.poll(async () => (await scene(page)).shapeCount).toBe(1);
   await page.getByRole("button", { name: "Undo", exact: true }).click();
   await expect.poll(async () => (await scene(page)).shapes[0].kind).toBe("box");
   expect((await scene(page)).shapes[0].groupedCount).toBe(0);
+  expect(errors).toEqual([]);
 });
 
 test("missing dashboard cards can be recovered from retained geometry", async ({ page }) => {

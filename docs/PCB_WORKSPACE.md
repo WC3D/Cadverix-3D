@@ -151,7 +151,10 @@ touch-friendly SKF download, return to **Geometry → Export → SKF**.
 Projects containing PCB data in the active state or retained history use
 **SKF format 4 / minimum reader 4**. Older readers reject these packages rather
 than silently dropping the circuits. Modeling-only projects remain format 2,
-and drawing-only extensions remain format 3. Existing formats still open.
+and drawing-only extensions remain format 3. Independent sketches, source-linked
+extrusions, or three-point planes in retained history raise the combined package
+to **format/minimum reader 5**. The native reader accepts packaged versions 1–5.
+See [SKF compatibility](SKF_PROJECT_FORMAT.md#compatibility-and-migrations).
 
 Autosave, recovery snapshots, SKF downloads, shared-folder saves, and versioned
 backups use the same combined package. No additional storage service or account

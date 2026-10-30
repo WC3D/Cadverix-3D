@@ -56,7 +56,16 @@ export function normalizePlacementWorkplane(value: unknown, fallbackElevation = 
   if (!origin || !normal || !xAxis || vector(normal).lengthSq() < EPSILON || vector(xAxis).lengthSq() < EPSILON) {
     return horizontalPlacementWorkplane(fallbackElevation);
   }
-  return placementWorkplaneFromSurface(origin, normal, xAxis);
+  const normalized = placementWorkplaneFromSurface(origin, normal, xAxis);
+  const zAxis = finitePoint(candidate.zAxis);
+  // Preserve valid axes: renormalizing floating-point unit vectors can alternate forever during autosave.
+  if (zAxis
+    && vector(normal).distanceTo(vector(normalized.normal)) < 1e-12
+    && vector(xAxis).distanceTo(vector(normalized.xAxis)) < 1e-12
+    && vector(zAxis).distanceTo(vector(normalized.zAxis)) < 1e-12) {
+    return { origin, normal, xAxis, zAxis };
+  }
+  return normalized;
 }
 
 export function placementWorkplaneFingerprint(workplane: PlacementWorkplane) {

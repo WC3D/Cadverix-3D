@@ -1,7 +1,7 @@
 {
   "name": "cadverix-3d",
   "productName": "Cadverix 3D",
-  "version": "1.20.2",
+  "version": "1.21.0",
   "private": true,
   "description": "A local-first 3D design editor.",
   "author": {

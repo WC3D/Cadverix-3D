@@ -1,0 +1,65 @@
+import { expect, test } from "@playwright/test";
+
+for (const vertical of [false, true]) test(`${vertical ? "Vertical" : "Horizontal"} sketch lengths edit inline, validate, cancel, drag, and undo`, async ({ page }) => {
+  const errors: string[] = [];
+  page.on("pageerror", (error) => errors.push(error.message));
+  await page.goto("/?editor=1");
+  await page.getByRole("tab", { name: "Sketch", exact: true }).click();
+  await page.getByRole("button", { name: "Sketch to 3D options" }).click();
+  await page.getByRole("menuitem", { name: /^Extrude sketch/ }).click();
+  await page.getByRole("button", { name: "XZ · Top", exact: true }).click();
+  const clickPoint = async (x: number, z: number) => {
+    const screen = await page.locator("svg.sketch-plate").evaluate((svg: SVGSVGElement, point) => {
+      const position = svg.createSVGPoint();
+      position.x = point.x; position.y = point.z;
+      const screen = position.matrixTransform(svg.getScreenCTM()!);
+      return { x: screen.x, y: screen.y };
+    }, { x, z });
+    await page.mouse.click(screen.x, screen.y);
+  };
+  await page.getByRole("button", { name: "Line", exact: true }).click();
+  await clickPoint(-40, 30);
+  await clickPoint(vertical ? -40 : 0, vertical ? 70 : 30);
+  await page.keyboard.press("Escape");
+  await page.getByRole("button", { name: "Select", exact: true }).click();
+  // Unselected edges no longer produce a label on every line.
+  await expect(page.getByRole("button", { name: /^Set length/ })).toHaveCount(0);
+  await clickPoint(vertical ? -40 : -20, vertical ? 50 : 30);
+  await page.getByRole("button", { name: /^Set length/ }).dblclick();
+  const input = page.getByRole("textbox", { name: "Sketch dimension length", exact: true });
+  await input.fill("-5");
+  await input.press("Enter");
+  await expect(input).toHaveAttribute("aria-invalid", "true");
+  await expect(page.locator(".sketch-inline-dimension").getByRole("alert")).toHaveText("Enter a positive length");
+  await input.fill("50");
+  await input.press("Enter");
+  const dimension = page.getByRole("button", { name: /^Edit length/ });
+  await expect(dimension).toContainText("50");
+  await expect(page.locator(".sketch-dimension-guides line")).toHaveCount(5);
+  const pathAfterEdit = await page.locator(".sketch-segments path").getAttribute("d");
+  await dimension.dblclick();
+  await input.fill("70");
+  await input.press("Escape");
+  await expect(input).toHaveCount(0);
+  await expect(page.locator(".sketch-segments path")).toHaveAttribute("d", pathAfterEdit!);
+  await dimension.focus();
+  await dimension.press("Enter");
+  await input.fill("60");
+  await page.getByRole("button", { name: "Apply sketch dimension", exact: true }).click();
+  await expect(dimension).toContainText("60");
+  await page.getByRole("button", { name: "Sketch undo", exact: true }).click();
+  await expect(dimension).toContainText("50");
+  await expect(page.locator(".sketch-segments path")).toHaveAttribute("d", pathAfterEdit!);
+  const beforeDrag = await dimension.getAttribute("transform");
+  const bounds = (await dimension.boundingBox())!;
+  await page.mouse.move(bounds.x + bounds.width / 2, bounds.y + bounds.height / 2);
+  await page.mouse.down();
+  await page.mouse.move(bounds.x + bounds.width / 2 + 45, bounds.y + bounds.height / 2 - 35, { steps: 5 });
+  await page.mouse.up();
+  await expect(dimension).not.toHaveAttribute("transform", beforeDrag!);
+  await expect(page.locator(".sketch-segments path")).toHaveAttribute("d", pathAfterEdit!);
+  await dimension.dblclick();
+  await expect(input).toBeVisible();
+  await input.press("Escape");
+  expect(errors).toEqual([]);
+});

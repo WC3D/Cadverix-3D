@@ -227,6 +227,17 @@ export function setSketchSegmentLength(profile: SketchProfile, segmentId: string
   return solveSketchProfile({ ...profile, dimensions }, segment.startId);
 }
 
+export function inferSketchLineConstraint(profile: SketchProfile, segmentId: string, createId: IdFactory): SketchProfile {
+  const segment = profile.segments.find((entry) => entry.id === segmentId);
+  if (!segment || !isLineSegment(segment)) return profile;
+  const start = profile.points.find((point) => point.id === segment.startId);
+  const end = profile.points.find((point) => point.id === segment.endId);
+  if (!start || !end || Math.hypot(end.x - start.x, end.z - start.z) < SOLVER_TOLERANCE) return profile;
+  const kind = Math.abs(start.z - end.z) < SOLVER_TOLERANCE ? "horizontal"
+    : Math.abs(start.x - end.x) < SOLVER_TOLERANCE ? "vertical" : null;
+  return kind ? { ...profile, constraints: [...(profile.constraints ?? []), { id: createId(`sketch-${kind}`), kind, segmentId }] } : profile;
+}
+
 export function moveConstrainedSketchPoint(profile: SketchProfile, pointId: string, position: { x: number; z: number }) {
   const next = cloneProfile(profile);
   const point = next.points.find((entry) => entry.id === pointId);

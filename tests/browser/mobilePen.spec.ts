@@ -51,6 +51,7 @@ test("native pen edits, interruption cleanup, and palm rejection", async ({ page
   await tap(page.getByRole("tab", { name: "Sketch", exact: true }));
   await tap(page.getByRole("button", { name: "Sketch to 3D options" }));
   await tap(page.getByRole("menuitem", { name: /^Extrude sketch/ }));
+  await tap(page.getByRole("button", { name: "XZ · Top", exact: true }));
   await expect(page.locator(".sketch-plate")).toBeVisible();
   await tap(page.getByRole("button", { name: "Line", exact: true }));
   await pen("mousePressed", 650, 500); await pen("mouseReleased", 650, 500);

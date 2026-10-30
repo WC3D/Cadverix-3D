@@ -19,7 +19,7 @@
     <a href="https://github.com/WC3D/Cadverix-3D/stargazers"><img alt="Star Cadverix 3D on GitHub" src="https://img.shields.io/github/stars/WC3D/Cadverix-3D?style=flat&logo=github"></a>
     <a href="https://github.com/sponsors/Formsmith746"><img alt="Sponsor upstream contributors on GitHub" src="https://img.shields.io/badge/GitHub-Sponsor-ea4aaa?logo=githubsponsors&logoColor=white"></a>
     <img alt="Local first" src="https://img.shields.io/badge/local--first-no%20account-0ea5e9">
-    <img alt="Version v1.20.2" src="https://img.shields.io/badge/version-v1.20.2-2563eb">
+    <img alt="Version v1.21.0" src="https://img.shields.io/badge/version-v1.21.0-2563eb">
     <a href="docs/MOBILE_ALPHA.md"><img alt="Mobile support: alpha" src="https://img.shields.io/badge/mobile-alpha-f59e0b"></a>
   </p>
 </div>
@@ -145,7 +145,9 @@ The **Scene** sidebar provides a searchable object/group overview. Selected obje
 
 Private projects autosave in IndexedDB for the browser and site address you use. Export a **`.skf`** package to back up an editable project or move it between browsers, computers, and mobile devices. Opening a package creates a new local project. Geometry exports such as STL and 3MF are separate from editable project backups.
 
-Modeling-only saves use **SKF format 2**, with deduplicated mesh/B-Rep/image assets and compact binary CAD display edges shared across history states. Drawing projects use **format 3 / minimum reader 3**. Combined PCB/mechanical projects use **format 4 / minimum reader 4**, preserving independent circuits, linked board instances and project history. The reader accepts formats 1–4, legacy JSON projects, and earlier JSON display-edge assets.
+Failed project saves now display an editor warning. A missing saved record for a nonempty project returns to the dashboard rather than opening an empty, autosaving replacement. Local recovery snapshots are best-effort and cannot recover geometry that was never saved. Export and verify an independent SKF backup before restarting a troubled browser or clearing site data. `localhost`, a LAN IP address, and different ports have separate browser storage.
+
+Ordinary modeling saves use **SKF format 2**, with deduplicated mesh/B-Rep/image assets and compact binary CAD display edges shared across history states. Drawing projects use **format 3 / minimum reader 3**. Combined PCB/mechanical projects use **format 4 / minimum reader 4**. Independent sketches, source-linked extrusions, or three-point planes in any retained history state require **format 5 / minimum reader 5**. The reader accepts formats 1–5, legacy JSON projects, and earlier JSON display-edge assets.
 
 See the [SKF project format documentation](docs/SKF_PROJECT_FORMAT.md) for package structure, history options, and compatibility details.
 
@@ -157,8 +159,17 @@ Open **Geometry > Workplane** to choose the active sketch plane or create a pers
 - **Angle** rotates a new associative plane from the base XZ plane or an existing construction plane.
 - **Mid-plane** creates a plane halfway between two parallel source planes, with an optional normal offset.
 - **Associative face plane** creates a plane from a model face that follows the source object's movement, rotation, and resizing.
+- **3 points** defines a plane from three non-collinear world-space points.
 
-New angle and midplanes remain linked to their source planes. Select any listed plane as the active sketch plane before starting an extrude, revolve, or sweep sketch.
+New angle and midplanes remain linked to their source planes. Use **Edit active plane** to change an existing definition. Reference planes are hidden in the viewport unless selected; **Show all reference planes** displays the others without changing their saved visibility. Placement mode shows its active workplane automatically.
+
+### Independent sketches and linked extrusions
+
+Choose an XZ/top, XY/front, YZ/side, or active construction plane, name the sketch, and select **Save sketch only** to retain an open or closed profile without creating a solid. The model browser provides **Edit saved sketch**, **Extrude saved sketch**, rename, and visibility actions. Saving a source edit rebuilds its directly linked exact extrusions atomically; failed rebuilds retain the last committed source and solids.
+
+Extrusion distance follows the sketch-plane normal. **One side**, **Reverse**, and **Symmetric** are explicit directions; symmetric distance is total thickness. Sketch view is orthographic, while the orbitable 3D preview is perspective. Body-reference silhouettes use the existing Manifold/Clipper2 engine and are not editable sketch entities; the separate **Project** tool creates sketch geometry.
+
+This is not a full Fusion/SolidWorks feature engine: a general constraint solver, loft evaluator, transitive downstream regeneration, and persistent face/edge naming remain unimplemented. See [parametric sketch behavior](docs/PARAMETRIC_SKETCH_BEHAVIOR.md) and the [architecture plan](docs/PARAMETRIC_CAD_PLAN.md) for supported behavior and limits.
 
 ## Mobile Support — Alpha
 
@@ -210,7 +221,7 @@ Cadverix 3D is local-first. Private projects stay in each user's browser storage
 
 Desktop packaging supports a Windows x64 installer, macOS Intel/Apple Silicon DMGs, and Linux AppImages. Download the matching asset from [GitHub Releases](https://github.com/WC3D/Cadverix-3D/releases).
 
-The source version is **1.20.2**; updating it does not build or publish desktop
+The source version is **1.21.0**; updating it does not build or publish desktop
 installers. The previously documented **1.0.15** packages are available on [GitHub Releases](https://github.com/WC3D/Cadverix-3D/releases/tag/v1.0.15), with local build copies in `dist/desktop/`; see the
 [build notes](docs/RELEASE_1.0.15.md) for filenames, checksums, signing status,
 and verification. Building locally does not automatically publish a release.

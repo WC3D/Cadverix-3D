@@ -4004,6 +4004,38 @@ button {
   background: var(--background);
 }
 
+.sketch-document-save {
+  position: absolute;
+  bottom: 12px;
+  left: 90px;
+  right: 22px;
+  z-index: 9;
+  display: flex;
+  gap: 6px;
+  align-items: center;
+  max-width: 390px;
+}
+
+.sketch-document-save input,
+.scene-shape-properties input {
+  min-width: 0;
+  width: 100%;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  padding: 6px;
+  background: var(--background);
+  color: var(--foreground);
+}
+
+.sketch-document-save button {
+  flex-shrink: 0;
+  padding: 8px;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  background: var(--background);
+  color: var(--foreground);
+}
+
 .sketch-operation-panel {
   position: absolute;
   top: 18px;
@@ -4051,9 +4083,25 @@ button {
 
 .construction-plane-modes {
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 6px;
 }
+
+.construction-plane-points fieldset {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 5px;
+  min-width: 0;
+  padding: 6px;
+  border: 1px solid var(--border);
+}
+
+.construction-plane-points input {
+  width: 100%;
+  min-width: 0;
+}
+
+.construction-plane-edit summary { cursor: pointer; margin-bottom: 8px; }
 
 .construction-plane-active > span,
 .construction-plane-face > span {
@@ -4382,8 +4430,61 @@ button {
   border: 1px solid rgba(166, 190, 204, 0.9);
   border-radius: 12px;
   box-shadow: 0 12px 34px rgba(34, 67, 86, 0.16);
+  pointer-events: auto;
+}
+
+.sketch-extrusion-settings {
+  position: absolute;
+  top: calc(36px + clamp(170px, 28vh, 270px));
+  right: 22px;
+  z-index: 8;
+  width: clamp(210px, 25vw, 330px);
+  padding: 12px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--background);
+  color: var(--foreground);
+  box-shadow: 0 5px 18px #0002;
+}
+
+.sketch-extrusion-settings p,
+.sketch-extrusion-settings small {
+  display: block;
+  margin: 6px 0;
+  font-size: 11px;
+}
+
+.sketch-extrusion-settings > label {
+  display: grid;
+  gap: 4px;
+  margin: 10px 0;
+  font-size: 12px;
+}
+
+.sketch-extrusion-settings select {
+  width: 100%;
+  min-height: 32px;
+  border: 1px solid var(--border);
+  background: var(--background);
+  color: var(--foreground);
+}
+
+.sketch-preview-hint {
+  position: absolute;
+  bottom: 8px;
+  left: 12px;
+  right: 12px;
+  color: #49647a;
+  font-size: 11px;
   pointer-events: none;
 }
+
+.sketch-revolve-preview .sketch-revolve-preview-empty {
+  position: absolute;
+  inset: 0;
+}
+
+.sketch-plane-picker button { min-height: 36px; text-align: left; }
 
 .sketch-revolve-preview-title {
   position: absolute;
@@ -4420,6 +4521,12 @@ button {
   inset: 14px 14px 42px;
   display: block;
   overflow: hidden;
+}
+
+@media (min-width: 1100px) {
+  .sketch-plate-wrap {
+    right: calc(clamp(210px, 25vw, 330px) + 44px);
+  }
 }
 
 .sketch-plate {
@@ -4523,7 +4630,7 @@ button {
 }
 
 .sketch-plate-background {
-  fill: #ddf8ff;
+  fill: #fcfcfc;
   stroke: none;
 }
 
@@ -4540,16 +4647,30 @@ button {
 }
 
 .sketch-grid .minor {
-  stroke: rgba(96, 204, 231, 0.46);
+  stroke: rgba(100, 110, 120, 0.1);
 }
 
 .sketch-grid .major {
-  stroke: rgba(54, 174, 207, 0.68);
+  stroke: rgba(100, 110, 120, 0.21);
 }
 
 .sketch-grid .axis {
-  stroke: #178db5;
-  stroke-width: 1.6;
+  stroke-width: 1.3;
+}
+
+.sketch-grid .vertical-axis {
+  stroke: #76ad85;
+}
+
+.sketch-grid .horizontal-axis {
+  stroke: #ce8585;
+}
+
+.sketch-origin {
+  fill: none;
+  stroke: #727b83;
+  stroke-width: 1.5;
+  vector-effect: non-scaling-stroke;
 }
 
 .sketch-revolve-guide rect {
@@ -4588,6 +4709,20 @@ button {
   stroke: rgba(188, 113, 18, 0.7);
   stroke-width: 1.25;
   vector-effect: non-scaling-stroke;
+}
+
+.project-save-error {
+  position: fixed;
+  bottom: 48px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 20000;
+  max-width: min(720px, 90vw);
+  padding: 12px 16px;
+  border: 1px solid #ffb0a8;
+  border-radius: 8px;
+  background: #641c19;
+  color: #fff;
 }
 
 .sketch-reference-images image {
@@ -4655,7 +4790,7 @@ button {
 }
 
 .sketch-profile-fills path {
-  fill: rgba(98, 148, 214, 0.2);
+  fill: rgba(125, 133, 123, 0.22);
   fill-rule: evenodd;
   stroke: none;
 }
@@ -4671,32 +4806,32 @@ button {
 }
 
 .sketch-profile-fills path.selectable {
-  fill: rgba(86, 173, 211, 0.09);
+  fill: rgba(125, 133, 123, 0.22);
   cursor: pointer;
   transition: fill 100ms ease;
 }
 
 .sketch-profile-fills path.selectable.selected {
-  fill: rgba(70, 156, 207, 0.18);
+  fill: rgba(36, 117, 211, 0.34);
 }
 
 .sketch-profile-fills path.selectable:hover,
 .sketch-profile-fills path.selectable:focus-visible {
-  fill: rgba(59, 177, 219, 0.24);
+  fill: rgba(36, 117, 211, 0.46);
   outline: none;
 }
 
 .sketch-segments path {
   fill: none;
-  stroke: #173f60;
-  stroke-width: 2.5;
+  stroke: #2567ba;
+  stroke-width: 1.8;
   vector-effect: non-scaling-stroke;
   pointer-events: stroke;
   cursor: pointer;
 }
 
 .sketch-segments path.constrained {
-  stroke: #087d89;
+  stroke: #273038;
 }
 
 .sketch-segments path.projected {
@@ -4708,8 +4843,8 @@ button {
 
 .sketch-segments path:hover,
 .sketch-segments path.selected {
-  stroke: #ff8a00;
-  stroke-width: 4;
+  stroke: #168ce0;
+  stroke-width: 3;
 }
 
 .sketch-preview-line {
@@ -4981,6 +5116,48 @@ button {
 
 .sketch-segment-dimensions .movable {
   cursor: move;
+}
+
+.sketch-dimension-guides line {
+  stroke: #59636c;
+  stroke-width: 1;
+  vector-effect: non-scaling-stroke;
+}
+
+.sketch-inline-dimension {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 3px;
+  font-size: 13px;
+}
+
+.sketch-inline-dimension input {
+  width: 143px;
+  height: 30px;
+  padding: 3px 7px;
+  border: 1px solid #2186ce;
+  border-radius: 2px;
+  background: var(--background);
+  color: var(--foreground);
+}
+
+.sketch-inline-dimension input[aria-invalid="true"] {
+  border-color: #cf4545;
+}
+
+.sketch-inline-dimension button {
+  width: 30px;
+  height: 30px;
+  background: #187cbd;
+  color: white;
+  border-radius: 2px;
+}
+
+.sketch-inline-dimension small {
+  padding: 2px 4px;
+  background: var(--background);
+  color: var(--foreground);
+  font-size: 10px;
 }
 
 .sketch-segment-dimensions .movable:hover rect,
@@ -9418,7 +9595,7 @@ html[data-theme="dark"] .sketch-revolve-preview-empty {
 }
 
 html[data-theme="dark"] .sketch-plate-background {
-  fill: #18303a;
+  fill: #24292e;
 }
 
 html[data-theme="dark"] .sketch-revolve-guide rect {
@@ -9430,15 +9607,19 @@ html[data-theme="dark"] .sketch-plate-border {
 }
 
 html[data-theme="dark"] .sketch-grid .minor {
-  stroke: rgba(91, 166, 187, 0.34);
+  stroke: rgba(180, 190, 200, 0.1);
 }
 
 html[data-theme="dark"] .sketch-grid .major {
-  stroke: rgba(91, 185, 210, 0.58);
+  stroke: rgba(180, 190, 200, 0.22);
 }
 
-html[data-theme="dark"] .sketch-grid .axis {
-  stroke: #6bcae3;
+html[data-theme="dark"] .sketch-segments path.constrained {
+  stroke: #d3d9df;
+}
+
+html[data-theme="dark"] .sketch-dimension-guides line {
+  stroke: #b1bac3;
 }
 
 html[data-theme="dark"] .sketch-command-button {

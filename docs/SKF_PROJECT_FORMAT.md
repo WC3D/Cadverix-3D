@@ -8,7 +8,7 @@ Cadverix 3D uses a packaged container (format option B). A `.skf` file is a ZIP 
 
 This was selected over pure JSON because imported STL/STEP data and exact B-Rep can be large, Base64 would add size and parsing overhead, and an archive lets Cadverix 3D validate and hash each asset independently. The editable model is still JSON and can be inspected by opening `project.json` from the package.
 
-## Version 2 / 3 / 4 layout
+## Version 2 / 3 / 4 / 5 layout
 
 ```text
 project.skf
@@ -36,6 +36,7 @@ project.skf
 - `editor`: workspace dimensions, units, snap grid, and selected workplane elevation
 - `editor.workspace.drawing` (format 3): paper template/orientation, title-block fields, projection convention, source-linked model views, paper entities, and dimensions with geometry fingerprints
 - `states[].electronics` (format 4): versioned PCB document containing independent board IDs, names, circuits, outlines, routing, and trace widths for each history state. Root shape definitions may carry `pcbInstance` links with board ID, geometry revision, and document-origin offset; generated component meshes use the existing deduplicated assets.
+- `states[].nodes[].definition` (format 5 when required): independent `kind: "sketchProfile"` nodes with local sketch geometry and a `sketchPlane` attachment; linked extrusion definitions use `sketchFeature.sketchId` to identify their source sketch. Construction planes can retain `constructionPlane.kind: "threePoint"` definitions with three world-space points.
 
 Object nodes keep stable Cadverix 3D object IDs. Groups refer to child node IDs instead of array positions. Fillet/chamfer history refers to explicit “before” nodes. Feature dependencies are explicit and checked for cycles.
 
@@ -49,6 +50,7 @@ New display-edge assets use `SKFEDG1` little-endian binary: an 8-byte magic, the
 - Position, rotation, dimensions, mirrors, colour, solid/hole role, visibility, and lock state
 - Nested groups, boolean operands, subtraction results, and intersection metadata
 - Sketch points, lines, Bezier/smooth handles, disjoint profiles, reference images, and extrusion depth
+- Independent named sketch nodes, supported constraints/dimensions/projection references, extrusion distance/direction, source-sketch links, and plane-local attachments
 - Imported 3MF, STL, SVG, and STEP sources, stored once and reused by instances
 - Exact imported STEP data, current exact CAD B-Rep, display edges, chamfer/fillet settings, and reversible edge-treatment history
 - Undo and redo states according to the export choice: Unlimited, 100, 50, or 30 recent actions. Unlimited means every state still retained by the editor, including available redo states.
@@ -69,7 +71,11 @@ Each state accepts at most 200 workplane notes and 2,000 UTF-16 code units per n
 
 ## Compatibility and migrations
 
-Modeling-only saves use format version 2 and minimum reader version 2. Projects containing `editor.workspace.drawing` use format version 3 and minimum reader version 3. Projects with PCB data in any retained state use format/minimum reader 4, so older readers reject them rather than losing circuits or their undo history. The current native reader accepts packaged versions 1–4, including version 1 inline display edges. The importer also migrates the documented version 0 pure-JSON prototype and preserves its object IDs and valid history.
+Ordinary modeling saves use format version 2 and minimum reader version 2. Projects containing `editor.workspace.drawing` use format version 3 and minimum reader version 3. Projects with PCB data in any retained state use format/minimum reader 4. Independent sketches, source-linked extrusions, or three-point planes in any retained state require format/minimum reader 5; this requirement takes precedence when combined with drawings or PCB data. Older readers must reject these packages rather than losing geometry, circuits, or undo history. The current native reader accepts packaged versions 1–5, including version 1 inline display edges. The importer also migrates the documented version 0 pure-JSON prototype and preserves its object IDs and valid history.
+
+Application release **1.21.0** is recorded in `createdWithVersion`; it is separate from the document's format/minimum-reader versions. A source release bump does not force ordinary projects to use format 5.
+
+Format-5 validation checks required sketch geometry/frames, supported dependency types, missing references, and cycles. Independent sketches cannot carry solid meshes, B-Reps, or grouped solid children. Their display wires and background body silhouettes are derived, not authoritative solid geometry. Source-sketch links support direct extrusion rebuilds, not a general executable downstream feature graph.
 
 PCB documents have their own version (currently 1). IDs and electrical references are validated within each board; repeated R1/J1 designators across independent boards are valid. Instance links must resolve to a board in the same state and remain root assembly objects. PCB geometry is a derived cache; stale revisions are regenerated without adding a user undo action. See [combined PCB projects](PCB_WORKSPACE.md).
 
@@ -85,7 +91,8 @@ Future schema changes should add a version-to-version migration, run validation 
 
 - Projects created before source-asset tracking cannot recover the exact original STL/SVG file. Their existing normalized editable mesh is preserved as a deduplicated legacy cache and is identified by the absence of a source asset.
 - Cadverix 3D currently bakes the displayed result of booleans and edge treatments. `.skf` preserves the operands, group hierarchy, feature metadata, reversible history, exact B-Rep where available, and a derived-result cache; it does not add a new live parametric feature editor that the application does not yet have.
-- The current workplane system stores a base plane plus numeric offset. It does not expose persistent associative face-workplane references, so `.skf` cannot preserve an association that the editor itself does not model.
+- Construction-plane definitions and sketch attachments preserve the associations supported by the editor, including source-frame face attachments and three-point planes. Face attachments do not provide persistent topological face/edge naming through arbitrary geometry changes.
 - Existing sketch points, segments, curve handles, profiles, and extrusion depth are preserved, along with the constraint/dimension data supported by the current project reader.
 - Camera position is intentionally omitted because the current project persistence system does not own it. It can be added as optional editor state in a compatible future version.
 - OBJ is currently an export format, not an import format. An OBJ source-asset record is reserved in the schema for future import support.
+- Saving a native project does not guarantee a separate recovery snapshot succeeded. Missing nonempty saved records are not opened as empty replacements, and write failures are shown in the editor. Retained snapshots cannot reconstruct geometry that was never persisted; keep independent SKF backups before recovery or browser restarts.

@@ -50,6 +50,7 @@ for (const [width, height] of [[390, 844], [820, 1180], [1024, 768], [1366, 1024
       const extrude = await exposedCenter(page.getByRole("menuitem", { name: /^Extrude sketch/ }));
       expect(extrude.exposed).toBe(true);
       await page.touchscreen.tap(extrude.x, extrude.y);
+      await page.getByRole("button", { name: "XZ · Top", exact: true }).tap();
       await expect(page.locator(".sketch-plate")).toBeVisible();
       await page.getByRole("button", { name: "Add sketch shape", exact: true }).tap();
       const rectangle = await exposedCenter(page.getByRole("menuitem", { name: "Rectangle", exact: true }));

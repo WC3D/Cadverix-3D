@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  inferSketchLineConstraint,
   moveConstrainedSketchPoint,
   pruneSketchParameters,
   setSketchPointFixed,
@@ -26,6 +27,18 @@ function profile(): SketchProfile {
 const createId = (prefix: string) => `${prefix}-id`;
 
 describe("sketch constraints", () => {
+  it("retains horizontal and vertical design intent for newly drawn lines", () => {
+    const source = profile();
+    source.points[1] = { id: "b", x: 8, z: 0 };
+    source.points[2] = { id: "c", x: 8, z: 12 };
+    const inferred = inferSketchLineConstraint(inferSketchLineConstraint(source, "ab", createId), "bc", createId);
+    expect(inferred.constraints?.map((entry) => entry.kind)).toEqual(["horizontal", "vertical"]);
+    const moved = moveConstrainedSketchPoint(inferred, "b", { x: 20, z: 5 }).profile;
+    expect(moved.points[0].z).toBe(moved.points[1].z);
+    expect(moved.points[2].x).toBe(moved.points[1].x);
+    expect(inferSketchLineConstraint(profile(), "ab", createId).constraints).toBeUndefined();
+    expect(source.constraints).toBeUndefined();
+  });
   it("applies horizontal and vertical constraints without mutating the source", () => {
     const source = profile();
     const horizontal = setSketchSegmentConstraint(source, "ab", "horizontal", true, createId).profile;

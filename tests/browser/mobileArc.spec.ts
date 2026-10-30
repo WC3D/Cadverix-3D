@@ -5,6 +5,7 @@ test("three-point arc uses endpoints then bulge, with preview, cancellation and 
   await page.getByRole("tab", { name: "Sketch", exact: true }).tap();
   await page.getByRole("button", { name: "Sketch to 3D options" }).tap();
   await page.getByRole("menuitem", { name: /^Extrude sketch/ }).tap();
+  await page.getByRole("button", { name: "XZ · Top", exact: true }).tap();
   await expect(page.locator(".sketch-plate")).toBeVisible();
   await page.getByRole("button", { name: "Three-point Arc", exact: true }).tap();
   await page.touchscreen.tap(600, 600);
@@ -46,6 +47,7 @@ test("two arcs sharing tapped endpoints form a closed profile", async ({ page })
   await page.getByRole("tab", { name: "Sketch", exact: true }).tap();
   await page.getByRole("button", { name: "Sketch to 3D options" }).tap();
   await page.getByRole("menuitem", { name: /^Extrude sketch/ }).tap();
+  await page.getByRole("button", { name: "XZ · Top", exact: true }).tap();
   await expect(page.locator(".sketch-plate")).toBeVisible();
   await page.getByRole("button", { name: "Three-point Arc", exact: true }).tap();
   await page.touchscreen.tap(600, 600);

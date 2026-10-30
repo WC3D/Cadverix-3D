@@ -6,6 +6,9 @@ import { placementWorkplaneFromSurface } from "@/lib/placementWorkplane";
 import { projectAssetFromBytes } from "@/lib/projectAssets";
 import * as projectAssets from "@/lib/projectAssets";
 import { canonicalizeShape } from "@/lib/workplaneShapes";
+import { principalPlanePose } from "@/lib/constructionPlanes";
+import { BASE_SKETCH_PLANE_ID, createSketchDocument } from "@/lib/parametricSketches";
+import { rectangleSketchGeometry } from "@/lib/sketchRectangles";
 import {
   exportLylProject,
   exportSkfProject,
@@ -14,6 +17,7 @@ import {
   LYL_SCHEMA_ID,
   SKF_FORMAT_VERSION,
   SKF_HYBRID_FORMAT_VERSION,
+  SKF_PARAMETRIC_FORMAT_VERSION,
   SKF_LIMITS,
   SKF_SCHEMA_ID,
   type SkfProjectDocumentV1,
@@ -82,6 +86,43 @@ function mutateProject(bytes: Uint8Array, mutate: (document: SkfProjectDocumentV
 }
 
 describe("SketchForge .skf project packages", () => {
+  it("round-trips independent sketches and their editable history using reader version 5", async () => {
+    const geometry = rectangleSketchGeometry({ minX: -10, maxX: 10, minZ: -5, maxZ: 5 });
+    const sketch = createSketchDocument(geometry, BASE_SKETCH_PLANE_ID, principalPlanePose("xz"));
+    const renamed = { ...sketch, name: "Base profile" };
+    const history = [editorHistoryEntry([sketch], [sketch.id]), editorHistoryEntry([renamed], [sketch.id])];
+    const bytes = await exportSkfProject(input([renamed], { history, historyIndex: 1 }));
+    const { document } = packageDocument(bytes);
+    expect(document.formatVersion).toBe(SKF_PARAMETRIC_FORMAT_VERSION);
+    expect(document.minimumReaderVersion).toBe(SKF_PARAMETRIC_FORMAT_VERSION);
+    expect(document.sketches).toHaveLength(1);
+    expect(document.sketches[0].extrusionDepth).toBe(0);
+    expect(document.features).toHaveLength(0);
+    const restored = await importSkfProject(bytes);
+    expect(restored.shapes[0]).toEqual(JSON.parse(JSON.stringify(renamed)));
+    expect(restored.history[0].shapes[0].name).toBe("Sketch");
+    expect(restored.historyIndex).toBe(1);
+    expect(packageDocument(await exportSkfProject(input([shape("box")]))).document.formatVersion).toBe(SKF_FORMAT_VERSION);
+    await expect(exportLylProject(input([sketch]))).rejects.toThrow(/Export SKF/);
+  });
+
+  it("rejects downgraded independent sketch packages, missing inputs, and invalid rigid frames", async () => {
+    const sketch = createSketchDocument(rectangleSketchGeometry({ minX: 0, maxX: 10, minZ: 0, maxZ: 10 }), BASE_SKETCH_PLANE_ID, principalPlanePose("xz"));
+    const bytes = await exportSkfProject(input([sketch]));
+    await expect(importSkfProject(mutateProject(bytes, (document) => { document.formatVersion = 4; document.minimumReaderVersion = 4; }))).rejects.toThrow(/reader version 5/);
+    await expect(importSkfProject(mutateProject(bytes, (document) => { (document.states[0].nodes[0].definition.sketchPlane as { constructionPlaneId: string }).constructionPlaneId = "missing-plane"; }))).rejects.toThrow(/reference plane/);
+    await expect(importSkfProject(mutateProject(bytes, (document) => { (document.states[0].nodes[0].definition.sketchPlane as { pose: { quaternion: number[] } }).pose.quaternion = [0, 0, 0, 0]; }))).rejects.toThrow(/degenerate/);
+    await expect(importSkfProject(mutateProject(bytes, (document) => { delete document.states[0].nodes[0].definition.sketchProfile; }))).rejects.toThrow(/missing.*geometry/);
+  });
+
+  it("persists three-point planes and rejects collinear coordinates", async () => {
+    const plane = shape("constructionPlane", "three-point", { constructionPlane: { kind: "threePoint", points: [[0, 0, 40], [10, 0, 40], [0, 10, 40]], pose: principalPlanePose("xy", 40) } });
+    const bytes = await exportSkfProject(input([plane]));
+    expect(packageDocument(bytes).document.formatVersion).toBe(SKF_PARAMETRIC_FORMAT_VERSION);
+    expect((await importSkfProject(bytes)).shapes[0].constructionPlane).toEqual(plane.constructionPlane);
+    await expect(importSkfProject(mutateProject(bytes, (document) => { (document.states[0].nodes[0].definition.constructionPlane as { points: number[][] }).points = [[0, 0, 0], [1, 1, 1], [2, 2, 2]]; }))).rejects.toThrow(/non-collinear/);
+  });
+
   it.each([exportSkfProject, exportLylProject])("round-trips saved pivots through native and compatible project packages", async (exportPackage) => {
     const source = shape("box", "pivoted", { rotationPivot: [.1, .2, -.3] });
     const bytes = await exportPackage(input([source]));
@@ -876,7 +917,7 @@ describe("SketchForge .skf project packages", () => {
   it("rejects unsupported future versions before restoring any state", async () => {
     const exported = await exportSkfProject(input([shape("box")]));
     const future = mutateProject(exported, (document) => {
-      (document as { formatVersion: number }).formatVersion = SKF_HYBRID_FORMAT_VERSION + 1;
+      (document as { formatVersion: number }).formatVersion = SKF_PARAMETRIC_FORMAT_VERSION + 1;
     });
 
     await expect(importSkfProject(future)).rejects.toThrow("requires a newer Cadverix 3D version");

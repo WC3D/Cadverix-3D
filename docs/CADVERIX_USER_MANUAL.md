@@ -1,5 +1,7 @@
 # Cadverix 3D User Manual
 
+Applies to source release **1.21.0**. See the [changelog](CHANGELOG.md) for release history.
+
 ## Editor reference
 
 For ISO/ANSI technical sheets, model views, and drawing dimensions, open the **Drawing** tab beside Sculpt and see the [Drawing workspace guide](DRAWING_WORKSPACE.md).
@@ -9,7 +11,7 @@ project themes, and basic interactive DC switch/LED tests, open **PCB** beside
 Drawing and see the [PCB workspace guide](PCB_WORKSPACE.md). PCB edits autosave;
 **Ctrl/Cmd+S** downloads the combined SKF project. There is no separate PCB Save
 button; touch users can use **Geometry → Export → SKF**. PCB-bearing packages
-require an SKF format-4 reader.
+require at least an SKF format-4 reader; independent sketches or three-point planes raise the project requirement to version 5.
 
 For command search, alignment snapping, section/overhang inspection, saved pivots,
 face hole patterns, reusable shapes, and storage recovery, see
@@ -76,6 +78,8 @@ Projects normally stay on the device in browser storage. No account is required.
 - **Shared:** available only when shared project storage is configured by the server administrator.
 
 Projects autosave geometry, history, imported assets, workspace settings, and thumbnails. Opening a shared SKF file creates a local editable copy. Saving back to shared storage checks the server revision before replacing the file.
+
+Autosave is not an independent backup. If **Project not saved** appears in the editor, export an SKF backup before closing the tab. A missing saved record for a nonempty project is reported instead of being opened and saved as an empty replacement. **Storage & backups** offers retained recovery snapshots, but cannot recover geometry that never reached storage. Keep a downloaded, verified SKF before restarting a troubled browser or clearing site data. Different browser profiles, protocols, hostnames/IP addresses, and ports have separate storage; changing from a LAN address to `localhost` does not move your designs.
 
 # 2. Navigating The Editor
 
@@ -209,15 +213,19 @@ Picking a model face also creates and activates an associative construction plan
 
 ## Persistent Construction Planes
 
-Open **Geometry > Workplane** to manage sketch planes:
+Open **Reference planes** in the Scene/model browser, or **Geometry > Workplane**, to manage sketch planes:
 
 - Base XZ plane.
 - Offset XZ/top plane.
 - Offset XY/front plane.
 - Offset YZ/side plane.
 - Planes attached to planar model faces.
+- Associative angle planes and midplanes between parallel source planes.
+- Three-point planes defined by non-collinear world-space coordinates in millimeters.
 
 Face-attached construction planes follow movement, rotation, and resizing of the source object. Construction-plane helpers are locked and omitted from normal geometry exports.
+
+Use **Edit active plane** to change a plane's definition. Dependent sketches move with it without changing their local dimensions. Referenced planes cannot be deleted until their dependents are removed. Reference helpers are hidden in the viewport unless selected; enable **Show all reference planes** to display the others. This is a session display control, not a change to each node's saved visibility. The base grid remains visible according to workspace settings, and placement mode displays the active workplane.
 
 ## Plane Workflow Tips
 
@@ -348,12 +356,18 @@ The underlying model uses millimeters. Some inspector controls convert display u
 1. Switch to **Sketch**.
 2. Open **Sketch to 3D**.
 3. Choose **Extrude sketch** or **Revolve sketch**.
-4. Draw on the active construction plane.
-5. Finish to create the 3D object, or cancel to discard the sketch.
+4. Choose **XZ · Top**, **XY · Front**, **YZ · Side**, the active workplane, or a listed construction plane.
+5. Draw a profile. Choose **Save sketch only** to retain it without a solid, **Finish sketch** to build the feature, or **Cancel** to discard the edit.
 
 To edit a sketch-derived object, select exactly one such object and choose **Edit sketch**. Finishing replaces the same 3D object. Canceling discards the edit.
 
-Sketches are stored on their generated 3D objects rather than as separate dashboard documents.
+**Save sketch only** creates an independent sketch inside the current project, not a separate dashboard card. Select it in the model browser to edit it, extrude it, rename it, or change its visibility. Legacy sketch-derived objects can still carry embedded profiles. See [Independent sketches and reusable inputs](#independent-sketches-and-reusable-inputs) for linked rebuild behavior.
+
+## Body References And The 3D Preview
+
+The 2D sketch plate is an orthographic view normal to the selected plane. Its body-reference outlines are projected silhouettes, not cross-sections, editable sketch entities, or hidden/internal mesh edges. The existing Manifold/Clipper2 engine unions the projected surfaces and retains silhouette holes and separate components. Projection affects display only, not saved model geometry.
+
+The orbitable **3D preview** uses perspective, so it will not look identical to the 2D view. Red or source-colored bodies are existing geometry; a new feature appears when a valid sketch profile is selected. **Preparing body outlines…** means the geometry runtime is loading. If an outline cannot be calculated, a status message identifies the failure rather than drawing a misleading bounding rectangle. The separate **Project** tool below creates actual sketch geometry and has different behavior.
 
 ## Sketch Navigation
 
@@ -464,6 +478,8 @@ Exact geometry anchors take priority. Endpoint snaps can reuse existing points a
 
 Select a straight segment to apply Horizontal or Vertical. Applying one removes the opposite constraint. Rectangles receive both automatically where appropriate.
 
+New horizontal/vertical lines retain inferred constraints, including edges from the sketch shape menu. Clicking an edge selects that edge; dragging a closed profile's center moves the profile. Conflicting constraint edits are rejected rather than silently accepting distorted geometry.
+
 Select a point and use Fix to hold it in place. Moving constrained geometry invokes the solver and may move connected points. Current sketch constraints do not include tangent, parallel, perpendicular, equal, angle, radius, or diameter.
 
 ## Dimensions
@@ -475,7 +491,7 @@ Select a point and use Fix to hold it in place. Moving constrained geometry invo
 3. Enter a positive Length.
 4. Set, update, or remove the dimension.
 
-The solver adjusts endpoint geometry. In Select mode, the dimension label can be repositioned.
+The solver adjusts endpoint geometry. Double-click a line's length label to edit it directly on the sketch, then press Enter or the checkmark to apply, or Escape to cancel. A focused label also opens with Enter. In Select mode, drag a driving dimension label to reposition it without moving the geometry. Driving dimensions stay visible; other line lengths appear only for a selected edge or with Dimension active.
 
 ### Reference Distance
 
@@ -517,15 +533,29 @@ These operations keep the originals and select the generated copies. Compatible 
 
 # 8. Turning Sketches Into 3D Models
 
+## Independent sketches and reusable inputs
+
+Draw on any supported sketch plane, name the sketch in the canvas footer, and choose **Save sketch only**. This saves local 2D geometry, including open contours, without creating a thin solid. The sketch appears as wire geometry and as an **Independent sketch** in the model browser.
+
+Select the saved sketch to **Edit saved sketch**, **Extrude saved sketch**, rename it, or hide/show it. Extruding a saved sketch retains a stable source reference. Editing that source and choosing **Save sketch only** rebuilds its directly linked exact extrusions in one undoable transaction. If a rebuild fails, the editor keeps the previous source/solids and leaves the failed edit open for correction. Later fillets/sculpt/group/taper modifications must still be removed before rebuilding their source.
+
+Use **Reference planes** in the model browser to create planes, or **Edit active plane** in the plane panel to adjust an existing definition. Three-point planes use world coordinates in millimeters: point 1 is the origin, points 1–2 define local X, and the third point defines the plane orientation. Repeated/collinear points and cyclic references are rejected. Changing a parent plane moves dependent sketches without changing their local dimensions. Referenced planes/sketches cannot be deleted until their dependents are removed.
+
+Independent sketches are excluded from solid booleans, resizing, and STL/STEP solid exports. Save them in SKF. Projects containing independent sketches or three-point planes require SKF reader version 5; previous project versions remain supported.
+
 ## Extrude
 
 1. Start Extrude Sketch.
 2. Draw one or more closed regions.
 3. In Select mode, click shaded regions or use All/Clear.
-4. Finish the sketch.
-5. Adjust Height on the resulting shape.
+4. Set **Extrusion distance** and choose **One side**, **Reverse**, or **Symmetric** while reviewing the live 3D preview. Symmetric uses the total distance, half on either side of the sketch plane.
+5. Finish the sketch. Use **Extrusion distance** in the shape inspector or the normal-direction handle to change its depth later.
 
-Regions support disjoint solids, nested holes, islands, overlaps, and open dividers crossing a closed face. At least one valid region must be selected. New extrusions start at 10 mm and extend along the positive plane normal.
+Regions support disjoint solids, nested holes, islands, overlaps, and open dividers crossing a closed face. At least one valid region must be selected. New extrusions default to 10 mm along the positive sketch-plane normal. Distance edits preserve orientation and cross-section; they do not rotate or bake the body into a different coordinate frame.
+
+Use **Edit sketch** to change the cross-section with driving dimensions, then finish to rebuild the same body in place. Generic footprint scaling handles are not shown for sketch extrusions, because scaling a mesh does not update its driving sketch. Distance, direction, sketch, and plane attachment are retained in saved projects. The preview keeps your orbit when dimensions change.
+
+Automatic regeneration of downstream fillets, chamfers, sculpting, grouping, or taper is not implemented. Remove those changes before editing the base sketch; the editor blocks that edit rather than silently deleting later work. This is not a complete Fusion/SolidWorks feature-history solver.
 
 Cadverix 3D first requests exact OpenCascade/B-Rep geometry. If that fails, it falls back to a triangulated mesh that remains sketch-editable but may not retain exact CAD edges.
 
@@ -593,6 +623,8 @@ SKF can preserve:
 - Original imported source assets and exact CAD data.
 
 Opening an SKF package creates a new local project rather than overwriting the currently open one.
+
+Ordinary modeling packages use format/minimum reader 2, drawings use 3, and PCB-bearing packages use 4. Independent sketches, source-linked extrusions, or three-point planes in any retained state require format/minimum reader 5. Current readers accept packaged versions 1–5; older readers reject unsupported new semantics rather than dropping them. See [SKF project format](SKF_PROJECT_FORMAT.md).
 
 Choose **LYL** in the Export dialog to create a Layerling format-2 package. Drawings, construction-plane attachments, Cadverix fasteners/threads, sculpt provenance, and extended sketch constraints, dimensions, projections, text, or sweep metadata cannot be represented safely and stop the export with an explanation. Use SKF when complete Cadverix editability is required. LYL exports are available as browser or local-folder downloads; shared project storage remains SKF-only.
 
@@ -749,6 +781,18 @@ Most full dialogs do not use Escape as a universal close command. Use their visi
 - Update the browser and graphics driver.
 - Revolve preview can show a fallback when WebGL is unavailable.
 
+## A Project Does Not Open Or Save
+
+- Read the dashboard message or **Project not saved** warning; an existing project card alone is not proof its geometry was saved.
+- If another tab blocks project storage, close the other Cadverix tabs and reopen the project. Do not clear site data.
+- Use the same browser profile and exact site address as before; `localhost` and a LAN IP have different storage.
+- Check **Storage & backups → Local recovery snapshots** and restore a snapshot **as a copy**. Also check independent SKF downloads and configured shared-storage versions.
+- Before restarting an unresponsive browser, export and verify an SKF if possible. Unsaved tab state may be lost; restoring browser tabs does not restore unsaved geometry. If the tab is already frozen, recovery is not guaranteed.
+
+## Reference Planes Obscure The Model
+
+Turn off **Show all reference planes** in the Reference planes panel and select a solid instead of a plane. The individual planes remain in the project. Use placement mode when you need to see the active workplane.
+
 ## A Boolean, Fillet, Or Chamfer Fails
 
 - Confirm the object is a closed solid rather than an open mesh.
@@ -779,6 +823,8 @@ Most full dialogs do not use Escape as a universal close command. Use their visi
 - Projection is a plane intersection, not a camera silhouette.
 - Geometry perpendicular to the plane can collapse.
 - Prefer a persistent construction plane for angled workflows.
+
+These points concern the **Project** command, not the non-editable body-reference silhouettes. For missing background outlines, read the sketch status message and allow the geometry runtime to load; inspect the 3D preview without changing the source body.
 
 ## Import Or Export Issues
 

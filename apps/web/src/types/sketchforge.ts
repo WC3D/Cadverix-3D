@@ -39,6 +39,7 @@ export type ShapeKind =
   | "polygon"
   | "icosahedron"
   | "constructionPlane"
+  | "sketchProfile"
   | "mesh";
 
 export type ShapeAsset = {
@@ -244,10 +245,11 @@ export type SketchProfile = {
 };
 
 export type SketchFeature =
-  | { kind: "extrusion"; regionIds?: string[] }
+  | { kind: "extrusion"; regionIds?: string[]; direction?: "positive" | "negative" | "symmetric"; sketchId?: string }
   | { kind: "sweep"; sectionSegmentIds: string[]; pathSegmentIds: string[] };
 
 export type ConstructionPlaneDefinition =
+  | { kind: "threePoint"; points: [Vector3Tuple, Vector3Tuple, Vector3Tuple]; pose: ConstructionPlanePose }
   | { kind: "principal"; principal: PrincipalPlane; offset: number; angle?: number; flipped?: boolean; pose: ConstructionPlanePose }
   | { kind: "face"; sourceShapeId: string; attachment: ConstructionPlaneAttachment; offset?: number; angle?: number; flipped?: boolean; pose: ConstructionPlanePose }
   | { kind: "angle"; referencePlaneId: string; angle: number; offset?: number; flipped?: boolean; pose: ConstructionPlanePose }

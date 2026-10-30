@@ -146,6 +146,7 @@ test("sketch clipboard and corner fillet preserve connected geometry and undo", 
   await page.getByRole("tab", { name: "Sketch", exact: true }).click();
   await page.getByRole("button", { name: "Sketch to 3D options" }).click();
   await page.getByRole("menuitem", { name: /^Extrude sketch/ }).click();
+  await page.getByRole("button", { name: "XZ · Top", exact: true }).click();
   await page.getByRole("button", { name: "Line", exact: true }).click();
   await page.touchscreen.tap(600, 600); await page.touchscreen.tap(850, 600); await page.touchscreen.tap(850, 450);
   await page.keyboard.press("Escape");
@@ -166,6 +167,7 @@ test("sketch Trim/Extend reaches a boundary and supports undo and redo", async (
   await page.getByRole("tab", { name: "Sketch", exact: true }).click();
   await page.getByRole("button", { name: "Sketch to 3D options" }).click();
   await page.getByRole("menuitem", { name: /^Extrude sketch/ }).click();
+  await page.getByRole("button", { name: "XZ · Top", exact: true }).click();
   const clickPoint = async (x: number, z: number) => {
     const screen = await page.locator("svg.sketch-plate").evaluate((svg: SVGSVGElement, point) => {
       const position = svg.createSVGPoint();
@@ -203,6 +205,7 @@ test("Repair Sketch highlights and locates endpoints without editing geometry", 
   await page.getByRole("tab", { name: "Sketch", exact: true }).click();
   await page.getByRole("button", { name: "Sketch to 3D options" }).click();
   await page.getByRole("menuitem", { name: /^Extrude sketch/ }).click();
+  await page.getByRole("button", { name: "XZ · Top", exact: true }).click();
   const clickPoint = async (x: number, z: number) => {
     const screen = await page.locator("svg.sketch-plate").evaluate((svg: SVGSVGElement, point) => {
       const position = svg.createSVGPoint();
