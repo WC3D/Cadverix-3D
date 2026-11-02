@@ -1,4 +1,5 @@
 import { expect, test, type Page } from "@playwright/test";
+import { chooseModifyTool } from "./helpers/modifyTools";
 import { strFromU8, unzipSync } from "fflate";
 
 const scene = async (page: Page) => JSON.parse(await page.locator("[data-codex-state]").textContent() ?? "{}");
@@ -47,8 +48,9 @@ test("command search runs existing tools and inspection does not change model da
   await expect.poll(async () => (await scene(page)).shapeCount).toBe(1);
   const before = (await scene(page)).shapes;
   await page.getByRole("button", { name: "Search commands", exact: true }).click();
-  await search.getByRole("textbox").fill("shell");
+  await search.getByRole("textbox").fill("Modeling tools");
   await search.getByRole("button", { name: /Modeling tools/ }).click();
+  await page.getByRole("button", { name: "Inspect / print", exact: true }).click();
   await page.getByLabel("Section view", { exact: true }).check();
   await page.getByLabel("Section offset", { exact: true }).fill("10");
   await page.getByLabel("Show overhangs", { exact: true }).check();
@@ -62,14 +64,16 @@ test("command search runs existing tools and inspection does not change model da
 
 test("reusable shapes survive reload, insert independently and undo", async ({ page }) => {
   await addBox(page);
-  await page.getByRole("button", { name: "Modeling tools", exact: true }).click();
+  await chooseModifyTool(page, "Modeling tools");
+  await page.getByRole("button", { name: "Reusable shapes", exact: true }).click();
   await page.getByLabel("Reusable shape name", { exact: true }).fill("Bracket");
   await page.evaluate(() => Object.defineProperty(crypto, "randomUUID", { value: undefined, configurable: true }));
   await page.getByRole("button", { name: "Save selection to library", exact: true }).click();
   await expect(page.getByRole("button", { name: "Insert Bracket", exact: true })).toBeVisible();
   await expect.poll(async () => (await savedState(page))?.rootNodeIds.length).toBe(1);
   await page.reload();
-  await page.getByRole("button", { name: "Modeling tools", exact: true }).click();
+  await chooseModifyTool(page, "Modeling tools");
+  await page.getByRole("button", { name: "Reusable shapes", exact: true }).click();
   await page.getByRole("button", { name: "Insert Bracket", exact: true }).click();
   await expect.poll(async () => (await scene(page)).shapeCount).toBe(2);
   expect(new Set((await scene(page)).shapes.map((shape: { id: string }) => shape.id)).size).toBe(2);
@@ -82,7 +86,7 @@ test("a picked pivot survives saving and reopening", async ({ page }) => {
   await addBox(page);
   await page.getByRole("button", { name: "Minimize shape settings", exact: true }).click();
   const point = await surfacePoint(page);
-  await page.getByRole("button", { name: "Modeling tools", exact: true }).click();
+  await chooseModifyTool(page, "Face tools / rotation pivot");
   await page.getByRole("button", { name: "Pick face pivot", exact: true }).click();
   await page.mouse.click(point.x, point.y);
   await expect.poll(async () => (await scene(page)).shapes[0].rotationPivot).not.toBeNull();
@@ -100,7 +104,7 @@ test("face holes cut and undo, and an associative face plane preserves the Group
   await addBox(page);
   await page.getByRole("button", { name: "Minimize shape settings", exact: true }).click();
   const point = await surfacePoint(page);
-  await page.getByRole("button", { name: "Modeling tools", exact: true }).click();
+  await chooseModifyTool(page, "Face hole pattern");
   await page.getByRole("button", { name: "Pick face for hole pattern", exact: true }).click();
   await page.mouse.click(point.x, point.y);
   await expect(page.getByRole("button", { name: "Create hole pattern", exact: true })).toBeEnabled();

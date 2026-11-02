@@ -2,6 +2,7 @@ import { useEffect, useRef, type CSSProperties } from "react";
 import * as THREE from "three";
 import {
   measureKeyForHandle,
+  visibleDimensionMarks,
   type TransformOverlayProps,
   type TransformOverlayState,
 } from "@/components/workplane/transformOverlayTypes";
@@ -71,7 +72,7 @@ export function TransformOverlay({
     overlay.addEventListener("wheel", onCameraWheel, { capture: true, passive: false });
     return () => overlay.removeEventListener("wheel", onCameraWheel, true);
   }, [onCameraWheel]);
-  const marks = measureKey ? (box.dimensions[measureKey] ?? []) : [];
+  const marks = visibleDimensionMarks(box.dimensions, measureKey);
   const visibleMarks = (hideDimensionMarks ? [] : marks).filter((mark) => mark.key !== editingDimension?.key);
   const handleMeasureKey = (handle: TransformOverlayState["handles"][number]) => measureKeyForHandle(handle.kind, handle.key, box);
   const protractorTicks = Array.from({ length: 16 }, (_, index) => {
@@ -174,6 +175,7 @@ export function TransformOverlay({
           key={`${mark.key}-label`}
           className="dimension-label"
           aria-label={`${mark.axis} dimension`}
+          title={`Edit ${mark.axis} — click to enter an exact dimension`}
           type="button"
           style={{ "--overlay-x": `${mark.labelX}px`, "--overlay-y": `${mark.labelY}px` } as CSSProperties}
           onPointerDown={(event) => event.stopPropagation()}
@@ -234,6 +236,7 @@ export function TransformOverlay({
             "--transform-handle-angle": `${handle.angle ?? 0}deg`,
           } as CSSProperties}
           title={handle.title}
+          aria-label={`${handle.title} (${handle.key})`}
           onPointerEnter={(event) => {
             if ((event.buttons & 4) !== 0) {
               onHoverMeasure(null);
@@ -272,7 +275,8 @@ export function TransformOverlay({
             "--rotate-plane-c": handle.plane.c,
             "--rotate-plane-d": handle.plane.d,
           } as CSSProperties}
-          title="Rotate"
+          title={`Rotate ${handle.key === "rotate-left" ? "X" : handle.key === "rotate-right" ? "Y" : "Z"} — drag or click to enter an angle`}
+          aria-label={`Rotate ${handle.key === "rotate-left" ? "X" : handle.key === "rotate-right" ? "Y" : "Z"}`}
           onPointerDown={(event) => {
             if (event.button === 0) {
               onBeginTransform("rotate", handle.key, event);

@@ -5,7 +5,15 @@ import type { SectionSettings } from "@/lib/viewportInspection";
 import { CustomShapes } from "./CustomShapes";
 import type { HolePatternSettings } from "@/lib/holePattern";
 
-export function ModelingTools({ onClose, onPattern, onFace, onRotate, onShell, hasPivot, onClearPivot, disabled, patternCenter, pickingCenter, onPickCenter, onClearCenter, onCancelCenter, section, onSection, overhangAngle, onOverhangAngle, onSaveCustomShape, onInsertCustomShape, holeSettings, onHoleSettings, holeCount, holeBusy, onPickHoles, onApplyHoles, onClearHoles }: {
+export const MODELING_TOOL_LABELS = {
+  tools: "Modeling tools", pattern: "3D pattern", faces: "Face tools / rotation pivot",
+  shell: "Shell / hollow", holes: "Face hole pattern", inspect: "Inspect / print", custom: "Reusable shapes",
+} as const;
+export type ModelingToolSection = keyof typeof MODELING_TOOL_LABELS;
+
+export function ModelingTools({ activeSection = "tools", onSelectSection, onClose, onPattern, onFace, onRotate, onShell, hasPivot, onClearPivot, disabled, patternCenter, pickingCenter, onPickCenter, onClearCenter, onCancelCenter, section, onSection, overhangAngle, onOverhangAngle, onSaveCustomShape, onInsertCustomShape, holeSettings, onHoleSettings, holeCount, holeBusy, onPickHoles, onApplyHoles, onClearHoles }: {
+  activeSection?: ModelingToolSection;
+  onSelectSection: (section: ModelingToolSection) => void;
   holeSettings: HolePatternSettings; onHoleSettings: (value: HolePatternSettings) => void; holeCount: number; holeBusy: boolean;
   onPickHoles: () => void; onApplyHoles: () => void; onClearHoles: () => void;
   onSaveCustomShape: (name: string) => Promise<Uint8Array>; onInsertCustomShape: (bytes: Uint8Array) => Promise<void>;
@@ -23,9 +31,12 @@ export function ModelingTools({ onClose, onPattern, onFace, onRotate, onShell, h
   const [thickness, setThickness] = useState(2);
   const [opening, setOpening] = useState<"top" | "bottom" | "both" | "closed">("top");
   if (pickingCenter) return <aside className="pattern-pick-prompt" aria-label="Pick pattern center"><span>Click or tap the active workplane to set the circular center.</span><button type="button" onClick={onCancelCenter}>Cancel picking</button></aside>;
-  return <aside className="modeling-tools" aria-label="Modeling tools">
-    <header><strong>Modeling tools</strong><button type="button" onClick={onClose}>Close</button></header>
-    <fieldset><legend>Inspect / print</legend>
+  return <aside className="modeling-tools" aria-label={MODELING_TOOL_LABELS[activeSection]}>
+    <header><strong>{MODELING_TOOL_LABELS[activeSection]}</strong><button type="button" onClick={onClose}>Close</button></header>
+    {activeSection !== "tools" ? <button type="button" onClick={() => onSelectSection("tools")}>All modeling tools</button> : <nav className="modeling-tool-picker" aria-label="Choose modeling tool">
+      {(["pattern", "faces", "shell", "holes", "inspect", "custom"] as const).map((tool) => <button key={tool} type="button" onClick={() => onSelectSection(tool)}>{MODELING_TOOL_LABELS[tool]}</button>)}
+    </nav>}
+    {activeSection === "inspect" ? <fieldset data-modeling-section="inspect"><legend>Inspect / print</legend>
       <label><input type="checkbox" checked={section.enabled} onChange={(event) => onSection({ ...section, enabled: event.target.checked })} />Section view</label>
       {section.enabled ? <>
         <label>Section axis<select aria-label="Section axis" value={section.axis} onChange={(event) => onSection({ ...section, axis: event.target.value as SectionSettings["axis"] })}><option value="x">X</option><option value="y">Y</option><option value="z">Z (height)</option></select></label>
@@ -37,8 +48,8 @@ export function ModelingTools({ onClose, onPattern, onFace, onRotate, onShell, h
       <label><input type="checkbox" checked={overhangAngle !== null} onChange={(event) => onOverhangAngle(event.target.checked ? 45 : null)} />Show overhangs</label>
       {overhangAngle !== null ? <label>Overhang angle (degrees)<input aria-label="Overhang angle" type="number" min="1" max="89" value={overhangAngle} onChange={(event) => { const value = event.target.valueAsNumber; if (Number.isFinite(value)) onOverhangAngle(Math.min(89, Math.max(1, value))); }} /></label> : null}
       <p>Orange highlights steep downward faces above the plate; this is not a slicer's support analysis.</p>
-    </fieldset>
-    <fieldset disabled={disabled}><legend>3D pattern</legend>
+    </fieldset> : null}
+    {activeSection === "pattern" ? <fieldset data-modeling-section="pattern" disabled={disabled}><legend>3D pattern</legend>
       <label>Pattern type<select aria-label="3D pattern type" value={options.kind} onChange={(e) => setOptions({ ...options, kind: e.target.value as PatternOptions["kind"] })}><option value="grid">XYZ grid</option><option value="circular">Circular</option></select></label>
       {options.kind === "grid" ? ["X", "Y", "Z (height)"].map((axis, index) => <div key={axis} className="modeling-row"><label>{axis} count<input aria-label={`Pattern ${axis} count`} type="number" min="1" max="256" value={options.counts[index]} onChange={(e) => setOptions({ ...options, counts: options.counts.map((n, i) => i === index ? Number(e.target.value) : n) as [number, number, number] })} /></label><label>Spacing (mm)<input aria-label={`Pattern ${axis} spacing`} type="number" value={options.spacing[index]} onChange={(e) => setOptions({ ...options, spacing: options.spacing.map((n, i) => i === index ? Number(e.target.value) : n) as [number, number, number] })} /></label></div>) : <>
         <label>Count<input aria-label="Circular pattern count" type="number" min="1" max="256" value={options.count} onChange={(e) => setOptions({ ...options, count: Number(e.target.value) })} /></label>
@@ -51,20 +62,20 @@ export function ModelingTools({ onClose, onPattern, onFace, onRotate, onShell, h
         <p>Count includes the originals. Picking uses the current snap step.</p>
       </>}
       <button type="button" onClick={() => onPattern(options, true)}>Preview pattern</button><button type="button" onClick={() => onPattern(options, false)}>Create pattern</button>
-    </fieldset>
-    <fieldset disabled={disabled}><legend>Face tools</legend>
+    </fieldset> : null}
+    {activeSection === "faces" ? <fieldset data-modeling-section="faces" disabled={disabled}><legend>Face tools</legend>
       <button type="button" onClick={() => onFace("flat")}>Lay flat on face</button><button type="button" onClick={() => onFace("pivot")}>Pick face pivot</button>
       <p>{hasPivot ? "Face pivot set" : "No face pivot"}</p>
       <label>Rotation (degrees)<input type="number" aria-label="Pivot rotation angle" value={angle} onChange={(e) => setAngle(Number(e.target.value))} /></label>
       <button type="button" onClick={() => onRotate(angle)}>Rotate selection</button><button type="button" onClick={onClearPivot}>Clear pivot</button>
-    </fieldset>
-    <fieldset disabled={disabled}><legend>Shell / hollow</legend>
+    </fieldset> : null}
+    {activeSection === "shell" ? <fieldset data-modeling-section="shell" disabled={disabled}><legend>Shell / hollow</legend>
       <label>Wall thickness (mm)<input aria-label="Shell thickness" type="number" min="0.01" step="0.1" value={thickness} onChange={(e) => setThickness(Number(e.target.value))} /></label>
       <label>Opening<select aria-label="Shell opening" value={opening} onChange={(e) => setOpening(e.target.value as typeof opening)}><option value="top">Top</option><option value="bottom">Bottom</option><option value="both">Top and bottom</option><option value="closed">Closed cavity</option></select></label>
       <button type="button" onClick={() => onShell(thickness, opening)}>Apply shell</button><p>One solid at a time. Invalid wall thicknesses leave the original intact. Openings follow the vertical Z axis.</p>
-    </fieldset>
-    <CustomShapes disabled={disabled} createPackage={onSaveCustomShape} onInsert={onInsertCustomShape} />
-    <fieldset disabled={disabled}><legend>Face hole pattern</legend>
+    </fieldset> : null}
+    {activeSection === "custom" ? <CustomShapes disabled={disabled} createPackage={onSaveCustomShape} onInsert={onInsertCustomShape} /> : null}
+    {activeSection === "holes" ? <fieldset data-modeling-section="holes" disabled={disabled}><legend>Face hole pattern</legend>
       <label>Hole shape<select aria-label="Pattern hole shape" value={holeSettings.form} onChange={(event) => onHoleSettings({ ...holeSettings, form: event.target.value as HolePatternSettings["form"] })}>{["round", "square", "rectangle", "hexagon", "slot"].map((form) => <option key={form} value={form}>{form}</option>)}</select></label>
       {(["size", "height", "spacing", "margin"] as const).filter((field) => field !== "height" || holeSettings.form === "rectangle" || holeSettings.form === "slot").map((field) => <label key={field}>{field} (mm)<input aria-label={`Hole ${field}`} type="number" min={field === "margin" ? 0 : .5} step=".5" value={holeSettings[field]} onChange={(event) => { if (Number.isFinite(event.target.valueAsNumber)) onHoleSettings({ ...holeSettings, [field]: event.target.valueAsNumber }); }} /></label>)}
       <label><input type="checkbox" checked={holeSettings.staggered} onChange={(event) => onHoleSettings({ ...holeSettings, staggered: event.target.checked })} />Staggered rows</label>
@@ -74,6 +85,6 @@ export function ModelingTools({ onClose, onPattern, onFace, onRotate, onShell, h
       <button type="button" disabled={!holeCount || holeBusy} onClick={onApplyHoles}>Create hole pattern</button>
       {holeCount ? <button type="button" onClick={onClearHoles}>Clear hole preview</button> : null}
       <p>{holeBusy ? "Cutting holes…" : holeCount ? `${holeCount} holes previewed.` : "Select one solid, choose settings, then pick a flat face to preview. Changing settings clears the preview. Up to 256 holes; at least 0.4 mm between holes."} Ungroup restores editable cutters and body.</p>
-    </fieldset>
+    </fieldset> : null}
   </aside>;
 }

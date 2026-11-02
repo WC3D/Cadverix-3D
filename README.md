@@ -46,6 +46,7 @@ No login. Private projects autosave locally in your browser, with optional share
 - **Solid and hole workflow** - turn shapes into cutters and group them into final geometry.
 - **Boolean Intersection** - keep only the geometry where selected solid and hole shapes overlap.
 - **Reversible edge tools** - chamfer and fillet selected CAD edges, with history controls for removing applied edge features.
+- **Previewable modifiers** - flexi joints, cookie cutters, fitted lids, exact body offsets, healed face deletion, face extrusion/pockets, mesh simplification, and surface relief. See [modifier coverage and limits](docs/LAYERLING_MODIFIERS.md) for differences from Layerling.
 - **Faceted mesh rim treatments** - dedicated chamfer and rounded Fillet paths for supported complete, convex, horizontal outer rims on imported meshes, with CAD validation and retained B-Rep geometry.
 - **Rotated solid edge treatment** - chamfer and fillet preserve analytic box topology after one-, two-, or three-axis rotations.
 - **Mesh sculpting** - Add, Subtract, and Smooth brushes with adjustable radius and strength, local remeshing, and undoable strokes processed in a background worker.
@@ -63,7 +64,7 @@ No login. Private projects autosave locally in your browser, with optional share
 Cadverix includes cross-file 3MF assembly import, fractional viewport/sketch
 measurements, printer build-volume presets, XYZ/circular patterns, lay-flat,
 face pivots, browser-worker shelling, and sketch clipboard/corner tools. Open
-**Geometry → Modify → Modeling tools** for patterns, face tools, and shelling.
+**Geometry → Modify** for grouped **Transform**, **Shape**, **Print**, and **Mesh** menus with focused tool panels; **Shape → Modeling tools** opens the tool chooser, inspection controls, and reusable-shape library.
 
 **Storage & backups** on the dashboard provides local recovery snapshots and
 downloadable SKF backups in every deployment. Configured Node/Docker instances

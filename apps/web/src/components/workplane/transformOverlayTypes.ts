@@ -284,6 +284,16 @@ export function getElevationMeasureKey(overlay: TransformOverlayState | null) {
   );
 }
 
+export function visibleDimensionMarks(dimensions: TransformOverlayState["dimensions"], measureKey: string | null) {
+  const active = measureKey ? dimensions[measureKey] ?? [] : [];
+  const marks = new Map<DimensionMark["axis"], DimensionMark>();
+  for (const mark of Object.values(dimensions).flat()) {
+    if (mark.axis !== "elevation" && !marks.has(mark.axis)) marks.set(mark.axis, mark);
+  }
+  for (const mark of active) marks.set(mark.axis, mark);
+  return [...marks.values()];
+}
+
 export function measureKeyForHandle(kind: TransformHandleKind, handleKey: string, overlay: TransformOverlayState | null) {
   if (kind === "lift") {
     return getElevationMeasureKey(overlay) ?? handleKey;

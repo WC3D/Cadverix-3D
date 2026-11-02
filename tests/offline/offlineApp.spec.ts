@@ -1,4 +1,5 @@
 import { expect, test } from "@playwright/test";
+import { chooseModifyTool } from "../browser/helpers/modifyTools";
 import { readFile } from "node:fs/promises";
 import { unzipSync } from "fflate";
 
@@ -18,7 +19,7 @@ test("cached app reloads and performs CAD shelling, drawings and SKF export offl
   await page.getByRole("button", { name: "Create new 3D design", exact: true }).click();
   await page.getByRole("button", { name: "Add shape", exact: true }).click();
   await page.getByRole("button", { name: "Box", exact: true }).click();
-  await page.getByRole("button", { name: "Modeling tools", exact: true }).click();
+  await chooseModifyTool(page, "Shell / hollow");
   await page.getByRole("button", { name: "Apply shell", exact: true }).click();
   await expect(page.locator(".editor-toast")).toContainText("Shelled", { timeout: 65000 });
   await page.getByRole("button", { name: "Close", exact: true }).click();

@@ -11,6 +11,70 @@
 .toolbar-section[data-tool-group="arrange"] { --tool-accent: #e77558; }
 .toolbar-section[data-tool-group="manage"] { --tool-accent: #758cea; }
 
+.toolbar-tool-menu { flex:0 0 auto; }
+.toolbar-section[data-tool-group] .modify-menu-trigger {
+  display:flex; align-items:center; gap:4px; width:auto; padding:0 5px;
+  color:var(--foreground); font-size:11px; font-weight:700;
+}
+.modify-menu-trigger > :first-child,.modify-tool-option > :first-child { flex-shrink:0; }
+.toolbar-icon .modify-menu-caret { width:12px; height:12px; }
+.modify-tool-dropdown {
+  z-index:100; display:grid; gap:4px; padding:6px;
+  border:1px solid var(--border); border-radius:10px;
+  color:var(--foreground); background:var(--panel); box-shadow:var(--shadow);
+}
+.modify-tool-option {
+  display:flex; align-items:center; gap:12px; width:100%; min-height:52px;
+  padding:4px 8px; border-radius:6px; background:var(--tile); color:var(--foreground);
+  font-size:13px; text-align:left; cursor:pointer;
+}
+.modify-tool-option > svg { width:43px; height:43px; flex-shrink:0; }
+.modify-tool-option:is(:hover, :focus-visible, .active):not(:disabled) {
+  background:var(--tile-hover); outline:2px solid var(--tool-accent); outline-offset:-2px;
+}
+.modify-tool-option:disabled { opacity:.45; cursor:default; }
+
+.toolbar-title-row { overflow-x: auto; scrollbar-width: none; }
+.editor-quick-access {
+  display: flex;
+  flex: 0 0 auto;
+  align-items: center;
+  gap: 2px;
+  margin-left: auto;
+  padding-inline: 6px;
+  color: var(--foreground);
+}
+.editor-quick-access a,
+.quick-theme {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 32px;
+  min-height: 32px;
+  border-radius: 6px;
+  color: inherit;
+}
+.editor-quick-access a:hover { background: var(--tile-hover); }
+.quick-theme { gap: 4px; padding-inline: 6px; }
+.quick-theme select {
+  max-width: 155px;
+  padding: 3px;
+  color: var(--foreground);
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  font: inherit;
+  cursor: pointer;
+}
+.editor-quick-access :is(a, select):focus-visible {
+  outline: 2px solid var(--foreground);
+  outline-offset: -2px;
+}
+@media (any-pointer: coarse), (max-width: 760px) {
+  .editor-quick-access a { min-width: 40px; min-height: 40px; }
+  .quick-theme select { max-width: 120px; }
+}
+
 .toolbar-mode-content:is(.geometry, .sketch, .sculpt) {
   overflow-x: auto;
   overflow-y: hidden;

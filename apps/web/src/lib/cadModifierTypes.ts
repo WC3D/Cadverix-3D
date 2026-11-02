@@ -17,7 +17,7 @@ export type CadModifierQuality = "draft" | "standard" | "fine";
 
 export type CadModifierFaultDiagnostic = {
   phase: string;
-  operation: CadModifierKind | "prepare" | "dispose" | "shell";
+  operation: CadModifierKind | "prepare" | "dispose" | "shell" | "faces" | "solid-modifier";
   strategy: "native-edge" | "planar-rim";
   edgeIds: number[];
   amount?: number;
@@ -58,6 +58,8 @@ export type CadModifierComponentMesh = {
 };
 
 export type CadModifierWorkerRequest =
+  | { type: "faces"; requestId: number; parts: CadModifierMeshPart[] }
+  | { type: "solid-modifier"; requestId: number; parts: CadModifierMeshPart[]; job: Extract<import("@/lib/layerlingModifierTypes").ModifierJob, { kind: "offset" | "deleteFace" | "face" }> }
   | { type: "shell"; requestId: number; parts: CadModifierMeshPart[]; thickness: number; opening: "top" | "bottom" | "both" | "closed" }
   | { type: "prepare"; requestId: number; parts: CadModifierMeshPart[]; sharpAngle: number; suppressTreatmentDetailEdges?: boolean }
   | {
@@ -73,6 +75,8 @@ export type CadModifierWorkerRequest =
   | { type: "dispose"; requestId: number };
 
 export type CadModifierWorkerResponse =
+  | { type: "faces"; requestId: number; faces: import("@/lib/layerlingModifierTypes").ModifierFace[] }
+  | { type: "solid-modifier"; requestId: number; meshes: import("@/lib/layerlingModifierTypes").ModifierMesh[]; keepSource: boolean; hole?: boolean }
   | { type: "ready"; requestId: number; edges: CadModifierEdge[]; selectableEdgeIds: number[]; sourceType: string; usedMeshFallback?: boolean }
   | {
       type: "preview";

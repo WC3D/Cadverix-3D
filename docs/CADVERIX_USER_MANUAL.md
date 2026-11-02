@@ -145,6 +145,10 @@ New shapes are inserted on the active placement workplane. Their initial orienta
 
 ## Transform Handles
 
+Width, depth, and height labels stay visible on a selection where those dimensions are editable; no handle hover is required. Click a label to enter an exact value, then press **Enter** to apply or **Escape** to cancel. Parametric sketch extrusions keep their existing resize restrictions. Elevation appears when using the lift control.
+
+Rotation arrows are red for **X**, green for **Y**, and blue for **Z** (height). Drag an arrow to rotate, or click it to enter an angle. Tooltips and accessible labels identify each axis as well as its color.
+
 Selected shapes can expose controls for:
 
 - Moving along the active workplane axes.
@@ -155,6 +159,21 @@ Selected shapes can expose controls for:
 - Entering exact dimensions, movement distances, and angles.
 
 Hold **Shift** while dragging a corner resize handle to preserve width/depth proportions. Hold **Alt/Option** to resize around the center. Hold both modifiers to combine those behaviors. Hold **Shift** while rotating to snap to 45-degree increments.
+
+## Quick Themes, Help, And Modifiers
+
+The title row's palette selector changes the workspace theme immediately using the same presets and persistence as Workspace settings. Custom uses the current custom palette; edit its colors in Workspace settings. The adjacent icons open the user manual, knowledge-base guides, keyboard shortcut reference, and GitHub support issues in new tabs. These online resources require an internet connection. On narrow screens, scroll the title row horizontally to reach these controls.
+
+**Geometry → Modify** uses four grouped menus without reducing tool icon sizes:
+
+- **Transform:** align, mirror, arrays, face pivots, and snap to grid.
+- **Shape:** chamfer, fillet, shell/hollow, hole patterns, offset, delete faces, and push/pocket. **Modeling tools** is also here for inspection and reusable shapes.
+- **Print:** flexi joints, cookie cutters, and lids.
+- **Mesh:** simplification and surface textures.
+
+Selecting a tool closes the menu and opens its existing focused panel. Menus support keyboard navigation, Escape, and outside-click dismissal. Command search (**Ctrl/Cmd+K**) still finds every individual tool directly. **Modeling tools** opens a compact chooser with separate **Inspect / print** and **Reusable shapes** panels; **All modeling tools** returns to that chooser. Geometry behavior and undo support are unchanged.
+
+The row also includes **Flexi joints**, **Cookie cutter**, **Lid**, **Offset body**, **Delete faces**, **Push / pocket face**, **Simplify mesh**, and **Surface texture**. These use a Preview → Apply workflow; Cancel retains the original and Apply creates one undo step. See [Layerling-inspired modifiers](LAYERLING_MODIFIERS.md) for supported settings, printer-fit calibration, geometry limits, and differences from upstream.
 
 ## Shape Inspector
 

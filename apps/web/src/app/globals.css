@@ -6416,7 +6416,8 @@ html[data-theme="dark"] .sketch-grid-settings {
   background: rgba(255, 255, 255, 0.94);
   border: 1px solid rgba(220, 229, 235, 0.86);
   color: #16283a;
-  font-size: 14px;
+  font-size: 16px;
+  font-variant-numeric: tabular-nums;
   font-weight: 500;
   line-height: 1;
   text-align: center;
@@ -6589,6 +6590,15 @@ html[data-theme="dark"] .sketch-grid-settings {
 
 .rotate-handle:hover {
   color: rgba(47, 61, 70, 0.86);
+}
+
+.cadverix-editor .rotate-handle.screen-left { color: #ef6468; }
+.cadverix-editor .rotate-handle.screen-right { color: #59cf7b; }
+.cadverix-editor .rotate-handle.screen-bottom { color: #6b9dff; }
+.cadverix-editor .rotate-handle:hover { filter: brightness(1.2); }
+.transform-overlay :is(button, input):focus-visible {
+  outline: 2px solid #009fe3;
+  outline-offset: 3px;
 }
 
 .rotate-handle-icon,

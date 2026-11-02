@@ -1,4 +1,5 @@
 import { expect, test, type Page } from "@playwright/test";
+import { chooseModifyTool } from "./helpers/modifyTools";
 import { strToU8, zipSync, unzipSync } from "fflate";
 import { readFile } from "node:fs/promises";
 const scene = async (page: Page) => JSON.parse(await page.locator("[data-codex-state]").textContent() ?? "{}");
@@ -13,7 +14,7 @@ test.beforeEach(async ({ page }) => {
 test("XYZ patterns preview without committing, apply once, and undo", async ({ page }) => {
   await page.getByRole("button", { name: "Add shape", exact: true }).click();
   await page.getByRole("button", { name: "Box", exact: true }).click();
-  await page.getByRole("button", { name: "Modeling tools", exact: true }).click();
+  await chooseModifyTool(page, "3D pattern / array");
   await page.getByLabel("Pattern Z (height) count", { exact: true }).fill("2");
   await page.getByRole("button", { name: "Preview pattern", exact: true }).click();
   await expect.poll(async () => (await scene(page)).shapeCount).toBe(1);
@@ -48,7 +49,7 @@ test("shells a box in the browser worker and preserves exact CAD geometry", asyn
   test.setTimeout(90000);
   await page.getByRole("button", { name: "Add shape", exact: true }).click();
   await page.getByRole("button", { name: "Box", exact: true }).click();
-  await page.getByRole("button", { name: "Modeling tools", exact: true }).click();
+  await chooseModifyTool(page, "Shell / hollow");
   await page.getByRole("button", { name: "Apply shell", exact: true }).click();
   await expect(page.locator(".editor-toast")).toContainText("Shelled", { timeout: 65000 });
   expect((await scene(page)).shapes[0].cadBrepLength).toBeGreaterThan(0);
@@ -249,7 +250,7 @@ test("face pivot rotates around the picked face and lay-flat is undoable", async
   await page.getByRole("button", { name: "Box", exact: true }).click();
   await page.getByRole("button", { name: "Center view on selection", exact: true }).click();
   await page.keyboard.press("4");
-  await page.getByRole("button", { name: "Modeling tools", exact: true }).click();
+  await chooseModifyTool(page, "Face tools / rotation pivot");
   await page.getByRole("button", { name: "Pick face pivot", exact: true }).click();
   await page.waitForTimeout(350);
   const canvas = page.locator(".workplane-wrap canvas");
@@ -259,7 +260,7 @@ test("face pivot rotates around the picked face and lay-flat is undoable", async
   await page.keyboard.press("r");
   await expect.poll(async () => Math.abs((await scene(page)).shapes[0].x)).toBeGreaterThan(1);
   await page.getByRole("button", { name: "Undo", exact: true }).click();
-  await page.getByRole("button", { name: "Modeling tools", exact: true }).click();
+  await chooseModifyTool(page, "Face tools / rotation pivot");
   await page.getByRole("button", { name: "Lay flat on face", exact: true }).click();
   await page.touchscreen.tap(box.x + box.width / 2, box.y + box.height / 2);
   await expect(page.locator(".editor-toast")).toContainText("Laid selection flat");
@@ -271,8 +272,8 @@ test("phone modeling tools fit the viewport and create a pattern by touch", asyn
   await page.setViewportSize({ width: 390, height: 844 });
   await page.getByRole("button", { name: "Add shape", exact: true }).tap();
   await page.getByRole("button", { name: "Box", exact: true }).tap();
-  await page.getByRole("button", { name: "Modeling tools", exact: true }).tap();
-  const panel = page.getByRole("complementary", { name: "Modeling tools", exact: true });
+  await chooseModifyTool(page, "3D pattern / array", true);
+  const panel = page.getByRole("complementary", { name: "3D pattern", exact: true });
   const bounds = (await panel.boundingBox())!;
   expect(bounds.x).toBeGreaterThanOrEqual(0);
   expect(bounds.x + bounds.width).toBeLessThanOrEqual(390);
@@ -289,7 +290,7 @@ test("circular patterns use a picked workplane center and preserve settings when
   await page.getByRole("button", { name: "Box", exact: true }).click();
   await page.getByRole("button", { name: "Center view on selection", exact: true }).click();
   await page.keyboard.press("5");
-  await page.getByRole("button", { name: "Modeling tools", exact: true }).click();
+  await chooseModifyTool(page, "3D pattern / array");
   await page.getByLabel("3D pattern type", { exact: true }).selectOption("circular");
   await page.getByLabel("Circular pattern count", { exact: true }).fill("2");
   await page.getByRole("button", { name: "Pick center on workplane", exact: true }).click();

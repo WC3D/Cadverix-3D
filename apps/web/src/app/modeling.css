@@ -5,6 +5,16 @@
 .modeling-tools input:not([type=checkbox]),.modeling-tools select { width:100%; background:var(--tile); color:var(--foreground); border:1px solid var(--border); padding:6px; border-radius:4px; }
 .modeling-tools button { margin:3px; padding:7px; border:1px solid var(--border); background:var(--tile); color:var(--foreground); border-radius:4px; }
 .modeling-tools p { font-size:12px; margin:6px 0; }
+.modeling-tool-picker { display:grid; gap:6px; margin-top:10px; }
+.modeling-tool-picker button { text-align:left; }
+.solid-modifier-panel header,.solid-modifier-panel footer { position:sticky; z-index:1; background:var(--panel); padding-block:4px; }
+.solid-modifier-panel header { top:-12px; }
+.solid-modifier-panel footer { bottom:-12px; display:flex; gap:6px; }
+.modifier-face-list { max-height:240px; overflow:auto; }
+.modifier-face-list label { display:flex; align-items:center; gap:6px; }
+.modifier-face-list small { display:block; color:var(--muted-strong); }
+.solid-modifier-panel button:disabled { opacity:.45; }
+.solid-modifier-panel :focus-visible { outline:2px solid var(--primary); outline-offset:2px; }
 .pattern-pick-prompt { position:absolute; z-index:45; top:12px; left:50%; transform:translateX(-50%); max-width:80%; padding:8px; border:1px solid var(--border); border-radius:6px; background:var(--panel); color:var(--foreground); font-size:13px; }
 .pattern-pick-prompt button { margin-left:8px; padding:6px; border:1px solid var(--border); border-radius:4px; background:var(--tile); color:var(--foreground); }
 .printer-status { position:absolute; bottom:45px; left:12px; z-index:10; pointer-events:none; background:var(--panel); color:var(--foreground); padding:5px 8px; border-radius:4px; font-size:12px; max-width:60%; }

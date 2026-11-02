@@ -1,4 +1,5 @@
 import { expect, test } from "@playwright/test";
+import { chooseModifyTool } from "./helpers/modifyTools";
 import type { CadModifierWorkerRequest, CadModifierWorkerResponse } from "../../apps/web/src/lib/cadModifierTypes";
 
 type Probe = Window & {
@@ -54,7 +55,7 @@ for (const kind of ["Chamfer", "Fillet"] as const) for (const multiSelect of [fa
   await page.keyboard.press("o");
   await page.keyboard.press("Shift+f");
   if (multiSelect) await page.getByRole("button", { name: "Multi-select", exact: true }).tap();
-  await page.getByRole("button", { name: kind, exact: true }).click();
+  await chooseModifyTool(page, kind);
   await expect(page.getByRole("button", { name: "All sharp edges", exact: true })).toBeEnabled({ timeout: 60_000 });
   const selected = await page.evaluate(() => {
     const probe = window as Probe;

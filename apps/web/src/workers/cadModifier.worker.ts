@@ -6,6 +6,8 @@ import { CAD_MODIFIER_MIN_AMOUNT, CAD_MODIFIER_RUNTIME_BASE, cadModifierMeshFall
 import { closedCadSolidComponents } from "@/lib/cadModifierGroups";
 import { planarRimChamferPlan, planarRimFilletPlan } from "@/lib/cadPlanarRim";
 import { cutPlanarCadRim } from "@/lib/cadPlanarRimKernel";
+import { cadFaceList, modifyCadSolid as modifyWholeCadSolid } from "@/lib/cadSolidTools";
+import { validateModifierJob } from "@/lib/layerlingModifierTypes";
 
 const HASH_UPPER_BOUND = 2_147_483_647;
 const CAD_EDGE_WIREFRAME_DEFLECTION = 0.035;
@@ -605,7 +607,7 @@ self.onmessage = async (event: MessageEvent<CadModifierWorkerRequest>) => {
       post({ type: "disposed", requestId: request.requestId });
       return;
     }
-    if (request.type === "prepare" || request.type === "shell") {
+    if (request.type === "prepare" || request.type === "shell" || request.type === "faces" || request.type === "solid-modifier") {
       phase = "reconstructing source geometry";
       let activeCad = cad;
       releaseSession(activeCad);
@@ -631,6 +633,19 @@ self.onmessage = async (event: MessageEvent<CadModifierWorkerRequest>) => {
       // OCCT wraps boolean-fused bodies in a compound even when the result is one solid.
       // Use that solid directly so overlapping grouped parts have one closed modifier body.
       baseShape = baseSolids.length === 1 ? baseSolids[0] : reconstructed;
+      if (request.type === "faces" || request.type === "solid-modifier") {
+        if (baseSolids.length !== 1) throw new Error("This modifier requires one connected CAD solid");
+        if (request.type === "faces") post({ type: "faces", requestId: request.requestId, faces: cadFaceList(activeCad, baseShape) });
+        else {
+          validateModifierJob(request.job);
+          const result = modifyWholeCadSolid(activeCad, baseShape, request.job);
+          const mesh = copyCadMesh(activeCad.tessellate(result.shape, { linearDeflection: 0.035, angularDeflection: 0.15 }));
+          const brep = activeCad.toBREP(result.shape);
+          post({ type: "solid-modifier", requestId: request.requestId, meshes: [{ positions: mesh.positions, indices: mesh.indices, brep }], keepSource: result.separate, hole: "hole" in result ? result.hole : undefined }, [mesh.positions.buffer, mesh.indices.buffer]);
+        }
+        releaseSession(activeCad);
+        return;
+      }
       if (request.type === "shell") {
         phase = "shelling solid";
         if (baseSolids.length !== 1) throw new Error("Shell requires one connected solid");

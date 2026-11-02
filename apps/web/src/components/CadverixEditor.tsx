@@ -68,8 +68,14 @@ import {
 } from "./icons";
 import { WorkplaneViewport, type ViewportCameraMemory } from "./WorkplaneViewport";
 import { DrawingWorkspace } from "./DrawingWorkspace";
-import { ModelingTools } from "./ModelingTools";
+import { ModelingTools, type ModelingToolSection } from "./ModelingTools";
+import { EditorQuickAccess } from "./EditorQuickAccess";
+import { SolidModifierPanel } from "./SolidModifierPanel";
+import { MODIFIER_LABELS, NEW_MODIFIERS, validateModifierJob, type ModifierFace, type ModifierJob, type NewModifier, type SolidModifierResponse } from "@/lib/layerlingModifierTypes";
+import { modifierWorkerRequest } from "@/lib/modifierWorkerRequest";
 import { CommandPalette } from "./CommandPalette";
+import { ToolbarToolMenu } from "./ToolbarToolMenu";
+import { MODIFY_TOOL_GROUPS } from "@/lib/modifyToolGroups";
 import { requireUnlockedObjects } from "@/lib/mcpEditSafety";
 import { carryShapePivot, shapePivotFromWorld, shapePivotWorld } from "@/lib/shapePivot";
 import { DEFAULT_SECTION } from "@/lib/viewportInspection";
@@ -243,6 +249,10 @@ type CadModifierPartInput = {
 };
 type Cuboid = { minX: number; maxX: number; minY: number; maxY: number; minZ: number; maxZ: number };
 type ShapeUpdatePatch = Partial<WorkplaneShape> & { bakeTransform?: boolean };
+type SolidModifierSession = {
+  kind: NewModifier; ids: string[]; fingerprint: string; faces: ModifierFace[]; busy: boolean; error: string | null;
+  preview?: { shapes: WorkplaneShape[]; keepSource: boolean; warning?: string };
+};
 type WithoutRequestId<T> = T extends unknown ? Omit<T, "requestId"> : never;
 type CadModifierWorkerPayload = WithoutRequestId<CadModifierWorkerRequest>;
 type EdgeModifierSession = {
@@ -6305,6 +6315,7 @@ export function CadverixEditor({
     if (workplaneMode) setNoteMode(false);
   }, [workplaneMode]);
   const [modelingToolsOpen, setModelingToolsOpen] = useState(false);
+  const [modelingToolSection, setModelingToolSection] = useState<ModelingToolSection>("tools");
   const [holeSettings, setHoleSettings] = useState(DEFAULT_HOLE_PATTERN);
   const [holeDraft, setHoleDraft] = useState<{ sourceId: string; fingerprint: string; projectId: string | null | undefined; cutters: WorkplaneShape[] } | null>(null);
   const [holeBusy, setHoleBusy] = useState(false);
@@ -6312,6 +6323,13 @@ export function CadverixEditor({
   const [section, setSection] = useState(DEFAULT_SECTION);
   const [overhangAngle, setOverhangAngle] = useState<number | null>(null);
   const [patternPreview, setPatternPreview] = useState<WorkplaneShape[]>([]);
+  const [solidModifier, setSolidModifier] = useState<SolidModifierSession | null>(null);
+  const solidModifierAbortRef = useRef<AbortController | null>(null);
+  const solidModifierRunRef = useRef(0);
+  useEffect(() => {
+    setSolidModifier(null);
+    return () => { solidModifierRunRef.current++; solidModifierAbortRef.current?.abort(); };
+  }, [projectId, selectedIds.join("|")]);
   const [faceAction, setFaceAction] = useState<"flat" | "pivot" | "holes" | null>(null);
   const [sessionFacePivot, setFacePivot] = useState<THREE.Vector3 | null>(null);
   const [patternCenter, setPatternCenter] = useState<THREE.Vector3 | null>(null);
@@ -11508,7 +11526,7 @@ export function CadverixEditor({
         const cutters = result.cutters.map((mesh, index) => meshComponentShape({ ...target, hole: true, name: `Pattern hole ${index + 1}` }, { ...mesh, name: "Pattern hole" }, mesh.faces.map((_, index) => index), 0, 1)).filter((shape): shape is WorkplaneShape => Boolean(shape));
         setHoleDraft({ sourceId: target.id, fingerprint: projectShapesFingerprint([target]), projectId, cutters });
         setPatternPreview(cutters.map((shape) => ({ ...shape, locked: true })));
-        setModelingToolsOpen(true); setNotice(`Previewing ${cutters.length} holes. Create hole pattern to cut the selected body.`);
+        setModelingToolSection("holes"); setModelingToolsOpen(true); setNotice(`Previewing ${cutters.length} holes. Create hole pattern to cut the selected body.`);
       } catch (error) { setHoleDraft(null); setPatternPreview([]); setNotice(error instanceof Error ? error.message : "Could not preview hole pattern"); }
     } else if (faceAction === "pivot") {
       if (selectedShapes.length === 1) {
@@ -11551,6 +11569,108 @@ export function CadverixEditor({
       setHoleDraft(null); setPatternPreview([]);
     } catch (error) { setNotice(error instanceof Error ? error.message : "Hole pattern failed; original retained"); }
     finally { setHoleBusy(false); }
+  };
+
+  const closeSolidModifier = () => {
+    solidModifierRunRef.current++;
+    solidModifierAbortRef.current?.abort();
+    solidModifierAbortRef.current = null;
+    setSolidModifier(null);
+  };
+  const showModelingTools = (section?: ModelingToolSection) => {
+    closeSolidModifier(); cancelShellRef.current?.(); holeRunRef.current++;
+    setHoleDraft(null); setPatternPreview([]);
+    if (pickingPatternCenter) { setPickingPatternCenter(false); setWorkplaneMode(false); }
+    setModelingToolSection(section ?? "tools");
+    setModelingToolsOpen((open) => section ? true : !open || modelingToolSection !== "tools");
+  };
+  const cadPartsForModifier = (sources: WorkplaneShape[]) => {
+    const inputs = sources.map((source): CadModifierPartInput => {
+      const mesh = meshForShape(source), primitive = !shapeHasTaper(source) ? cadModifierPrimitiveForShape(source) : null;
+      const stepTransform = cadImportedStepTransformForShape(source);
+      if (primitive) return { shape: source, primitive, mesh };
+      if (source.cadBrep && !shapeHasTaper(source)) return { shape: source, mesh, brep: source.cadBrep, brepTransform: cadBrepTransformForShape(source) };
+      if (source.importedMesh?.brepStep && stepTransform && !shapeHasTaper(source)) return { shape: source, mesh, step: source.importedMesh.brepStep, brepTransform: stepTransform };
+      return { shape: source, mesh };
+    });
+    const transfer = cadModifierTransferParts(inputs);
+    if (transfer.requiredMeshTriangleCount > 4000) throw new Error("This CAD operation needs an exact STEP body or fewer than 4,000 mesh triangles. Use Simplify mesh first.");
+    return transfer.parts;
+  };
+  const openSolidModifier = async (kind: NewModifier) => {
+    closeSolidModifier();
+    const sources = shapesRef.current.filter((shape) => selectedIdsRef.current.includes(shape.id));
+    if (sources.some((shape) => shape.pcbInstance || shape.imagePlate)) { setNotice("Detach linked PCB references or select a solid instead of an image plate before modifying geometry"); return; }
+    if (!sources.length || sources.some((shape) => shape.locked || isReferenceShape(shape)) || !sources.some((shape) => !shape.hole)) { setNotice("Select unlocked solid model objects first"); return; }
+    if (!["flexi", "lid", "cookie"].includes(kind) && sources.length !== 1) { setNotice("Select one body for this modifier"); return; }
+    cancelShellRef.current?.();
+    if (edgeModifier) cancelEdgeModifier();
+    setAlignMode(false); setMirrorMode(false);
+    setModelingToolsOpen(false); setPatternPreview([]); setHoleDraft(null); setPickingPatternCenter(false); setWorkplaneMode(false);
+    const session: SolidModifierSession = { kind, ids: sources.map((shape) => shape.id), fingerprint: projectShapesFingerprint(sources), faces: [], busy: kind === "face" || kind === "deleteFace", error: null };
+    setSolidModifier(session);
+    if (!session.busy) return;
+    const run = ++solidModifierRunRef.current, controller = new AbortController();
+    solidModifierAbortRef.current = controller;
+    try {
+      const parts = cadPartsForModifier(sources);
+      const worker = new Worker(new URL("../workers/cadModifier.worker.ts", import.meta.url), { type: "module" });
+      const result = await modifierWorkerRequest<Extract<CadModifierWorkerResponse, { type: "faces" }>>(worker, { type: "faces", requestId: 1, parts }, controller.signal);
+      if (run !== solidModifierRunRef.current) return;
+      setSolidModifier({ ...session, busy: false, faces: result.faces });
+    } catch (error) {
+      if (run === solidModifierRunRef.current) setSolidModifier({ ...session, busy: false, error: error instanceof Error ? error.message : "Cannot load CAD faces" });
+    }
+  };
+  const previewSolidModifier = async (job: ModifierJob) => {
+    const session = solidModifier;
+    if (!session || session.busy || session.kind !== job.kind) return;
+    const sources = shapesRef.current.filter((shape) => session.ids.includes(shape.id));
+    const run = ++solidModifierRunRef.current, controller = new AbortController();
+    solidModifierAbortRef.current?.abort(); solidModifierAbortRef.current = controller;
+    setSolidModifier({ ...session, busy: true, error: null, preview: undefined });
+    try {
+      validateModifierJob(job);
+      if (projectShapesFingerprint(sources) !== session.fingerprint) throw new Error("The source changed. Close and reopen the modifier.");
+      let response: Exclude<SolidModifierResponse, { error: string }> & { hole?: boolean };
+      if (job.kind === "offset" || job.kind === "deleteFace" || job.kind === "face") {
+        const parts = cadPartsForModifier(sources);
+        const worker = new Worker(new URL("../workers/cadModifier.worker.ts", import.meta.url), { type: "module" });
+        response = await modifierWorkerRequest<Extract<CadModifierWorkerResponse, { type: "solid-modifier" }>>(worker, { type: "solid-modifier", requestId: 1, parts, job }, controller.signal);
+      } else {
+        const parts = sources.map((shape) => ({ ...meshDataToCadTransfer(meshForShape(shape)), hole: Boolean(shape.hole) }));
+        const worker = new Worker(new URL("../workers/solidModifier.worker.ts", import.meta.url), { type: "module" });
+        response = await modifierWorkerRequest<Exclude<SolidModifierResponse, { error: string }>>(worker, { parts, job, assetBase: new URL(".", window.location.href).href }, controller.signal);
+      }
+      if (run !== solidModifierRunRef.current) return;
+      const current = shapesRef.current.filter((shape) => session.ids.includes(shape.id));
+      if (projectShapesFingerprint(current) !== session.fingerprint) throw new Error("The source changed during calculation. Close and reopen the modifier.");
+      const source = sources.find((shape) => !shape.hole)!;
+      const results = response.meshes.map((mesh, index) => {
+        const positions = Array.from(mesh.indices).flatMap((id) => [mesh.positions[id * 3], mesh.positions[id * 3 + 1], mesh.positions[id * 3 + 2]]);
+        const id = !response.keepSource && index === 0 ? source.id : createLocalId(`${source.id}-${job.kind}`);
+        const seed = splitShapeFromWorldPositions(source, positions, id, mesh.suffix ? `${source.name} ${mesh.suffix}` : source.name);
+        if (!seed) throw new Error("Modifier produced no usable geometry");
+        const result = mesh.brep ? shapeFromCadMesh(seed, mesh.positions, new Float32Array(), mesh.indices, mesh.brep) : seed;
+        if (!result) throw new Error("Modifier produced an invalid mesh");
+        const clean = canonicalizeShape({ ...result, hole: response.hole || undefined, hidden: false });
+        return clean.id === source.id ? carryShapePivot(source, clean) : clean;
+      });
+      if (!results.length) throw new Error("Modifier produced no bodies");
+      setSolidModifier({ ...session, busy: false, error: null, preview: { shapes: results, keepSource: response.keepSource, warning: response.warning } });
+      setNotice(`Preview: ${MODIFIER_LABELS[job.kind]}. Apply to save, or Cancel to retain the original. ${response.warning ?? ""}`);
+    } catch (error) {
+      if (run === solidModifierRunRef.current) setSolidModifier({ ...session, busy: false, preview: undefined, error: error instanceof Error ? error.message : "Modifier failed; original retained" });
+    }
+  };
+  const applySolidModifier = () => {
+    const session = solidModifier;
+    if (!session?.preview || session.busy) return;
+    const sources = shapesRef.current.filter((shape) => session.ids.includes(shape.id));
+    if (sources.some((shape) => shape.locked) || projectShapesFingerprint(sources) !== session.fingerprint) { setSolidModifier({ ...session, preview: undefined, error: "The source changed. Close and reopen the modifier." }); return; }
+    const result = session.preview;
+    closeSolidModifier();
+    commitShapes([...shapesRef.current.filter((shape) => result.keepSource || !session.ids.includes(shape.id)), ...result.shapes], result.shapes.map((shape) => shape.id), `Applied ${MODIFIER_LABELS[session.kind]}. ${result.warning ?? ""}`);
   };
 
   const applyShell = async (thickness: number, opening: "top" | "bottom" | "both" | "closed") => {
@@ -11812,6 +11932,9 @@ export function CadverixEditor({
   return (
     <div className={`cadverix-editor${toolbarMode === "pcb" ? " pcb-active" : ""}`} style={themeStyles}>
       <SecondaryToolbar
+        onSolidModifier={(kind) => { void openSolidModifier(kind); }}
+        themeId={workspaceSettings.themeId ?? "sketchforge"}
+        onThemeChange={(themeId) => updateProjectWorkspaceSettings({ workspace: { ...workspaceSettingsRef.current, themeId, ...(themeId === "custom" ? { customTheme: customThemeWithDefaults(workspaceSettingsRef.current.customTheme ?? activeTheme) } : {}) }, snap: snapGridRef.current })}
         toolbarMode={toolbarMode}
         drawingToolbarRef={setDrawingToolbarHost}
         pcbToolbarRef={setPcbToolbarHost}
@@ -11819,6 +11942,7 @@ export function CadverixEditor({
         onProjectNameChange={onProjectNameChange}
         showProjectNameInToolbar={showProjectNameInToolbar}
         onToolbarModeChange={(mode) => {
+          closeSolidModifier();
           if (mode === "pcb") { if (sketchActive) return; if (edgeModifier) cancelEdgeModifier(); setModelingToolsOpen(false); }
           if (mode !== "geometry" && pickingPatternCenter) { setPickingPatternCenter(false); setWorkplaneMode(false); }
           if (mode === "drawing") {
@@ -11894,8 +12018,8 @@ export function CadverixEditor({
         onSketchRectangularPattern={() => openSketchCommand("rectangular-pattern")}
         onSketchCircularPattern={() => openSketchCommand("circular-pattern")}
         onHome={onHome}
-        onAlign={toggleAlignMode}
-        onChamfer={() => edgeModifier?.kind === "chamfer" ? cancelEdgeModifier() : startEdgeModifier("chamfer")}
+        onAlign={() => { closeSolidModifier(); toggleAlignMode(); }}
+        onChamfer={() => { closeSolidModifier(); edgeModifier?.kind === "chamfer" ? cancelEdgeModifier() : startEdgeModifier("chamfer"); }}
         onCopy={copySelected}
         onDelete={deleteSelected}
         onDuplicate={duplicateSelected}
@@ -11904,14 +12028,14 @@ export function CadverixEditor({
         onGroup={groupSelected}
         onBodiesSplit={separateSelectedParts}
         onIntersect={intersectSelected}
-        onFillet={() => edgeModifier?.kind === "fillet" ? cancelEdgeModifier() : startEdgeModifier("fillet")}
-        onMirror={toggleMirrorMode}
-        onModelingTools={() => { setPatternPreview([]); if (pickingPatternCenter) { setPickingPatternCenter(false); setWorkplaneMode(false); } setModelingToolsOpen((open) => !open); }}
+        onFillet={() => { closeSolidModifier(); edgeModifier?.kind === "fillet" ? cancelEdgeModifier() : startEdgeModifier("fillet"); }}
+        onMirror={() => { closeSolidModifier(); toggleMirrorMode(); }}
+        onModelingTools={showModelingTools}
         onSketchClipboard={sketchClipboardAction}
         onSculptBrushChange={(brush) => setSculptSession((current) => current ? { ...current, brush } : null)}
         onSculptRadiusChange={(radius) => setSculptSession((current) => current ? { ...current, radius } : null)}
         onSculptStrengthChange={(strength) => setSculptSession((current) => current ? { ...current, strength } : null)}
-        onSplit={toggleSplitMode}
+        onSplit={() => { closeSolidModifier(); toggleSplitMode(); }}
         onPaste={pasteShape}
         onRedo={redo}
         onSnap={snapSelected}
@@ -11921,7 +12045,7 @@ export function CadverixEditor({
         onToggleHidden={toggleHidden}
         onUngroup={ungroupSelected}
         onUndo={undo}
-        onWorkplaneTool={activateConstructionPlaneTool}
+        onWorkplaneTool={() => { closeSolidModifier(); activateConstructionPlaneTool(); }}
         workplaneMode={workplaneMode || constructionPlanePanelOpen}
         onTopPanel={(panel) => {
           setTopPanel((current) => (current === panel ? null : panel));
@@ -12136,7 +12260,7 @@ export function CadverixEditor({
           <WorkplaneViewport
             theme={activeTheme}
             externalWorkspace={workspaceSettings}
-          shapes={patternPreview.length ? [...viewportShapes, ...patternPreview] : viewportShapes}
+          shapes={solidModifier?.preview ? [...viewportShapes.filter((shape) => solidModifier.preview!.keepSource || !solidModifier.ids.includes(shape.id)), ...solidModifier.preview.shapes.map((shape) => ({ ...shape, locked: true }))] : patternPreview.length ? [...viewportShapes, ...patternPreview] : viewportShapes}
           selectedIds={selectedIds}
           alignMode={alignMode}
           alignAnchorId={effectiveAlignAnchorId}
@@ -12194,7 +12318,7 @@ export function CadverixEditor({
            onShapeInspectorCollapsedChange={setShapeInspectorCollapsed}
           onWorkspaceSettingsChange={updateProjectWorkspaceSettings}
           onWorkplaneModeChange={(active) => { closeViewportWorkplaneMode(active); if (!active) { setFaceAction(null); setPickingPatternCenter(false); } }}
-          modifierActive={Boolean(edgeModifier)}
+          modifierActive={Boolean(edgeModifier || solidModifier)}
           modifierPreviewActive={Boolean(edgeModifier?.preview)}
            modifierEdges={viewportModifierEdges}
            selectedModifierEdgeIds={viewportSelectedEdgeIds}
@@ -12204,7 +12328,15 @@ export function CadverixEditor({
           resolvedTheme={resolvedTheme}
           />
         )}
+        {toolbarMode === "geometry" && solidModifier ? <SolidModifierPanel
+          key={`${solidModifier.kind}:${solidModifier.fingerprint}`} kind={solidModifier.kind} faces={solidModifier.faces} busy={solidModifier.busy} canApply={Boolean(solidModifier.preview)} error={solidModifier.error}
+          previewInfo={solidModifier.preview ? `${solidModifier.preview.shapes.length} bodies · ${solidModifier.preview.shapes.reduce((sum, shape) => sum + (shape.importedMesh?.triangleCount ?? 0), 0).toLocaleString()} triangles. ${solidModifier.preview.warning ?? ""}` : undefined}
+          onChange={() => setSolidModifier((current) => current ? { ...current, preview: undefined, error: null } : current)}
+          onPreview={(job) => { void previewSolidModifier(job); }} onApply={applySolidModifier} onClose={closeSolidModifier}
+        /> : null}
         {toolbarMode === "geometry" && modelingToolsOpen ? <ModelingTools
+          activeSection={modelingToolSection}
+          onSelectSection={showModelingTools}
           holeSettings={holeSettings} onHoleSettings={(settings) => { setHoleSettings(settings); setHoleDraft(null); setPatternPreview([]); }}
           holeCount={holeDraft?.cutters.length ?? 0} holeBusy={holeBusy} onApplyHoles={applyHolePattern}
           onClearHoles={() => { setHoleDraft(null); setPatternPreview([]); }}
@@ -12750,6 +12882,9 @@ const sketchShapeMenuItems = [
 ] satisfies Array<{ primitive: SketchPrimitive; label: string; icon: typeof SquareIcon }>;
 
 function SecondaryToolbar({
+  onSolidModifier,
+  themeId,
+  onThemeChange,
   onModelingTools,
   onSketchClipboard,
   toolbarMode,
@@ -12842,7 +12977,10 @@ function SecondaryToolbar({
   onAddShape,
 }: {
   toolbarMode: ToolbarMode;
-  onModelingTools: () => void;
+  themeId: string;
+  onThemeChange: (themeId: string) => void;
+  onModelingTools: (section?: ModelingToolSection) => void;
+  onSolidModifier: (kind: NewModifier) => void;
   onSketchClipboard: (action: "copy" | "cut" | "paste" | "duplicate") => void;
   drawingToolbarRef: (element: HTMLDivElement | null) => void;
   pcbToolbarRef: (element: HTMLDivElement | null) => void;
@@ -12936,6 +13074,8 @@ function SecondaryToolbar({
   const [generatorsOpen, setGeneratorsOpen] = useState(false);
   const [sketchCreateOpen, setSketchCreateOpen] = useState(false);
   const [visibilityOpen, setVisibilityOpen] = useState(false);
+  const [modifyMenu, setModifyMenu] = useState<string | null>(null);
+  useEffect(() => { setModifyMenu(null); }, [toolbarMode]);
   const shapesMenuRef = useRef<HTMLDivElement>(null);
   const generatorsMenuRef = useRef<HTMLDivElement>(null);
   const sketchCreateMenuRef = useRef<HTMLDivElement>(null);
@@ -12973,6 +13113,7 @@ function SecondaryToolbar({
     if (nextName !== projectName) onProjectNameChange?.(nextName);
   };
   const selectToolbarMode = (mode: ToolbarMode) => {
+    setModifyMenu(null);
     setShapesOpen(false);
     setGeneratorsOpen(false);
     setSketchCreateOpen(false);
@@ -13102,10 +13243,15 @@ function SecondaryToolbar({
   const modifyTools = [
     { label: "Align", icon: ToolbarAlignIcon, action: onAlign, enabled: canAlign && geometryActionsEnabled, active: alignMode },
     { label: "Mirror", icon: ToolbarMirrorIcon, action: onMirror, enabled: hasSelection && geometryActionsEnabled, active: mirrorMode },
-    { label: "Modeling tools", icon: ToolbarDuplicateIcon, action: onModelingTools, enabled: geometryActionsEnabled },
+    { label: "3D pattern / array", icon: Grid2X2, action: () => onModelingTools("pattern"), enabled: hasSelection && geometryActionsEnabled },
+    { label: "Face tools / rotation pivot", icon: RotateCw, action: () => onModelingTools("faces"), enabled: hasSelection && geometryActionsEnabled },
+    { label: "Face hole pattern", icon: CircleDot, action: () => onModelingTools("holes"), enabled: canEdgeModify && geometryActionsEnabled },
+    { label: "Shell / hollow", icon: Square, action: () => onModelingTools("shell"), enabled: canEdgeModify && geometryActionsEnabled },
+    { label: "Modeling tools", icon: ToolbarDuplicateIcon, action: () => onModelingTools(), enabled: geometryActionsEnabled },
     { label: "Snap to grid", icon: ToolbarSnapGridIcon, action: onSnap, enabled: hasSelection && geometryActionsEnabled },
     { label: "Chamfer", icon: ToolbarChamferIcon, action: onChamfer, enabled: canEdgeModify && geometryActionsEnabled, active: edgeModifierKind === "chamfer" },
     { label: "Fillet", icon: ToolbarFilletIcon, action: onFillet, enabled: canEdgeModify && geometryActionsEnabled, active: edgeModifierKind === "fillet" },
+    ...NEW_MODIFIERS.map((kind) => ({ label: MODIFIER_LABELS[kind], icon: kind === "texture" ? Paintbrush : kind === "flexi" ? Route : kind === "cookie" ? Scissors : kind === "lid" ? ToolbarBodiesSplitIcon : kind === "deleteFace" ? ToolbarTrashIcon : kind === "face" ? MoveRight : kind === "simplify" ? TriangleIcon : CopyPlus, action: () => onSolidModifier(kind), enabled: hasSelection && geometryActionsEnabled })),
   ];
   const arrangeTools = [
     { label: "Workplane", icon: ToolbarWorkplaneIcon, action: onWorkplaneTool, enabled: geometryActionsEnabled, active: workplaneMode },
@@ -13334,7 +13480,15 @@ function SecondaryToolbar({
         </div>
         <div className="toolbar-section" data-tool-group="modify">
           <div className="toolbar-section-label">Modify</div>
-          <div className="toolbar-section-tools">{modifyTools.map(renderToolButton)}</div>
+          <div className="toolbar-section-tools">{MODIFY_TOOL_GROUPS.map((group) => <ToolbarToolMenu
+            key={group.label} label={group.label} icon={{ Transform: ToolbarAlignIcon, Shape: ToolbarChamferIcon, Print: ToolbarBodiesSplitIcon, Mesh: TriangleIcon }[group.label]}
+            tools={group.tools.map((label) => modifyTools.find((tool) => tool.label === label)!)}
+            open={modifyMenu === group.label}
+            onOpenChange={(open) => {
+              setModifyMenu(open ? group.label : null);
+              if (open) { setShapesOpen(false); setGeneratorsOpen(false); setSketchCreateOpen(false); setVisibilityOpen(false); onTopPanel(null); }
+            }}
+          />)}</div>
         </div>
         <div className="toolbar-section" data-tool-group="arrange">
           <div className="toolbar-section-label">Arrange</div>
@@ -13717,6 +13871,7 @@ function SecondaryToolbar({
             </label>
           </div>
         ) : null}
+        <EditorQuickAccess themeId={themeId} onThemeChange={onThemeChange} />
       </div>
     </div>
   );

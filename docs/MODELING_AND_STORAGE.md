@@ -65,7 +65,7 @@ filament settings, or direct printer connections. The catalog works offline.
 
 ## 3D patterns and face tools
 
-Open **Geometry → Modify → Modeling tools**.
+Open **Geometry → Modify → Transform → 3D pattern / array** or **Face tools / rotation pivot** for the matching focused panel. **Shape → Modeling tools** opens a compact chooser; inspection and reusable shapes have separate panels there. **All modeling tools** returns to the chooser without showing unrelated controls.
 
 ### Patterns
 
@@ -99,7 +99,7 @@ Open **Geometry → Modify → Modeling tools**.
 
 ## Shelling / hollowing
 
-In **Modeling tools → Shell / hollow**, select one unlocked solid, choose wall
+In **Geometry → Modify → Shape → Shell / hollow**, select one unlocked solid, choose wall
 thickness and **Top**, **Bottom**, **Top and bottom**, or **Closed cavity**, then
 press **Apply shell**. Openings are horizontal end faces along the vertical Z axis; use
 Lay flat first when necessary.
