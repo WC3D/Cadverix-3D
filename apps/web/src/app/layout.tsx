@@ -7,6 +7,7 @@ import "./modeling.css";
 import "./offline.css";
 import "../pcb/vendor/scoped.css";
 import "./pcb.css";
+import "./inventor.css";
 
 const STATIC_EXPORT = process.env.NEXT_PUBLIC_STATIC_EXPORT === "true";
 const INSTALL_EVENTS = `window.addEventListener("beforeinstallprompt",function(event){event.preventDefault();window.cadverixInstallPrompt=event;window.dispatchEvent(new Event("cadverix-install-available"));});window.addEventListener("appinstalled",function(){window.cadverixInstallPrompt=null;});`;

@@ -18,20 +18,7 @@
 }
 .modify-menu-trigger > :first-child,.modify-tool-option > :first-child { flex-shrink:0; }
 .toolbar-icon .modify-menu-caret { width:12px; height:12px; }
-.modify-tool-dropdown {
-  z-index:100; display:grid; gap:4px; padding:6px;
-  border:1px solid var(--border); border-radius:10px;
-  color:var(--foreground); background:var(--panel); box-shadow:var(--shadow);
-}
-.modify-tool-option {
-  display:flex; align-items:center; gap:12px; width:100%; min-height:52px;
-  padding:4px 8px; border-radius:6px; background:var(--tile); color:var(--foreground);
-  font-size:13px; text-align:left; cursor:pointer;
-}
-.modify-tool-option > svg { width:43px; height:43px; flex-shrink:0; }
-.modify-tool-option:is(:hover, :focus-visible, .active):not(:disabled) {
-  background:var(--tile-hover); outline:2px solid var(--tool-accent); outline-offset:-2px;
-}
+.modify-tool-dropdown { z-index:100; }
 .modify-tool-option:disabled { opacity:.45; cursor:default; }
 
 .toolbar-title-row { overflow-x: auto; scrollbar-width: none; }
@@ -188,8 +175,19 @@
   white-space: normal;
   overflow-wrap: anywhere;
 }
-.shape-menu-dropdown.shape-palette .shape-menu-item:hover,
-.shape-menu-dropdown.shape-palette .shape-menu-item:focus-visible {
+.shape-menu-dropdown.shape-palette .modify-tool-art,
+.shape-menu-dropdown.shape-palette .modify-tool-art > :first-child {
+  width:52px; height:52px; flex-shrink:0; pointer-events:none;
+}
+.shape-menu-dropdown.shape-palette .modify-tool-option.active {
+  border-color:var(--tool-accent);
+  background:color-mix(in srgb, var(--tool-accent) 12%, var(--tile));
+}
+.shape-menu-dropdown.shape-palette .modify-tool-option:disabled {
+  background:var(--tile); border-color:var(--border); outline:none; box-shadow:none; transform:none;
+}
+.shape-menu-dropdown.shape-palette .shape-menu-item:hover:not(:disabled),
+.shape-menu-dropdown.shape-palette .shape-menu-item:focus-visible:not(:disabled) {
   background: color-mix(in srgb, var(--tool-accent) 12%, var(--tile));
   border-color: var(--tool-accent);
   outline: 2px solid var(--tool-accent);
@@ -216,6 +214,8 @@
     font-size: 14px;
   }
   .shape-menu-dropdown.shape-palette .shape-menu-item img { width: 44px; height: 44px; }
+  .shape-menu-dropdown.shape-palette .modify-tool-art,
+  .shape-menu-dropdown.shape-palette .modify-tool-art > :first-child { width:44px; height:44px; }
   .shape-menu-dropdown.shape-palette .shape-menu-title { height: 48px; font-size: 19px; }
 }
 @media (max-width: 359px) {

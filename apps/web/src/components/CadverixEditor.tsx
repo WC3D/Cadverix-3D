@@ -11930,7 +11930,7 @@ export function CadverixEditor({
   ]);
 
   return (
-    <div className={`cadverix-editor${toolbarMode === "pcb" ? " pcb-active" : ""}`} style={themeStyles}>
+    <div className={`cadverix-editor${toolbarMode === "pcb" ? " pcb-active" : ""}`} data-theme-preset={activeTheme.id} style={themeStyles}>
       <SecondaryToolbar
         onSolidModifier={(kind) => { void openSolidModifier(kind); }}
         themeId={workspaceSettings.themeId ?? "sketchforge"}

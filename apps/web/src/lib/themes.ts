@@ -55,7 +55,7 @@ export const THEME_PRESET_OPTIONS = [
 ] as const;
 
 export function appColorModeForThemePreset(themeId: string): "light" | "dark" {
-  return themeId === "sketchforge" ? "dark" : "light";
+  return themeId === "sketchforge" || themeId === "inventor" ? "dark" : "light";
 }
 
 export const defaultThemes: Record<string, AppTheme> = {

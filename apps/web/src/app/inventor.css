@@ -1,0 +1,68 @@
+/* Inventor uses dark-mode artwork with its own blue surfaces and gold accents. */
+.cadverix-editor[data-theme-preset="inventor"] :is(.secondary-toolbar, .toolbar-mode-content, .sketch-toolbar-ribbon) {
+  color:var(--foreground); background:var(--subbar); border-color:var(--border);
+}
+.cadverix-editor[data-theme-preset="inventor"] :is(.toolbar-workspace-tabs button, .toolbar-section-label, .toolbar-project-name-field input, .action-icon-button, .inspector-header-icon) {
+  color:var(--foreground);
+}
+.cadverix-editor[data-theme-preset="inventor"] .toolbar-workspace-tabs button.active {
+  color:var(--primary); background:var(--panel); border-bottom-color:var(--active-tab);
+}
+.cadverix-editor[data-theme-preset="inventor"] .toolbar-project-name-field input:focus,
+.cadverix-editor[data-theme-preset="inventor"] .toolbar-project-name-field:hover input {
+  border-bottom-color:var(--primary);
+}
+.cadverix-editor[data-theme-preset="inventor"] :is(.shape-inspector, .camera-controls, .editor-toast, .snap-menu) {
+  color:var(--foreground); background:var(--background); border-color:var(--border);
+}
+.cadverix-editor[data-theme-preset="inventor"] :is(.scene-overview-sidebar, .shape-inspector-header, .property-card, .color-card, .shape-state-card, .shape-floating-controls, .shape-mini-tools) {
+  color:var(--foreground); background:var(--panel); border-color:var(--border);
+}
+.cadverix-editor[data-theme-preset="inventor"] :is(.property-card-header, .color-card-header, .gear-type-property, .range-property, .range-property-name, .text-property, .select-property, .range-value-unit, .color-value, .shape-state-card button, .camera-controls button, .snap-row, .snap-menu button) {
+  color:var(--foreground);
+}
+.cadverix-editor[data-theme-preset="inventor"] :is(.scene-sidebar-actions button, .scene-sidebar-header > div > span, .scene-feature-section-label),
+.cadverix-editor[data-theme-preset="inventor"] .scene-shape-row:is(.selected, :hover) .scene-shape-copy small {
+  color:var(--foreground);
+}
+.cadverix-editor[data-theme-preset="inventor"] :is(.range-value-control, .range-value-control input, .text-property input, .select-property select, .snap-select, .custom-color, .shape-control-cluster button, .gear-type-options button) {
+  color:var(--foreground); background:var(--background); border-color:var(--muted);
+}
+.cadverix-editor[data-theme-preset="inventor"] :is(.range-value-control:focus-within, .text-property input:focus, .select-property select:focus) {
+  border-color:var(--primary); box-shadow:0 0 0 2px var(--workplane-soft);
+}
+.cadverix-editor[data-theme-preset="inventor"] :is(.shape-state-card button.active, .gear-type-options button.selected) {
+  color:var(--primary); background:var(--panel);
+}
+.cadverix-editor[data-theme-preset="inventor"] .shape-state-card button.active :is(.large-solid-swatch, .large-hole-swatch),
+.cadverix-editor[data-theme-preset="inventor"] .gear-type-options button.selected {
+  border-color:var(--primary);
+}
+.cadverix-editor[data-theme-preset="inventor"] .inspector-snap-dock {
+  background:var(--background); border-color:var(--border);
+}
+.cadverix-editor[data-theme-preset="inventor"] :is(.property-card-header, .inspector-header-icon, .shape-state-card button, .camera-controls button):hover:not(:disabled) {
+  color:var(--nav-text); background:var(--tile-hover);
+}
+.cadverix-editor[data-theme-preset="inventor"] .range-control input[type="range"]::-webkit-slider-runnable-track {
+  background:linear-gradient(to right, var(--primary) 0 var(--slider-pos), var(--muted) var(--slider-pos) 100%);
+}
+.cadverix-editor[data-theme-preset="inventor"] .range-control input[type="range"]::-webkit-slider-thumb {
+  border-color:var(--primary);
+}
+.cadverix-editor[data-theme-preset="inventor"] .range-control input[type="range"]::-moz-range-track {
+  background:var(--muted);
+}
+.cadverix-editor[data-theme-preset="inventor"] .range-control input[type="range"]::-moz-range-progress {
+  background:var(--primary);
+}
+.cadverix-editor[data-theme-preset="inventor"] .range-control input[type="range"]::-moz-range-thumb {
+  border-color:var(--primary);
+}
+/* The Inventor workplane remains light even though its surrounding UI is dark. */
+.cadverix-editor[data-theme-preset="inventor"] .transform-guides line {
+  stroke:var(--background);
+}
+.cadverix-editor[data-theme-preset="inventor"] .transform-guides #dimension-arrow path {
+  fill:var(--background);
+}

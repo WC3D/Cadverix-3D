@@ -19,8 +19,10 @@ describe("theme presets", () => {
     expect(defaultThemes.dark).toBeUndefined();
   });
 
-  it("uses app dark mode only for the current preset so legacy presets are not overridden", () => {
+  it("uses dark-mode surfaces for both dark palettes and leaves light presets unchanged", () => {
     expect(appColorModeForThemePreset("sketchforge")).toBe("dark");
+    expect(appColorModeForThemePreset("inventor")).toBe("dark");
+    expect(appColorModeForThemePreset("light")).toBe("light");
     expect(appColorModeForThemePreset("solidworks")).toBe("light");
     expect(appColorModeForThemePreset("custom")).toBe("light");
   });
