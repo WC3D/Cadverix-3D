@@ -26,7 +26,7 @@ export const SKF_HYBRID_FORMAT_VERSION = 4;
 export const SKF_PARAMETRIC_FORMAT_VERSION = 5;
 export const SKF_MINIMUM_READER_VERSION = 2;
 export const SKF_OLDEST_READABLE_FORMAT_VERSION = 1;
-export const SKF_CREATED_WITH_VERSION = "1.21.0";
+export const SKF_CREATED_WITH_VERSION = "1.40.0";
 export const SKF_MEDIA_TYPE = "application/vnd.sketchforge.project+zip";
 export const LYL_MEDIA_TYPE = "application/vnd.layerling.project+zip";
 

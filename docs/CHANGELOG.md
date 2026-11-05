@@ -1,5 +1,10 @@
 # Changelog
 
+## 1.40.0
+
+- Updated the application/package versions, README badge, and SKF `createdWithVersion` metadata to **1.40.0**. SKF format and minimum-reader versions are unchanged.
+- Prepared Windows x64, Linux x64, and macOS Intel/Apple Silicon desktop packages for publication through the existing Desktop Release workflow.
+
 ## 1.21.0
 
 - Added independent named sketches, **Save sketch only**, model-browser edit/extrude actions, and source-linked exact extrusions. Source edits rebuild directly linked extrusions atomically; failed or stale builds retain committed geometry.
