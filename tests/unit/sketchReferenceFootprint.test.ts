@@ -77,6 +77,7 @@ describe("sketch mesh references", () => {
     expect(Math.max(...zs) - Math.min(...zs)).toBeCloseTo(20, 1);
   });
 
+  // Dense-mesh projection exceeds 10 seconds on hosted Intel macOS runners.
   it("keeps the silhouette of a dense imported mesh small and filled", () => {
     const footprint = importedMeshFootprint(meshShape(new SphereGeometry(10, 256, 256), 20, 20), runtime)!;
     const contours = rings(footprint.outlineD!);
@@ -84,7 +85,7 @@ describe("sketch mesh references", () => {
     expect(contours[0].length).toBeLessThanOrEqual(260);
     expect(footprint.fillD).toBe(footprint.outlineD);
     expect(Math.abs(area(contours[0]))).toBeCloseTo(Math.PI * 100, 0);
-  }, 10000);
+  }, 30000);
 
   it("preserves separate components instead of bridging the empty space between them", () => {
     const left = new BoxGeometry(10, 4, 10).translate(-15, 0, 0).toNonIndexed();
